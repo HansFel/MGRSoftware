@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Neuer Einsatz - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4 justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-plus-circle"></i> Neuen Einsatz erfassen
+                </h4>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST" id="einsatzForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="datum" class="form-label">Datum *</label>
+                            <input type="date" class="form-control" id="datum" name="datum" 
+                                   value="{{ heute }}" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="maschine_id" class="form-label">Maschine *</label>
+                            <select class="form-select" id="maschine_id" name="maschine_id" required>
+                                <option value="">Bitte wählen...</option>
+                                {% for maschine in maschinen %}
+                                <option value="{{ maschine.id }}" 
+                                        data-stundenzaehler="{{ maschine.stundenzaehler_aktuell }}">
+                                    {{ maschine.bezeichnung }} ({{ maschine.hersteller or 'unbekannt' }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="einsatzzweck_id" class="form-label">Einsatzzweck *</label>
+                        <select class="form-select" id="einsatzzweck_id" name="einsatzzweck_id" required>
+                            <option value="">Bitte wählen...</option>
+                            {% for zweck in einsatzzwecke %}
+                            <option value="{{ zweck.id }}">{{ zweck.bezeichnung }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="anfangstand" class="form-label">Anfangstand (h) *</label>
+                            <input type="number" class="form-control" id="anfangstand" 
+                                   name="anfangstand" step="0.1" required>
+                            <small class="text-muted" id="aktuellerStand"></small>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="endstand" class="form-label">Endstand (h) *</label>
+                            <input type="number" class="form-control" id="endstand" 
+                                   name="endstand" step="0.1" required>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="betriebsstunden" class="form-label">Betriebsstunden</label>
+                            <input type="text" class="form-control" id="betriebsstunden" 
+                                   readonly style="background-color: #e9ecef;">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="treibstoffverbrauch" class="form-label">
+                                Treibstoffverbrauch (l)
+                            </label>
+                            <input type="number" class="form-control" id="treibstoffverbrauch" 
+                                   name="treibstoffverbrauch" step="0.1">
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="treibstoffkosten" class="form-label">
+                                Treibstoffkosten (€)
+                            </label>
+                            <input type="number" class="form-control" id="treibstoffkosten" 
+                                   name="treibstoffkosten" step="0.01">
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="anmerkungen" class="form-label">Anmerkungen</label>
+                        <textarea class="form-control" id="anmerkungen" name="anmerkungen" 
+                                  rows="3"></textarea>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Abbrechen
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Einsatz speichern
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">
+                    <i class="bi bi-info-circle"></i> Hinweise
+                </h6>
+                <ul class="small text-muted mb-0">
+                    <li>Felder mit * sind Pflichtfelder</li>
+                    <li>Der Anfangstand wird automatisch vom aktuellen Stundenzähler übernommen</li>
+                    <li>Die Betriebsstunden werden automatisch berechnet</li>
+                    <li>Der Stundenzähler der Maschine wird beim Speichern aktualisiert</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Automatisches Setzen des Anfangsstands bei Maschinen-Auswahl
+document.getElementById('maschine_id').addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    const stundenzaehler = selectedOption.dataset.stundenzaehler;
+    
+    if (stundenzaehler) {
+        document.getElementById('anfangstand').value = stundenzaehler;
+        document.getElementById('aktuellerStand').textContent = 
+            `Aktueller Stand: ${parseFloat(stundenzaehler).toFixed(1)} h`;
+        berechneBetriebsstunden();
+    }
+});
+
+// Automatische Berechnung der Betriebsstunden
+function berechneBetriebsstunden() {
+    const anfang = parseFloat(document.getElementById('anfangstand').value) || 0;
+    const ende = parseFloat(document.getElementById('endstand').value) || 0;
+    const stunden = Math.max(0, ende - anfang);
+    document.getElementById('betriebsstunden').value = stunden.toFixed(1) + ' h';
+}
+
+document.getElementById('anfangstand').addEventListener('input', berechneBetriebsstunden);
+document.getElementById('endstand').addEventListener('input', berechneBetriebsstunden);
+
+// Validierung vor dem Absenden
+document.getElementById('einsatzForm').addEventListener('submit', function(e) {
+    const anfang = parseFloat(document.getElementById('anfangstand').value);
+    const ende = parseFloat(document.getElementById('endstand').value);
+    
+    if (ende < anfang) {
+        e.preventDefault();
+        alert('Der Endstand muss größer oder gleich dem Anfangstand sein!');
+        return false;
+    }
+});
+</script>
+{% endblock %}

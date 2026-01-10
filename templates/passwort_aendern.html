@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Passwort ändern - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4 justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-key"></i> Passwort ändern
+                </h4>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="altes_passwort" class="form-label">Altes Passwort</label>
+                        <input type="password" class="form-control" id="altes_passwort" 
+                               name="altes_passwort" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="neues_passwort" class="form-label">Neues Passwort</label>
+                        <input type="password" class="form-control" id="neues_passwort" 
+                               name="neues_passwort" required minlength="4">
+                        <small class="text-muted">Mindestens 4 Zeichen</small>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="neues_passwort_wdh" class="form-label">
+                            Neues Passwort wiederholen
+                        </label>
+                        <input type="password" class="form-control" id="neues_passwort_wdh" 
+                               name="neues_passwort_wdh" required minlength="4">
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Abbrechen
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Passwort ändern
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">
+                    <i class="bi bi-shield-check"></i> Sicherheitshinweise
+                </h6>
+                <ul class="small text-muted mb-0">
+                    <li>Verwenden Sie ein sicheres Passwort</li>
+                    <li>Teilen Sie Ihr Passwort niemals mit anderen</li>
+                    <li>Ändern Sie Ihr Passwort regelmäßig</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Validierung: Passwörter müssen übereinstimmen
+document.querySelector('form').addEventListener('submit', function(e) {
+    const neues = document.getElementById('neues_passwort').value;
+    const wdh = document.getElementById('neues_passwort_wdh').value;
+    
+    if (neues !== wdh) {
+        e.preventDefault();
+        alert('Die neuen Passwörter stimmen nicht überein!');
+        return false;
+    }
+});
+</script>
+{% endblock %}

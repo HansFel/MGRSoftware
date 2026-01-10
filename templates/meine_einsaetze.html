@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Meine Einsätze - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="bi bi-list-ul"></i> Meine Einsätze
+                </h4>
+                <a href="{{ url_for('neuer_einsatz') }}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-circle"></i> Neuer Einsatz
+                </a>
+            </div>
+            <div class="card-body">
+                {% if einsaetze %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Datum</th>
+                                <th>Maschine</th>
+                                <th>Einsatzzweck</th>
+                                <th>Anfang</th>
+                                <th>Ende</th>
+                                <th>Stunden</th>
+                                <th>Treibstoff</th>
+                                <th>Kosten</th>
+                                <th>Anmerkungen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for einsatz in einsaetze %}
+                            <tr>
+                                <td>{{ einsatz.datum }}</td>
+                                <td>
+                                    <strong>{{ einsatz.maschine }}</strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ einsatz.einsatzzweck }}</span>
+                                </td>
+                                <td>{{ "%.1f"|format(einsatz.anfangstand) }} h</td>
+                                <td>{{ "%.1f"|format(einsatz.endstand) }} h</td>
+                                <td>
+                                    <strong>{{ "%.1f"|format(einsatz.betriebsstunden) }} h</strong>
+                                </td>
+                                <td>
+                                    {% if einsatz.treibstoffverbrauch %}
+                                        {{ "%.1f"|format(einsatz.treibstoffverbrauch) }} l
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if einsatz.treibstoffkosten %}
+                                        {{ "%.2f"|format(einsatz.treibstoffkosten) }} €
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if einsatz.anmerkungen %}
+                                        <small class="text-muted">{{ einsatz.anmerkungen[:50] }}{% if einsatz.anmerkungen|length > 50 %}...{% endif %}</small>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <td colspan="5" class="text-end"><strong>Gesamt:</strong></td>
+                                <td><strong>{{ "%.1f"|format(einsaetze|sum(attribute='betriebsstunden')) }} h</strong></td>
+                                <td>
+                                    {% set treibstoff_gesamt = einsaetze|selectattr('treibstoffverbrauch')|sum(attribute='treibstoffverbrauch') %}
+                                    {% if treibstoff_gesamt > 0 %}
+                                        <strong>{{ "%.1f"|format(treibstoff_gesamt) }} l</strong>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% set kosten_gesamt = einsaetze|selectattr('treibstoffkosten')|sum(attribute='treibstoffkosten') %}
+                                    {% if kosten_gesamt > 0 %}
+                                        <strong>{{ "%.2f"|format(kosten_gesamt) }} €</strong>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox" style="font-size: 4rem; color: #ccc;"></i>
+                    <p class="text-muted mt-3">Noch keine Einsätze vorhanden</p>
+                    <a href="{{ url_for('neuer_einsatz') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Ersten Einsatz erfassen
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

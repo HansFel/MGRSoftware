@@ -1,0 +1,566 @@
+"""
+Flask-Webanwendung für Maschinengemeinschaft
+Ermöglicht Benutzern den Zugriff von extern (z.B. Mobiltelefon)
+"""
+
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify
+from database import MaschinenDBContext
+from datetime import datetime
+import os
+import json
+import csv
+from io import StringIO, BytesIO
+from functools import wraps
+import zipfile
+
+app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))  # Für Session-Management
+
+DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), "maschinengemeinschaft.db"))
+
+
+def login_required(f):
+    """Decorator für geschützte Routen"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'benutzer_id' not in session:
+            flash('Bitte melden Sie sich an.', 'warning')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def admin_required(f):
+    """Decorator für Admin-Routen"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'benutzer_id' not in session:
+            flash('Bitte melden Sie sich an.', 'warning')
+            return redirect(url_for('login'))
+        if not session.get('is_admin'):
+            flash('Zugriff verweigert. Administrator-Rechte erforderlich.', 'danger')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+@app.route('/')
+def index():
+    """Startseite - Weiterleitung"""
+    if 'benutzer_id' in session:
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('login'))
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login-Seite"""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        with MaschinenDBContext(DB_PATH) as db:
+            benutzer = db.verify_login(username, password)
+            
+            if benutzer:
+                session['benutzer_id'] = benutzer['id']
+                session['benutzer_name'] = f"{benutzer['name']}, {benutzer['vorname']}"
+                session['is_admin'] = bool(benutzer.get('is_admin', False))
+                flash(f"Willkommen, {benutzer['vorname']}!", 'success')
+                return redirect(url_for('dashboard'))
+            else:
+                flash('Ungültiger Benutzername oder Passwort.', 'danger')
+    
+    return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    """Logout"""
+    session.clear()
+    flash('Sie wurden abgemeldet.', 'info')
+    return redirect(url_for('login'))
+
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    """Dashboard - Übersicht für den Benutzer"""
+    with MaschinenDBContext(DB_PATH) as db:
+        benutzer_id = session['benutzer_id']
+        
+        # Statistiken laden
+        statistik = db.get_statistik_benutzer(benutzer_id)
+        
+        # Letzte Einsätze
+        einsaetze = db.get_einsaetze_by_benutzer(benutzer_id)
+        letzte_einsaetze = einsaetze[:10] if einsaetze else []
+        
+    return render_template('dashboard.html', 
+                         statistik=statistik,
+                         einsaetze=letzte_einsaetze)
+
+
+@app.route('/neuer-einsatz', methods=['GET', 'POST'])
+@login_required
+def neuer_einsatz():
+    """Neuen Einsatz erfassen"""
+    if request.method == 'POST':
+        try:
+            datum = request.form.get('datum')
+            maschine_id = int(request.form.get('maschine_id'))
+            einsatzzweck_id = int(request.form.get('einsatzzweck_id'))
+            anfangstand = float(request.form.get('anfangstand'))
+            endstand = float(request.form.get('endstand'))
+            treibstoff = request.form.get('treibstoffverbrauch')
+            kosten = request.form.get('treibstoffkosten')
+            anmerkungen = request.form.get('anmerkungen')
+            
+            if endstand < anfangstand:
+                flash('Endstand muss größer oder gleich Anfangstand sein!', 'danger')
+                return redirect(url_for('neuer_einsatz'))
+            
+            with MaschinenDBContext(DB_PATH) as db:
+                db.add_einsatz(
+                    datum=datum,
+                    benutzer_id=session['benutzer_id'],
+                    maschine_id=maschine_id,
+                    einsatzzweck_id=einsatzzweck_id,
+                    anfangstand=anfangstand,
+                    endstand=endstand,
+                    treibstoffverbrauch=float(treibstoff) if treibstoff else None,
+                    treibstoffkosten=float(kosten) if kosten else None,
+                    anmerkungen=anmerkungen if anmerkungen else None
+                )
+            
+            flash('Einsatz wurde erfolgreich gespeichert!', 'success')
+            return redirect(url_for('dashboard'))
+            
+        except Exception as e:
+            flash(f'Fehler beim Speichern: {str(e)}', 'danger')
+            return redirect(url_for('neuer_einsatz'))
+    
+    # GET - Formular anzeigen
+    with MaschinenDBContext(DB_PATH) as db:
+        maschinen = db.get_all_maschinen()
+        einsatzzwecke = db.get_all_einsatzzwecke()
+    
+    return render_template('neuer_einsatz.html',
+                         maschinen=maschinen,
+                         einsatzzwecke=einsatzzwecke,
+                         heute=datetime.now().strftime('%Y-%m-%d'))
+
+
+@app.route('/meine-einsaetze')
+@login_required
+def meine_einsaetze():
+    """Liste aller eigenen Einsätze"""
+    with MaschinenDBContext(DB_PATH) as db:
+        einsaetze = db.get_einsaetze_by_benutzer(session['benutzer_id'])
+    
+    return render_template('meine_einsaetze.html', einsaetze=einsaetze)
+
+
+@app.route('/api/maschine/<int:maschine_id>')
+@login_required
+def api_maschine_details(maschine_id):
+    """API-Endpunkt für Maschinen-Details (für AJAX)"""
+    with MaschinenDBContext(DB_PATH) as db:
+        maschine = db.get_maschine(maschine_id)
+    
+    if maschine:
+        return {
+            'success': True,
+            'stundenzaehler': maschine['stundenzaehler_aktuell']
+        }
+    return {'success': False}, 404
+
+
+@app.route('/passwort-aendern', methods=['GET', 'POST'])
+@login_required
+def passwort_aendern():
+    """Passwort ändern"""
+    if request.method == 'POST':
+        altes_passwort = request.form.get('altes_passwort')
+        neues_passwort = request.form.get('neues_passwort')
+        neues_passwort_wdh = request.form.get('neues_passwort_wdh')
+        
+        if neues_passwort != neues_passwort_wdh:
+            flash('Die Passwörter stimmen nicht überein!', 'danger')
+            return redirect(url_for('passwort_aendern'))
+        
+        with MaschinenDBContext(DB_PATH) as db:
+            # Altes Passwort überprüfen
+            benutzer = db.get_benutzer(session['benutzer_id'])
+            if not db.verify_login(benutzer['username'], altes_passwort):
+                flash('Altes Passwort ist falsch!', 'danger')
+                return redirect(url_for('passwort_aendern'))
+            
+            # Neues Passwort setzen
+            db.update_password(session['benutzer_id'], neues_passwort)
+            flash('Passwort wurde erfolgreich geändert!', 'success')
+            return redirect(url_for('dashboard'))
+    
+    return render_template('passwort_aendern.html')
+
+
+# ==================== ADMIN-BEREICH ====================
+
+@app.route('/admin')
+@admin_required
+def admin_dashboard():
+    """Admin-Dashboard"""
+    with MaschinenDBContext(DB_PATH) as db:
+        # Alle Einsätze
+        alle_einsaetze = db.get_all_einsaetze(limit=50)
+        
+        # Statistiken
+        benutzer = db.get_all_benutzer()
+        maschinen = db.get_all_maschinen()
+        
+        # Gesamt-Statistiken
+        cursor = db.cursor
+        cursor.execute("""
+            SELECT 
+                COUNT(*) as gesamt_einsaetze,
+                SUM(betriebsstunden) as gesamt_stunden,
+                SUM(treibstoffverbrauch) as gesamt_treibstoff
+            FROM maschineneinsaetze
+        """)
+        gesamt_stats = dict(cursor.fetchone())
+    
+    return render_template('admin_dashboard.html',
+                         einsaetze=alle_einsaetze,
+                         benutzer=benutzer,
+                         maschinen=maschinen,
+                         stats=gesamt_stats)
+
+
+@app.route('/admin/alle-einsaetze')
+@admin_required
+def admin_alle_einsaetze():
+    """Alle Einsätze aller Benutzer"""
+    with MaschinenDBContext(DB_PATH) as db:
+        einsaetze = db.get_all_einsaetze()
+    
+    return render_template('admin_alle_einsaetze.html', einsaetze=einsaetze)
+
+
+@app.route('/admin/benutzer')
+@admin_required
+def admin_benutzer():
+    """Benutzerverwaltung"""
+    with MaschinenDBContext(DB_PATH) as db:
+        benutzer = db.get_all_benutzer(nur_aktive=False)
+    
+    return render_template('admin_benutzer.html', benutzer=benutzer)
+
+
+@app.route('/admin/benutzer/neu', methods=['GET', 'POST'])
+@admin_required
+def admin_benutzer_neu():
+    """Neuen Benutzer anlegen"""
+    if request.method == 'POST':
+        with MaschinenDBContext(DB_PATH) as db:
+            db.add_benutzer(
+                name=request.form['name'],
+                vorname=request.form.get('vorname'),
+                username=request.form.get('username'),
+                password=request.form.get('password'),
+                is_admin=bool(request.form.get('is_admin')),
+                telefon=request.form.get('telefon'),
+                email=request.form.get('email')
+            )
+        flash('Benutzer erfolgreich angelegt!', 'success')
+        return redirect(url_for('admin_benutzer'))
+    return render_template('admin_benutzer_form.html', benutzer=None)
+
+
+@app.route('/admin/benutzer/<int:benutzer_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_benutzer_edit(benutzer_id):
+    """Benutzer bearbeiten"""
+    with MaschinenDBContext(DB_PATH) as db:
+        if request.method == 'POST':
+            update_data = {
+                'name': request.form['name'],
+                'vorname': request.form.get('vorname'),
+                'username': request.form.get('username'),
+                'is_admin': bool(request.form.get('is_admin')),
+                'telefon': request.form.get('telefon'),
+                'email': request.form.get('email')
+            }
+            # Passwort nur ändern wenn angegeben
+            if request.form.get('password'):
+                db.update_password(benutzer_id, request.form['password'])
+            db.update_benutzer(benutzer_id, **update_data)
+            flash('Benutzer erfolgreich aktualisiert!', 'success')
+            return redirect(url_for('admin_benutzer'))
+        
+        benutzer = db.get_benutzer_by_id(benutzer_id)
+    return render_template('admin_benutzer_form.html', benutzer=benutzer)
+
+
+@app.route('/admin/benutzer/<int:benutzer_id>/delete', methods=['POST'])
+@admin_required
+def admin_benutzer_delete(benutzer_id):
+    """Benutzer löschen"""
+    with MaschinenDBContext(DB_PATH) as db:
+        benutzer = db.get_benutzer_by_id(benutzer_id)
+        # Hard delete: tatsächlich aus Datenbank löschen
+        db.delete_benutzer(benutzer_id, soft_delete=False)
+    flash(f'Benutzer {benutzer["name"]} wurde gelöscht.', 'success')
+    return redirect(url_for('admin_benutzer'))
+
+
+@app.route('/admin/benutzer/<int:benutzer_id>/activate', methods=['POST'])
+@admin_required
+def admin_benutzer_activate(benutzer_id):
+    """Benutzer reaktivieren"""
+    with MaschinenDBContext(DB_PATH) as db:
+        benutzer = db.get_benutzer_by_id(benutzer_id)
+        db.activate_benutzer(benutzer_id)
+    flash(f'Benutzer {benutzer["name"]} wurde reaktiviert.', 'success')
+    return redirect(url_for('admin_benutzer'))
+
+
+@app.route('/admin/maschinen')
+@admin_required
+def admin_maschinen():
+    """Maschinenverwaltung"""
+    with MaschinenDBContext(DB_PATH) as db:
+        maschinen = db.get_all_maschinen(nur_aktive=False)
+    
+    return render_template('admin_maschinen.html', maschinen=maschinen)
+
+
+@app.route('/admin/maschinen/neu', methods=['GET', 'POST'])
+@admin_required
+def admin_maschinen_neu():
+    """Neue Maschine anlegen"""
+    if request.method == 'POST':
+        with MaschinenDBContext(DB_PATH) as db:
+            db.add_maschine(
+                bezeichnung=request.form['bezeichnung'],
+                hersteller=request.form.get('hersteller'),
+                modell=request.form.get('modell'),
+                baujahr=int(request.form['baujahr']) if request.form.get('baujahr') else None,
+                kennzeichen=request.form.get('kennzeichen'),
+                stundenzaehler_aktuell=float(request.form.get('stundenzaehler_aktuell', 0)),
+                wartungsintervall=int(request.form.get('wartungsintervall', 50)),
+                naechste_wartung=float(request.form.get('naechste_wartung')) if request.form.get('naechste_wartung') else None,
+                anmerkungen=request.form.get('anmerkungen')
+            )
+        flash('Maschine erfolgreich angelegt!', 'success')
+        return redirect(url_for('admin_maschinen'))
+    return render_template('admin_maschinen_form.html', maschine=None)
+
+
+@app.route('/admin/maschinen/<int:maschine_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_maschinen_edit(maschine_id):
+    """Maschine bearbeiten"""
+    with MaschinenDBContext(DB_PATH) as db:
+        if request.method == 'POST':
+            update_data = {
+                'bezeichnung': request.form['bezeichnung'],
+                'hersteller': request.form.get('hersteller'),
+                'modell': request.form.get('modell'),
+                'baujahr': int(request.form['baujahr']) if request.form.get('baujahr') else None,
+                'kennzeichen': request.form.get('kennzeichen'),
+                'stundenzaehler_aktuell': float(request.form.get('stundenzaehler_aktuell', 0)),
+                'wartungsintervall': int(request.form.get('wartungsintervall', 50)),
+                'naechste_wartung': float(request.form.get('naechste_wartung')) if request.form.get('naechste_wartung') else None,
+                'anmerkungen': request.form.get('anmerkungen')
+            }
+            db.update_maschine(maschine_id, **update_data)
+            flash('Maschine erfolgreich aktualisiert!', 'success')
+            return redirect(url_for('admin_maschinen'))
+        
+        maschine = db.get_maschine_by_id(maschine_id)
+    return render_template('admin_maschinen_form.html', maschine=maschine)
+
+
+@app.route('/admin/maschinen/<int:maschine_id>/delete', methods=['POST'])
+@admin_required
+def admin_maschinen_delete(maschine_id):
+    """Maschine löschen"""
+    with MaschinenDBContext(DB_PATH) as db:
+        maschine = db.get_maschine_by_id(maschine_id)
+        db.delete_maschine(maschine_id)
+    flash(f'Maschine {maschine["bezeichnung"]} wurde gelöscht.', 'success')
+    return redirect(url_for('admin_maschinen'))
+
+
+@app.route('/admin/einsatzzwecke')
+@admin_required
+def admin_einsatzzwecke():
+    """Einsatzzwecke verwalten"""
+    with MaschinenDBContext(DB_PATH) as db:
+        einsatzzwecke = db.get_all_einsatzzwecke(nur_aktive=False)
+    
+    return render_template('admin_einsatzzwecke.html', einsatzzwecke=einsatzzwecke)
+
+
+@app.route('/admin/einsatzzwecke/neu', methods=['GET', 'POST'])
+@admin_required
+def admin_einsatzzwecke_neu():
+    """Neuer Einsatzzweck"""
+    if request.method == 'POST':
+        with MaschinenDBContext(DB_PATH) as db:
+            db.add_einsatzzweck(
+                bezeichnung=request.form['bezeichnung'],
+                beschreibung=request.form.get('beschreibung')
+            )
+        flash('Einsatzzweck erfolgreich angelegt!', 'success')
+        return redirect(url_for('admin_einsatzzwecke'))
+    
+    return render_template('admin_einsatzzwecke_form.html', einsatzzweck=None)
+
+
+@app.route('/admin/einsatzzwecke/<int:einsatzzweck_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_einsatzzwecke_edit(einsatzzweck_id):
+    """Einsatzzweck bearbeiten"""
+    with MaschinenDBContext(DB_PATH) as db:
+        if request.method == 'POST':
+            update_data = {
+                'bezeichnung': request.form['bezeichnung'],
+                'beschreibung': request.form.get('beschreibung'),
+                'aktiv': 1 if request.form.get('aktiv') else 0
+            }
+            db.update_einsatzzweck(einsatzzweck_id, **update_data)
+            flash('Einsatzzweck erfolgreich aktualisiert!', 'success')
+            return redirect(url_for('admin_einsatzzwecke'))
+        
+        einsatzzweck = db.get_einsatzzweck_by_id(einsatzzweck_id)
+    
+    return render_template('admin_einsatzzwecke_form.html', einsatzzweck=einsatzzweck)
+
+
+@app.route('/admin/einsatzzwecke/<int:einsatzzweck_id>/delete', methods=['POST'])
+@admin_required
+def admin_einsatzzwecke_delete(einsatzzweck_id):
+    """Einsatzzweck löschen"""
+    with MaschinenDBContext(DB_PATH) as db:
+        einsatzzweck = db.get_einsatzzweck_by_id(einsatzzweck_id)
+        db.delete_einsatzzweck(einsatzzweck_id, soft_delete=False)
+    flash(f'Einsatzzweck {einsatzzweck["bezeichnung"]} wurde gelöscht.', 'success')
+    return redirect(url_for('admin_einsatzzwecke'))
+
+
+@app.route('/admin/einsatzzwecke/<int:einsatzzweck_id>/activate', methods=['POST'])
+@admin_required
+def admin_einsatzzwecke_activate(einsatzzweck_id):
+    """Einsatzzweck reaktivieren"""
+    with MaschinenDBContext(DB_PATH) as db:
+        einsatzzweck = db.get_einsatzzweck_by_id(einsatzzweck_id)
+        db.activate_einsatzzweck(einsatzzweck_id)
+    flash(f'Einsatzzweck {einsatzzweck["bezeichnung"]} wurde reaktiviert.', 'success')
+    return redirect(url_for('admin_einsatzzwecke'))
+
+
+@app.route('/admin/export/json')
+@admin_required
+def admin_export_json():
+    """Alle Daten als JSON exportieren"""
+    with MaschinenDBContext(DB_PATH) as db:
+        data = {
+            'export_datum': datetime.now().isoformat(),
+            'benutzer': db.get_all_benutzer(nur_aktive=False),
+            'maschinen': db.get_all_maschinen(nur_aktive=False),
+            'einsatzzwecke': db.get_all_einsatzzwecke(nur_aktive=False),
+            'einsaetze': db.get_all_einsaetze()
+        }
+    
+    # JSON in BytesIO schreiben
+    json_str = json.dumps(data, indent=2, ensure_ascii=False, default=str)
+    json_bytes = BytesIO(json_str.encode('utf-8'))
+    json_bytes.seek(0)
+    
+    filename = f'maschinengemeinschaft_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+    return send_file(
+        json_bytes,
+        mimetype='application/json',
+        as_attachment=True,
+        download_name=filename
+    )
+
+
+@app.route('/admin/export/csv')
+@admin_required
+def admin_export_csv():
+    """Alle Daten als CSV-ZIP exportieren"""
+    with MaschinenDBContext(DB_PATH) as db:
+        benutzer = db.get_all_benutzer(nur_aktive=False)
+        maschinen = db.get_all_maschinen(nur_aktive=False)
+        einsatzzwecke = db.get_all_einsatzzwecke(nur_aktive=False)
+        einsaetze = db.get_all_einsaetze()
+    
+    # ZIP-Datei im Speicher erstellen
+    zip_buffer = BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # Benutzer CSV
+        if benutzer:
+            csv_buffer = StringIO()
+            writer = csv.DictWriter(csv_buffer, fieldnames=benutzer[0].keys())
+            writer.writeheader()
+            writer.writerows(benutzer)
+            zip_file.writestr('benutzer.csv', csv_buffer.getvalue())
+        
+        # Maschinen CSV
+        if maschinen:
+            csv_buffer = StringIO()
+            writer = csv.DictWriter(csv_buffer, fieldnames=maschinen[0].keys())
+            writer.writeheader()
+            writer.writerows(maschinen)
+            zip_file.writestr('maschinen.csv', csv_buffer.getvalue())
+        
+        # Einsatzzwecke CSV
+        if einsatzzwecke:
+            csv_buffer = StringIO()
+            writer = csv.DictWriter(csv_buffer, fieldnames=einsatzzwecke[0].keys())
+            writer.writeheader()
+            writer.writerows(einsatzzwecke)
+            zip_file.writestr('einsatzzwecke.csv', csv_buffer.getvalue())
+        
+        # Einsätze CSV
+        if einsaetze:
+            csv_buffer = StringIO()
+            writer = csv.DictWriter(csv_buffer, fieldnames=einsaetze[0].keys())
+            writer.writeheader()
+            writer.writerows(einsaetze)
+            zip_file.writestr('einsaetze.csv', csv_buffer.getvalue())
+    
+    zip_buffer.seek(0)
+    filename = f'maschinengemeinschaft_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.zip'
+    
+    return send_file(
+        zip_buffer,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=filename
+    )
+
+
+@app.route('/admin/backup/database')
+@admin_required
+def admin_backup_database():
+    """Komplette SQLite-Datenbank herunterladen"""
+    if not os.path.exists(DB_PATH):
+        flash('Datenbankdatei nicht gefunden!', 'danger')
+        return redirect(url_for('admin_dashboard'))
+    
+    filename = f'maschinengemeinschaft_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db'
+    return send_file(
+        DB_PATH,
+        mimetype='application/x-sqlite3',
+        as_attachment=True,
+        download_name=filename
+    )
+
+
+if __name__ == '__main__':
+    # Für Entwicklung
+    app.run(host='0.0.0.0', port=5000, debug=True)

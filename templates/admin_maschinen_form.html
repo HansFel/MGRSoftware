@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Maschine bearbeiten' if maschine else 'Neue Maschine' }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-10 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h4>
+                        <i class="bi bi-tools"></i>
+                        {{ 'Maschine bearbeiten' if maschine else 'Neue Maschine' }}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="bezeichnung" class="form-label">Bezeichnung *</label>
+                                <input type="text" class="form-control" id="bezeichnung" name="bezeichnung" 
+                                       value="{{ maschine.bezeichnung if maschine else '' }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="hersteller" class="form-label">Hersteller</label>
+                                <input type="text" class="form-control" id="hersteller" name="hersteller" 
+                                       value="{{ maschine.hersteller if maschine else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="modell" class="form-label">Modell</label>
+                                <input type="text" class="form-control" id="modell" name="modell" 
+                                       value="{{ maschine.modell if maschine else '' }}">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="baujahr" class="form-label">Baujahr</label>
+                                <input type="number" class="form-control" id="baujahr" name="baujahr" 
+                                       value="{{ maschine.baujahr if maschine else '' }}" min="1900" max="2100">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="kennzeichen" class="form-label">Kennzeichen</label>
+                                <input type="text" class="form-control" id="kennzeichen" name="kennzeichen" 
+                                       value="{{ maschine.kennzeichen if maschine else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="stundenzaehler_aktuell" class="form-label">Stundenzähler aktuell (Std.)</label>
+                                <input type="number" class="form-control" id="stundenzaehler_aktuell" 
+                                       name="stundenzaehler_aktuell" step="0.1" min="0"
+                                       value="{{ '%.1f'|format(maschine.stundenzaehler_aktuell) if maschine else '0.0' }}">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="wartungsintervall" class="form-label">Wartungsintervall (Std.)</label>
+                                <input type="number" class="form-control" id="wartungsintervall" 
+                                       name="wartungsintervall" min="1"
+                                       value="{{ maschine.wartungsintervall if maschine else '50' }}">
+                                <small class="text-muted">z.B. alle 50 Stunden</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="naechste_wartung" class="form-label">Nächste Wartung bei (Std.)</label>
+                                <input type="number" class="form-control" id="naechste_wartung" 
+                                       name="naechste_wartung" step="0.1" min="0"
+                                       value="{{ '%.1f'|format(maschine.naechste_wartung) if maschine and maschine.naechste_wartung else '' }}">
+                                <small class="text-muted">Optional, wird auto-berechnet</small>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="anmerkungen" class="form-label">Anmerkungen</label>
+                            <textarea class="form-control" id="anmerkungen" name="anmerkungen" rows="3">{{ maschine.anmerkungen if maschine else '' }}</textarea>
+                        </div>
+
+                        <hr>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('admin_maschinen') }}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Zurück
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> Speichern
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

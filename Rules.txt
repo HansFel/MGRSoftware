@@ -1,0 +1,68 @@
+
+mkdir -p ~/maschinengemeinschaft
+
+scp -r * heizpi@192.168.178.36:/home/heizpi/maschinengemeinschaft/
+
+ sftp heizpi@192.168.178.36
+
+# Von Windows aus (im Projektverzeichnis):
+scp Dockerfile docker-compose.yml requirements.txt database.py web_app.py schema.sql .dockerignore pi@192.168.178.36:~/maschinengemeinschaft/
+
+scp -r templates pi@192.168.178.36:~/maschinengemeinschaft/
+
+für nginx
+heizpi@heizpi:~/maschinengemeinschaft $ docker cp nginx.conf felfer-nginx:/etc/nginx/conf.d/maschinengemeinschaft.conf
+Successfully copied 3.07kB to felfer-nginx:/etc/nginx/conf.d/maschinengemeinschaft.conf
+
+heizpi@heizpi:~/maschinengemeinschaft $ docker inspect felfer-nginx | grep -A 5 Mounts
+        "Mounts": [
+            {
+                "Type": "volume",
+                "Name": "nginx_data",
+                "Source": "/var/lib/docker/volumes/nginx_data/_data",
+                "Destination": "/usr/share/nginx/html",
+heizpi@heizpi:~/maschinengemeinschaft $
+
+
+
+docker run --rm \
+  -v $(pwd)/certbot/conf:/etc/letsencrypt \
+  -v $(pwd)/certbot/www:/var/www/certbot \
+  -p 80:80 \
+  certbot/certbot certonly \
+  --standalone \
+  --email htfelfer@outlook.com \
+  --agree-tos \
+  -d ml76y0cjb8gqzf3p.myfritz.net
+
+
+
+
+
+
+Portainer:
+
+# 1. Alten Portainer stoppen und entfernen
+docker stop portainer
+docker rm portainer
+
+# 2. Optional: Alte Daten löschen (für kompletten Neustart)
+docker volume rm portainer_data
+# ODER Daten behalten, um Einstellungen zu übernehmen
+
+# 3. Portainer neu installieren
+docker run -d \
+  --name portainer \
+  --restart=always \
+  -p 8000:8000 \
+  -p 9443:9443 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v portainer_data:/data \
+  portainer/portainer-ce:latest
+
+# 4. Portainer ist jetzt erreichbar unter:
+# https://raspberry-ip:9443
+# z.B. https://192.168.178.36:9443
+
+
+Portainer user:hans pw:Rattenberg@57

@@ -1,0 +1,38 @@
+services:
+  maschinengemeinschaft:
+    build: .
+    container_name: maschinengemeinschaft
+    expose:
+      - "5000"
+    volumes:
+      - ./data:/data
+    environment:
+      - DB_PATH=/data/maschinengemeinschaft.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/login')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - web
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx_maschinengemeinschaft
+    ports:
+      - "80:80"
+      - "8443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    restart: unless-stopped
+    depends_on:
+      - maschinengemeinschaft
+    networks:
+      - web
+
+networks:
+  web:
+    driver: bridge
