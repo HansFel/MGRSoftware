@@ -86,14 +86,20 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <a href="{{ url_for('admin_maschinen_edit', maschine_id=maschine.id) }}" 
-                                       class="btn btn-sm btn-outline-primary" title="Bearbeiten">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                    <button type="button" class="btn btn-sm btn-outline-danger" 
-                                            onclick="confirmDelete({{ maschine.id }}, '{{ maschine.bezeichnung }}')" title="Löschen">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ url_for('admin_maschinen_edit', maschine_id=maschine.id) }}" 
+                                           class="btn btn-sm btn-outline-primary" title="Bearbeiten">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <a href="{{ url_for('admin_maschinen_rentabilitaet', maschine_id=maschine.id) }}" 
+                                           class="btn btn-sm btn-outline-success" title="Rentabilität">
+                                            <i class="bi bi-graph-up-arrow"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                onclick="confirmDelete({{ maschine.id }}, '{{ maschine.bezeichnung }}')" title="Löschen">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}

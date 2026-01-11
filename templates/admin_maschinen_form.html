@@ -70,6 +70,23 @@
                         </div>
 
                         <hr>
+                        <h5 class="mb-3"><i class="bi bi-people-fill"></i> Zuordnung</h5>
+
+                        <div class="mb-3">
+                            <label for="gemeinschaft_id" class="form-label">Gemeinschaft *</label>
+                            <select class="form-control" id="gemeinschaft_id" name="gemeinschaft_id" required>
+                                <option value="">Bitte wählen...</option>
+                                {% for gem in gemeinschaften %}
+                                <option value="{{ gem.id }}" 
+                                        {{ 'selected' if maschine and maschine.gemeinschaft_id == gem.id else '' }}>
+                                    {{ gem.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Die Maschine gehört zu dieser Gemeinschaft</small>
+                        </div>
+
+                        <hr>
                         <h5 class="mb-3"><i class="bi bi-cash-coin"></i> Abrechnung</h5>
 
                         <div class="row">
@@ -97,6 +114,33 @@
                                        name="preis_pro_einheit" step="0.01" min="0"
                                        value="{{ '%.2f'|format(maschine.preis_pro_einheit) if maschine and maschine.preis_pro_einheit else '0.00' }}">
                                 <small class="text-muted">z.B. 25.00 € pro Stunde oder 120.00 € pro Hektar</small>
+                            </div>
+                        </div>
+
+                        <hr>
+                        <h5 class="mb-3"><i class="bi bi-currency-euro"></i> Rentabilität</h5>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="anschaffungspreis" class="form-label">Anschaffungspreis (€)</label>
+                                <input type="number" class="form-control" id="anschaffungspreis" 
+                                       name="anschaffungspreis" step="0.01" min="0"
+                                       value="{{ '%.2f'|format(maschine.anschaffungspreis) if maschine and maschine.anschaffungspreis else '0.00' }}">
+                                <small class="text-muted">Ursprünglicher Kaufpreis</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="abschreibungsdauer_jahre" class="form-label">Abschreibungsdauer (Jahre)</label>
+                                <input type="number" class="form-control" id="abschreibungsdauer_jahre" 
+                                       name="abschreibungsdauer_jahre" min="1"
+                                       value="{{ maschine.abschreibungsdauer_jahre if maschine else '10' }}">
+                                <small class="text-muted">Übliche Nutzungsdauer</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="anschaffungsdatum" class="form-label">Anschaffungsdatum</label>
+                                <input type="date" class="form-control" id="anschaffungsdatum" 
+                                       name="anschaffungsdatum"
+                                       value="{{ maschine.anschaffungsdatum if maschine else '' }}">
+                                <small class="text-muted">Kaufdatum der Maschine</small>
                             </div>
                         </div>
 

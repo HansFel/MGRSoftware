@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS benutzer (
     email TEXT,
     mitglied_seit DATE,
     aktiv BOOLEAN DEFAULT 1,
-    bemerkungen TEXT
+    bemerkungen TEXT,
+    treibstoffkosten_preis REAL DEFAULT 1.50
 );
 
 -- Tabelle für Maschinen
@@ -35,7 +36,10 @@ CREATE TABLE IF NOT EXISTS maschinen (
     bemerkungen TEXT,
     erfassungsmodus TEXT DEFAULT 'fortlaufend',
     abrechnungsart TEXT DEFAULT 'stunden',
-    preis_pro_einheit REAL DEFAULT 0.0
+    preis_pro_einheit REAL DEFAULT 0.0,
+    gemeinschaft_id INTEGER DEFAULT 1 REFERENCES gemeinschaften(id),
+    anschaffungspreis REAL DEFAULT 0.0,
+    abschreibungsdauer_jahre INTEGER DEFAULT 10
 );
 
 -- Tabelle für Einsatzzwecke
@@ -117,3 +121,46 @@ INSERT OR IGNORE INTO einsatzzwecke (bezeichnung, beschreibung) VALUES
     ('Grünlandpflege', 'Weidepflege und Grünlandarbeiten'),
     ('Wegeinstandhaltung', 'Pflege und Instandhaltung von Wegen'),
     ('Sonstiges', 'Andere Einsätze');
+
+-- Tabelle für Gemeinschaften
+CREATE TABLE IF NOT EXISTS gemeinschaften (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    beschreibung TEXT,
+    erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    aktiv BOOLEAN DEFAULT 1
+);
+
+-- Zuordnungstabelle: Mitglieder <-> Gemeinschaften (N:M)
+CREATE TABLE IF NOT EXISTS mitglied_gemeinschaft (
+    mitglied_id INTEGER NOT NULL,
+    gemeinschaft_id INTEGER NOT NULL,
+    beigetreten_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    rolle TEXT DEFAULT 'mitglied',
+    PRIMARY KEY (mitglied_id, gemeinschaft_id),
+    FOREIGN KEY (mitglied_id) REFERENCES benutzer(id) ON DELETE CASCADE,
+    FOREIGN KEY (gemeinschaft_id) REFERENCES gemeinschaften(id) ON DELETE CASCADE
+);
+
+-- Standard-Gemeinschaft
+INSERT OR IGNORE INTO gemeinschaften (id, name, beschreibung) 
+VALUES (1, 'Hauptgemeinschaft', 'Standard-Gemeinschaft');
+
+-- Indizes für Performance
+CREATE INDEX IF NOT EXISTS idx_maschinen_gemeinschaft ON maschinen(gemeinschaft_id);
+CREATE INDEX IF NOT EXISTS idx_mitglied_gemeinschaft_mitglied ON mitglied_gemeinschaft(mitglied_id);
+CREATE INDEX IF NOT EXISTS idx_mitglied_gemeinschaft_gemeinschaft ON mitglied_gemeinschaft(gemeinschaft_id);
+
+-- View für Gemeinschafts-Übersicht
+CREATE VIEW IF NOT EXISTS gemeinschaften_uebersicht AS
+SELECT 
+    g.id,
+    g.name,
+    g.beschreibung,
+    g.aktiv,
+    COUNT(DISTINCT m.id) as anzahl_maschinen,
+    COUNT(DISTINCT mg.mitglied_id) as anzahl_mitglieder
+FROM gemeinschaften g
+LEFT JOIN maschinen m ON g.id = m.gemeinschaft_id AND m.aktiv = 1
+LEFT JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
+GROUP BY g.id, g.name, g.beschreibung, g.aktiv;

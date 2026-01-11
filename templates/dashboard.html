@@ -100,6 +100,104 @@
     </div>
 </div>
 
+<!-- Forderungen nach Gemeinschaft -->
+{% if schulden_nach_gemeinschaft %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-cash-stack"></i> Meine Forderungen nach Gemeinschaft
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Gemeinschaft</th>
+                                <th class="text-end">Einsätze</th>
+                                <th class="text-end">Maschinenkosten</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for schuld in schulden_nach_gemeinschaft %}
+                            <tr>
+                                <td><strong>{{ schuld.bezeichnung }}</strong></td>
+                                <td class="text-end">{{ schuld.anzahl_einsaetze }}</td>
+                                <td class="text-end">
+                                    <strong class="text-primary">{{ "%.2f"|format(schuld.gesamtkosten or 0) }}€</strong>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <th>Gesamt</th>
+                                <th class="text-end">{{ schulden_nach_gemeinschaft|sum(attribute='anzahl_einsaetze') }}</th>
+                                <th class="text-end">
+                                    <strong class="text-primary">{{ "%.2f"|format(schulden_nach_gemeinschaft|sum(attribute='gesamtkosten')) }}€</strong>
+                                </th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Meine Reservierungen -->
+{% if reservierungen %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-calendar-check"></i> Meine Reservierungen
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Datum</th>
+                                <th>Maschine</th>
+                                <th>Zeit</th>
+                                <th>Dauer</th>
+                                <th>Zweck</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for res in reservierungen %}
+                            <tr>
+                                <td><strong>{{ res.datum }}</strong></td>
+                                <td>{{ res.maschine_bezeichnung }}</td>
+                                <td>{{ res.uhrzeit_von }} - {{ res.uhrzeit_bis }} Uhr</td>
+                                <td>{{ res.nutzungsdauer_stunden }} h</td>
+                                <td>{{ res.zweck or '-' }}</td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('reservierung_stornieren', reservierung_id=res.id) }}" 
+                                          style="display: inline;" onsubmit="return confirm('Reservierung wirklich stornieren?');">
+                                        <button type="submit" class="btn btn-sm btn-danger" title="Stornieren">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Schnellzugriff -->
 <div class="row g-3 mb-4">
     <div class="col-md-6">

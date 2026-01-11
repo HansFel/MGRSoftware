@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}Rentabilität {{ maschine.bezeichnung }} - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="text-white">
+                <i class="bi bi-graph-up-arrow"></i> Rentabilitätsbericht: {{ maschine.bezeichnung }}
+            </h2>
+            <div>
+                <a href="{{ url_for('admin_maschinen_aufwendungen', maschine_id=maschine.id) }}" class="btn btn-info me-2">
+                    <i class="bi bi-cash-coin"></i> Aufwendungen
+                </a>
+                <a href="{{ url_for('admin_maschinen_rentabilitaet_pdf', maschine_id=maschine.id) }}" class="btn btn-primary me-2" target="_blank">
+                    <i class="bi bi-file-pdf"></i> PDF
+                </a>
+                <a href="{{ url_for('admin_maschinen') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Zurück
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Maschinen-Info -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>Hersteller:</strong> {{ maschine.hersteller or '-' }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Modell:</strong> {{ maschine.modell or '-' }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Baujahr:</strong> {{ maschine.baujahr or '-' }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Abrechnungsart:</strong> 
+                        {% if maschine.abrechnungsart == 'stunden' %}Stunden
+                        {% elif maschine.abrechnungsart == 'hektar' %}Hektar
+                        {% elif maschine.abrechnungsart == 'kilometer' %}Kilometer
+                        {% elif maschine.abrechnungsart == 'stueck' %}Stück
+                        {% else %}{{ maschine.abrechnungsart }}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Kennzahlen -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <p class="text-muted mb-1">Anschaffungspreis</p>
+                <h4 class="mb-0">{{ "%.2f"|format(rentabilitaet.anschaffungspreis) }}€</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card">
+            <div class="card-body">
+                <p class="text-muted mb-1">Restwert (aktuell)</p>
+                <h4 class="mb-0 text-info">{{ "%.2f"|format(rentabilitaet.restwert) }}€</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card">
+            <div class="card-body">
+                <p class="text-muted mb-1">Einnahmen gesamt</p>
+                <h4 class="mb-0 text-success">{{ "%.2f"|format(rentabilitaet.einnahmen_gesamt) }}€</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card">
+            <div class="card-body">
+                <p class="text-muted mb-1">Aufwendungen</p>
+                <h4 class="mb-0 text-warning">{{ "%.2f"|format(rentabilitaet.aufwendungen_gesamt) }}€</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card {% if rentabilitaet.deckungsbeitrag >= 0 %}bg-success{% else %}bg-danger{% endif %} text-white">
+            <div class="card-body">
+                <p class="mb-1 opacity-75">Deckungsbeitrag</p>
+                <h4 class="mb-0">{{ "%.2f"|format(rentabilitaet.deckungsbeitrag) }}€</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Abschreibung -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-calculator"></i> Abschreibung</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <td><strong>Abschreibungsdauer:</strong></td>
+                        <td class="text-end">{{ rentabilitaet.abschreibungsdauer }} Jahre</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Abschreibung pro Jahr:</strong></td>
+                        <td class="text-end">{{ "%.2f"|format(rentabilitaet.abschreibung_pro_jahr) }}€</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Alter der Maschine:</strong></td>
+                        <td class="text-end">{{ "%.1f"|format(rentabilitaet.alter_jahre) }} Jahre</td>
+                    </tr>
+                    <tr class="table-light">
+                        <td><strong>Abschreibung bisher:</strong></td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(rentabilitaet.abschreibung_bisher) }}€</strong></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-percent"></i> Rentabilität</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <td><strong>Anzahl Einsätze:</strong></td>
+                        <td class="text-end">{{ rentabilitaet.anzahl_einsaetze }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Betriebsstunden:</strong></td>
+                        <td class="text-end">{{ "%.1f"|format(rentabilitaet.betriebsstunden) }} h</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Einnahmen:</strong></td>
+                        <td class="text-end">{{ "%.2f"|format(rentabilitaet.einnahmen_gesamt) }}€</td>
+                    </tr>
+                    <tr>
+                        <td><strong>- Abschreibung:</strong></td>
+                        <td class="text-end">-{{ "%.2f"|format(rentabilitaet.abschreibung_bisher) }}€</td>
+                    </tr>
+                    <tr>
+                        <td><strong>- Aufwendungen:</strong></td>
+                        <td class="text-end">-{{ "%.2f"|format(rentabilitaet.aufwendungen_gesamt) }}€</td>
+                    </tr>
+                    <tr class="table-light">
+                        <td><strong>= Deckungsbeitrag:</strong></td>
+                        <td class="text-end">
+                            <strong class="{% if rentabilitaet.deckungsbeitrag >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                {{ "%.2f"|format(rentabilitaet.deckungsbeitrag) }}€
+                            </strong>
+                        </td>
+                    </tr>
+                    <tr class="table-light">
+                        <td><strong>Rentabilität:</strong></td>
+                        <td class="text-end">
+                            <strong class="{% if rentabilitaet.rentabilitaet_prozent >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                {{ "%.1f"|format(rentabilitaet.rentabilitaet_prozent) }}%
+                            </strong>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Einsätze pro Jahr -->
+{% if einsaetze_pro_jahr %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-calendar3"></i> Einsätze und Einnahmen pro Jahr
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Jahr</th>
+                                <th class="text-end">Einsätze</th>
+                                <th class="text-end">Betriebsstunden</th>
+                                <th class="text-end">Einnahmen</th>
+                                <th class="text-end">Aufwendungen</th>
+                                <th class="text-end">Gewinn</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for jahr in einsaetze_pro_jahr %}
+                            <tr>
+                                <td><strong>{{ jahr.jahr }}</strong></td>
+                                <td class="text-end">{{ jahr.anzahl }}</td>
+                                <td class="text-end">{{ "%.1f"|format(jahr.stunden or 0) }} h</td>
+                                <td class="text-end">{{ "%.2f"|format(jahr.einnahmen or 0) }}€</td>
+                                <td class="text-end text-warning">{{ "%.2f"|format(jahr.aufwendungen or 0) }}€</td>
+                                <td class="text-end {% if jahr.gewinn >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    <strong>{{ "%.2f"|format(jahr.gewinn or 0) }}€</strong>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Hinweise -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">
+                    <i class="bi bi-info-circle"></i> Erläuterungen zur Rentabilitätsrechnung
+                </h6>
+                <ul class="small text-muted mb-0">
+                    <li><strong>Abschreibung:</strong> Lineare Abschreibung über die angegebene Nutzungsdauer</li>
+                    <li><strong>Restwert:</strong> Anschaffungspreis minus bisherige Abschreibung (mindestens 0€)</li>
+                    <li><strong>Einnahmen:</strong> Summe aller Maschinenkosten aus Einsätzen (ohne Treibstoffkosten)</li>
+                    <li><strong>Aufwendungen:</strong> Wartung, Reparatur, Versicherung, Steuern und sonstige Kosten (erfasst unter "Aufwendungen")</li>
+                    <li><strong>Deckungsbeitrag:</strong> Einnahmen minus Abschreibung minus Aufwendungen (positiv = rentabel)</li>
+                    <li><strong>Rentabilität:</strong> Deckungsbeitrag in Prozent des Anschaffungspreises</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

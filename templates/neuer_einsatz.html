@@ -29,11 +29,24 @@
                                         data-stundenzaehler="{{ maschine.stundenzaehler_aktuell }}"
                                         data-abrechnungsart="{{ maschine.abrechnungsart or 'stunden' }}"
                                         data-preis="{{ maschine.preis_pro_einheit or 0 }}"
-                                        data-erfassungsmodus="{{ maschine.erfassungsmodus or 'fortlaufend' }}">
-                                    {{ maschine.bezeichnung }} ({{ maschine.hersteller or 'unbekannt' }})
+                                        data-erfassungsmodus="{{ maschine.erfassungsmodus or 'fortlaufend' }}"
+                                        {% if maschine.reservierung_aktiv %}
+                                        data-reservierung="{{ maschine.reservierung_info }}"
+                                        {% endif %}>
+                                    {{ maschine.bezeichnung }} 
+                                    {% if maschine.reservierung_aktiv %}
+                                    <span class="badge bg-warning">Reserviert</span>
+                                    {% endif %}
                                 </option>
                                 {% endfor %}
                             </select>
+                            <small class="text-muted" id="reservierungsHinweis"></small>
+                        </div>
+                        
+                        <div class="col-md-12 mb-3 text-end">
+                            <a href="#" id="reservierungLink" class="btn btn-sm btn-outline-primary" style="display: none;">
+                                <i class="bi bi-calendar-check"></i> Maschine reservieren
+                            </a>
                         </div>
                     </div>
 
@@ -85,7 +98,8 @@
                                 Treibstoffverbrauch (l)
                             </label>
                             <input type="number" class="form-control" id="treibstoffverbrauch" 
-                                   name="treibstoffverbrauch" step="0.1">
+                                   name="treibstoffverbrauch" step="0.1"
+                                   oninput="berechneTreibstoffkosten()">
                         </div>
 
                         <div class="col-md-6 mb-3">
@@ -94,6 +108,7 @@
                             </label>
                             <input type="number" class="form-control" id="treibstoffkosten" 
                                    name="treibstoffkosten" step="0.01">
+                            <small class="text-muted">Preis: {{ treibstoffkosten_preis|round(2) }} EUR/L</small>
                         </div>
                     </div>
 
@@ -152,6 +167,22 @@
 
 {% block scripts %}
 <script>
+// Treibstoffpreis des Benutzers
+const TREIBSTOFFPREIS = {{ treibstoffkosten_preis|default(1.50) }};
+
+// Berechne Treibstoffkosten basierend auf Verbrauch
+function berechneTreibstoffkosten() {
+    const verbrauch = parseFloat(document.getElementById('treibstoffverbrauch').value) || 0;
+    const kostenInput = document.getElementById('treibstoffkosten');
+    
+    if (verbrauch > 0) {
+        const kosten = verbrauch * TREIBSTOFFPREIS;
+        kostenInput.value = kosten.toFixed(2);
+    } else {
+        kostenInput.value = '';
+    }
+}
+
 // Automatisches Setzen des Anfangsstands bei Maschinen-Auswahl
 document.getElementById('maschine_id').addEventListener('change', function() {
     const selectedOption = this.options[this.selectedIndex];
@@ -159,6 +190,24 @@ document.getElementById('maschine_id').addEventListener('change', function() {
     const abrechnungsart = selectedOption.dataset.abrechnungsart || 'stunden';
     const preis = parseFloat(selectedOption.dataset.preis) || 0;
     const erfassungsmodus = selectedOption.dataset.erfassungsmodus || 'fortlaufend';
+    
+    // Reservierungslink anzeigen
+    if (selectedOption.value) {
+        const reservierungLink = document.getElementById('reservierungLink');
+        reservierungLink.href = '/maschine/' + selectedOption.value + '/reservieren';
+        reservierungLink.style.display = 'inline-block';
+        
+        // Reservierungshinweis
+        const hinweis = document.getElementById('reservierungsHinweis');
+        const reservierung = selectedOption.dataset.reservierung;
+        if (reservierung) {
+            hinweis.innerHTML = '<i class="bi bi-exclamation-triangle text-warning"></i> ' + reservierung;
+            hinweis.style.display = 'block';
+        } else {
+            hinweis.innerHTML = '';
+            hinweis.style.display = 'none';
+        }
+    }
     
     // Container für die Erfassungsart anzeigen/verstecken
     const fortlaufendContainer = document.getElementById('fortlaufendContainer');

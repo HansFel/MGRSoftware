@@ -23,6 +23,9 @@ class MaschinenGUI:
                                      "maschinengemeinschaft.db")
         self.init_database()
         
+        # Treibstoffpreis des aktuellen Benutzers
+        self.aktueller_treibstoffpreis = 1.50  # Default
+        
         # GUI erstellen
         self.create_menu()
         self.create_widgets()
@@ -112,6 +115,7 @@ class MaschinenGUI:
         self.benutzer_combo = ttk.Combobox(form_frame, textvariable=self.benutzer_var,
                                            width=28, state='readonly')
         self.benutzer_combo.grid(row=row, column=1, sticky='w', pady=5)
+        self.benutzer_combo.bind('<<ComboboxSelected>>', self.on_benutzer_selected)
         row += 1
         
         # Maschine
@@ -159,16 +163,22 @@ class MaschinenGUI:
         ttk.Label(form_frame, text="Treibstoffverbrauch (l):").grid(
             row=row, column=0, sticky='w', pady=5)
         self.treibstoff_var = tk.StringVar()
-        ttk.Entry(form_frame, textvariable=self.treibstoff_var, width=30).grid(
-            row=row, column=1, sticky='w', pady=5)
+        treibstoff_entry = ttk.Entry(form_frame, textvariable=self.treibstoff_var, width=30)
+        treibstoff_entry.grid(row=row, column=1, sticky='w', pady=5)
+        # Bei Änderung des Verbrauchs, Kosten automatisch berechnen
+        self.treibstoff_var.trace('w', self.berechne_treibstoffkosten)
         row += 1
         
         # Treibstoffkosten
         ttk.Label(form_frame, text="Treibstoffkosten (€):").grid(
             row=row, column=0, sticky='w', pady=5)
         self.kosten_var = tk.StringVar()
-        ttk.Entry(form_frame, textvariable=self.kosten_var, width=30).grid(
-            row=row, column=1, sticky='w', pady=5)
+        kosten_frame = ttk.Frame(form_frame)
+        kosten_frame.grid(row=row, column=1, sticky='w', pady=5)
+        ttk.Entry(kosten_frame, textvariable=self.kosten_var, width=20).pack(side='left')
+        self.treibstoff_preis_label = ttk.Label(kosten_frame, text="", 
+                                                 foreground='gray')
+        self.treibstoff_preis_label.pack(side='left', padx=(5, 0))
         row += 1
         
         # Fläche/Menge
@@ -311,6 +321,63 @@ class MaschinenGUI:
         self.statistik_text.pack(pady=20, padx=20)
     
     # ==================== EVENT HANDLER ====================
+    
+    def on_benutzer_selected(self, event=None):
+        """Wenn Benutzer ausgewählt wird, nur dessen Gemeinschafts-Maschinen anzeigen"""
+        benutzer_name = self.benutzer_var.get()
+        if not benutzer_name:
+            return
+        
+        with MaschinenDBContext(self.db_path) as db:
+            # Finde Benutzer-ID
+            benutzer = db.get_all_benutzer()
+            benutzer_id = None
+            for b in benutzer:
+                display_name = f"{b['name']}, {b['vorname']}"
+                if display_name == benutzer_name:
+                    benutzer_id = b['id']
+                    break
+            
+            if benutzer_id:
+                # Hole Treibstoffkosten des Benutzers
+                benutzer_data = db.get_benutzer(benutzer_id)
+                self.aktueller_treibstoffpreis = benutzer_data.get('treibstoffkosten_preis', 1.50)
+                self.treibstoff_preis_label.config(text=f"({self.aktueller_treibstoffpreis:.2f} EUR/L)")
+                
+                # Hole nur Maschinen aus Gemeinschaften des Benutzers
+                cursor = db.connection.cursor()
+                cursor.execute("""
+                    SELECT DISTINCT m.* 
+                    FROM maschinen m
+                    JOIN gemeinschaften g ON m.gemeinschaft_id = g.id
+                    JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
+                    WHERE mg.mitglied_id = ? 
+                      AND m.aktiv = 1 
+                      AND g.aktiv = 1
+                    ORDER BY m.bezeichnung
+                """, (benutzer_id,))
+                
+                columns = [desc[0] for desc in cursor.description]
+                maschinen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                
+                maschinen_names = [f"{m['bezeichnung']} ({m['hersteller'] or 'unbekannt'})" 
+                                  for m in maschinen]
+                self.maschine_combo['values'] = maschinen_names
+                
+                # Leere Auswahl
+                self.maschine_var.set('')
+    
+    def berechne_treibstoffkosten(self, *args):
+        """Berechne Treibstoffkosten basierend auf Verbrauch"""
+        try:
+            verbrauch = float(self.treibstoff_var.get())
+            if verbrauch > 0:
+                kosten = verbrauch * self.aktueller_treibstoffpreis
+                self.kosten_var.set(f"{kosten:.2f}")
+            else:
+                self.kosten_var.set('')
+        except (ValueError, AttributeError):
+            pass
     
     def on_maschine_selected(self, event=None):
         """Wenn Maschine ausgewählt wird, Anfangstand vorschlagen"""
@@ -1336,7 +1403,7 @@ class EinsatzzweckeWindow:
             
             try:
                 with MaschinenDBContext(self.db_path) as db:
-                    cursor = db.conn.cursor()
+                    cursor = db.connection.cursor()
                     cursor.execute("""
                         SELECT COUNT(*) as anzahl,
                                SUM(treibstoff_kosten) as gesamt_treibstoff,
@@ -1380,14 +1447,14 @@ class EinsatzzweckeWindow:
             
             try:
                 with MaschinenDBContext(self.db_path) as db:
-                    cursor = db.conn.cursor()
+                    cursor = db.connection.cursor()
                     cursor.execute("""
                         DELETE FROM einsaetze
                         WHERE datum BETWEEN ? AND ?
                     """, (von_datum, bis_datum))
                     
                     geloescht = cursor.rowcount
-                    db.conn.commit()
+                    db.connection.commit()
                     
                 messagebox.showinfo("Erfolg", f"{geloescht} Einsätze wurden gelöscht!")
                 delete_window.destroy()
