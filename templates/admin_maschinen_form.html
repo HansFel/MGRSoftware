@@ -69,6 +69,39 @@
                             </div>
                         </div>
 
+                        <hr>
+                        <h5 class="mb-3"><i class="bi bi-cash-coin"></i> Abrechnung</h5>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="erfassungsmodus" class="form-label">Erfassungsmodus</label>
+                                <select class="form-control" id="erfassungsmodus" name="erfassungsmodus">
+                                    <option value="fortlaufend" {{ 'selected' if not maschine or maschine.erfassungsmodus == 'fortlaufend' else '' }}>Fortlaufend (Start/Ende)</option>
+                                    <option value="direkt" {{ 'selected' if maschine and maschine.erfassungsmodus == 'direkt' else '' }}>Direkt eingeben</option>
+                                </select>
+                                <small class="text-muted">Fortlaufend: Stundenzähler Start/Ende. Direkt: z.B. 5 Stunden</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="abrechnungsart" class="form-label">Abrechnungsart</label>
+                                <select class="form-control" id="abrechnungsart" name="abrechnungsart">
+                                    <option value="stunden" {{ 'selected' if maschine and maschine.abrechnungsart == 'stunden' else '' }}>Betriebsstunden</option>
+                                    <option value="hektar" {{ 'selected' if maschine and maschine.abrechnungsart == 'hektar' else '' }}>Hektar (ha)</option>
+                                    <option value="kilometer" {{ 'selected' if maschine and maschine.abrechnungsart == 'kilometer' else '' }}>Kilometer</option>
+                                    <option value="stueck" {{ 'selected' if maschine and maschine.abrechnungsart == 'stueck' else '' }}>Stück/Einheiten</option>
+                                </select>
+                                <small class="text-muted">Wie wird die Maschine abgerechnet?</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="preis_pro_einheit" class="form-label">Preis pro Einheit (€)</label>
+                                <input type="number" class="form-control" id="preis_pro_einheit" 
+                                       name="preis_pro_einheit" step="0.01" min="0"
+                                       value="{{ '%.2f'|format(maschine.preis_pro_einheit) if maschine and maschine.preis_pro_einheit else '0.00' }}">
+                                <small class="text-muted">z.B. 25.00 € pro Stunde oder 120.00 € pro Hektar</small>
+                            </div>
+                        </div>
+
+                        <hr>
+
                         <div class="mb-3">
                             <label for="anmerkungen" class="form-label">Anmerkungen</label>
                             <textarea class="form-control" id="anmerkungen" name="anmerkungen" rows="3">{{ maschine.anmerkungen if maschine else '' }}</textarea>

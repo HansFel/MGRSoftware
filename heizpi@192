@@ -3,7 +3,7 @@ Flask-Webanwendung für Maschinengemeinschaft
 Ermöglicht Benutzern den Zugriff von extern (z.B. Mobiltelefon)
 """
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify, make_response
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify
 from database import MaschinenDBContext
 from datetime import datetime
 import os
@@ -92,11 +92,6 @@ def dashboard():
         # Statistiken laden
         statistik = db.get_statistik_benutzer(benutzer_id)
         
-        # Gesamtkosten berechnen
-        treibstoffkosten = statistik.get('gesamt_kosten', 0) or 0
-        maschinenkosten = statistik.get('gesamt_maschinenkosten', 0) or 0
-        statistik['gesamtkosten'] = treibstoffkosten + maschinenkosten
-        
         # Letzte Einsätze
         einsaetze = db.get_einsaetze_by_benutzer(benutzer_id)
         letzte_einsaetze = einsaetze[:10] if einsaetze else []
@@ -115,45 +110,18 @@ def neuer_einsatz():
             datum = request.form.get('datum')
             maschine_id = int(request.form.get('maschine_id'))
             einsatzzweck_id = int(request.form.get('einsatzzweck_id'))
-            anmerkungen = request.form.get('anmerkungen')
+            anfangstand = float(request.form.get('anfangstand'))
+            endstand = float(request.form.get('endstand'))
             treibstoff = request.form.get('treibstoffverbrauch')
             kosten = request.form.get('treibstoffkosten')
+            anmerkungen = request.form.get('anmerkungen')
             flaeche_menge = request.form.get('flaeche_menge')
             
-            # Hole Maschine für Erfassungsmodus
+            if endstand < anfangstand:
+                flash('Endstand muss größer oder gleich Anfangstand sein!', 'danger')
+                return redirect(url_for('neuer_einsatz'))
+            
             with MaschinenDBContext(DB_PATH) as db:
-                maschine = db.get_maschine_by_id(maschine_id)
-                erfassungsmodus = maschine.get('erfassungsmodus', 'fortlaufend')
-                
-                if erfassungsmodus == 'direkt':
-                    # Direkter Modus - Wert direkt eingeben
-                    direkt_wert = float(request.form.get('direkt_wert', 0))
-                    if direkt_wert <= 0:
-                        flash('Bitte geben Sie einen Wert ein!', 'danger')
-                        return redirect(url_for('neuer_einsatz'))
-                    
-                    # Verwende aktuellen Stundenzähler als Anfang, berechne Ende
-                    aktueller_stand = maschine.get('stundenzaehler_aktuell', 0) or 0
-                    anfangstand = aktueller_stand
-                    
-                    # Bei Stundenabrechnung: Ende = Anfang + Wert
-                    # Bei anderen: Ende = Anfang + Wert (damit Betriebsstunden = Wert)
-                    if maschine.get('abrechnungsart') == 'stunden':
-                        endstand = anfangstand + direkt_wert
-                    else:
-                        # Bei Hektar/km/Stück: Stunden ≈ Wert (vereinfacht)
-                        endstand = anfangstand + direkt_wert
-                        if not flaeche_menge:
-                            flaeche_menge = str(direkt_wert)
-                else:
-                    # Fortlaufender Modus - Start/Ende
-                    anfangstand = float(request.form.get('anfangstand'))
-                    endstand = float(request.form.get('endstand'))
-                    
-                    if endstand < anfangstand:
-                        flash('Endstand muss größer oder gleich Anfangstand sein!', 'danger')
-                        return redirect(url_for('neuer_einsatz'))
-                
                 db.add_einsatz(
                     datum=datum,
                     benutzer_id=session['benutzer_id'],
@@ -191,69 +159,8 @@ def meine_einsaetze():
     """Liste aller eigenen Einsätze"""
     with MaschinenDBContext(DB_PATH) as db:
         einsaetze = db.get_einsaetze_by_benutzer(session['benutzer_id'])
-        
-        # Summen berechnen
-        summe_treibstoff = sum(e.get('treibstoffkosten', 0) or 0 for e in einsaetze)
-        summe_maschine = sum(e.get('kosten_berechnet', 0) or 0 for e in einsaetze)
-        summe_gesamt = summe_treibstoff + summe_maschine
     
-    return render_template('meine_einsaetze.html', 
-                         einsaetze=einsaetze,
-                         summe_treibstoff=summe_treibstoff,
-                         summe_maschine=summe_maschine,
-                         summe_gesamt=summe_gesamt)
-
-
-@app.route('/meine-einsaetze/csv')
-@login_required
-def meine_einsaetze_csv():
-    """Exportiere eigene Einsätze als CSV"""
-    with MaschinenDBContext(DB_PATH) as db:
-        einsaetze = db.get_einsaetze_by_benutzer(session['benutzer_id'])
-    
-    # CSV in StringIO erstellen
-    csv_buffer = StringIO()
-    writer = csv.writer(csv_buffer, delimiter=';')
-    
-    # Header
-    writer.writerow([
-        'Datum', 'Benutzer', 'Maschine', 'Einsatzzweck',
-        'Abrechnungsart', 'Preis pro Einheit',
-        'Anfangstand', 'Endstand', 'Betriebsstunden',
-        'Treibstoffverbrauch (l)', 'Treibstoffkosten (€)',
-        'Fläche/Menge', 'Maschinenkosten (€)', 'Anmerkungen'
-    ])
-    
-    # Daten
-    for e in einsaetze:
-        writer.writerow([
-            e['datum'],
-            e['benutzer'],
-            e['maschine'],
-            e['einsatzzweck'],
-            e.get('abrechnungsart', 'stunden'),
-            f"{e.get('preis_pro_einheit', 0):.2f}",
-            f"{e['anfangstand']:.1f}",
-            f"{e['endstand']:.1f}",
-            f"{e['betriebsstunden']:.1f}",
-            f"{e['treibstoffverbrauch']:.1f}" if e['treibstoffverbrauch'] else '',
-            f"{e.get('treibstoffkosten', 0):.2f}" if e.get('treibstoffkosten') else '',
-            f"{e.get('flaeche_menge', 0):.1f}" if e.get('flaeche_menge') else '',
-            f"{e.get('kosten_berechnet', 0):.2f}" if e.get('kosten_berechnet') else '',
-            e.get('anmerkungen', '')
-        ])
-    
-    # BytesIO für send_file
-    csv_bytes = BytesIO(csv_buffer.getvalue().encode('utf-8-sig'))
-    csv_bytes.seek(0)
-    
-    filename = f'meine_einsaetze_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
-    return send_file(
-        csv_bytes,
-        mimetype='text/csv',
-        as_attachment=True,
-        download_name=filename
-    )
+    return render_template('meine_einsaetze.html', einsaetze=einsaetze)
 
 
 @app.route('/api/maschine/<int:maschine_id>')
@@ -446,8 +353,7 @@ def admin_maschinen_neu():
                 naechste_wartung=float(request.form.get('naechste_wartung')) if request.form.get('naechste_wartung') else None,
                 anmerkungen=request.form.get('anmerkungen'),
                 abrechnungsart=request.form.get('abrechnungsart', 'stunden'),
-                preis_pro_einheit=float(request.form.get('preis_pro_einheit', 0)),
-                erfassungsmodus=request.form.get('erfassungsmodus', 'fortlaufend')
+                preis_pro_einheit=float(request.form.get('preis_pro_einheit', 0))
             )
         flash('Maschine erfolgreich angelegt!', 'success')
         return redirect(url_for('admin_maschinen'))
@@ -471,8 +377,7 @@ def admin_maschinen_edit(maschine_id):
                 'naechste_wartung': float(request.form.get('naechste_wartung')) if request.form.get('naechste_wartung') else None,
                 'anmerkungen': request.form.get('anmerkungen'),
                 'abrechnungsart': request.form.get('abrechnungsart', 'stunden'),
-                'preis_pro_einheit': float(request.form.get('preis_pro_einheit', 0)),
-                'erfassungsmodus': request.form.get('erfassungsmodus', 'fortlaufend')
+                'preis_pro_einheit': float(request.form.get('preis_pro_einheit', 0))
             }
             db.update_maschine(maschine_id, **update_data)
             flash('Maschine erfolgreich aktualisiert!', 'success')
@@ -660,162 +565,6 @@ def admin_backup_database():
         as_attachment=True,
         download_name=filename
     )
-
-
-@app.route('/admin/einsaetze/loeschen', methods=['GET', 'POST'])
-@admin_required
-def admin_einsaetze_loeschen():
-    """Einsätze nach Zeitraum löschen"""
-    if request.method == 'POST':
-        von_datum = request.form.get('von_datum')
-        bis_datum = request.form.get('bis_datum')
-        bestaetigung = request.form.get('bestaetigung')
-        
-        if bestaetigung != 'LOESCHEN':
-            flash('Bestätigung nicht korrekt. Bitte "LOESCHEN" eingeben.', 'danger')
-            return redirect(url_for('admin_einsaetze_loeschen'))
-        
-        try:
-            with MaschinenDBContext(DB_PATH) as db:
-                # Zähle Einsätze im Zeitraum
-                cursor = db.cursor
-                cursor.execute("""
-                    SELECT COUNT(*) FROM maschineneinsaetze 
-                    WHERE datum BETWEEN ? AND ?
-                """, (von_datum, bis_datum))
-                anzahl = cursor.fetchone()[0]
-                
-                if anzahl == 0:
-                    flash('Keine Einsätze im angegebenen Zeitraum gefunden.', 'warning')
-                    return redirect(url_for('admin_einsaetze_loeschen'))
-                
-                # Lösche Einsätze
-                cursor.execute("""
-                    DELETE FROM maschineneinsaetze 
-                    WHERE datum BETWEEN ? AND ?
-                """, (von_datum, bis_datum))
-                db.connection.commit()
-                
-                flash(f'{anzahl} Einsätze erfolgreich gelöscht!', 'success')
-                return redirect(url_for('admin_dashboard'))
-                
-        except Exception as e:
-            flash(f'Fehler beim Löschen: {str(e)}', 'danger')
-            return redirect(url_for('admin_einsaetze_loeschen'))
-    
-    # GET - Zeige Formular
-    with MaschinenDBContext(DB_PATH) as db:
-        cursor = db.cursor
-        # Hole ältesten und neuesten Einsatz
-        cursor.execute("""
-            SELECT MIN(datum) as min_datum, MAX(datum) as max_datum, COUNT(*) as anzahl
-            FROM maschineneinsaetze
-        """)
-        zeitraum = cursor.fetchone()
-    
-    return render_template('admin_einsaetze_loeschen.html', zeitraum=zeitraum)
-
-
-@app.route('/admin/backup')
-@admin_required
-def admin_database_backup():
-    """Erstellt ein Backup der Datenbank als Download"""
-    import shutil
-    from datetime import datetime
-    
-    try:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_filename = f"maschinengemeinschaft_backup_{timestamp}.db"
-        
-        # Erstelle temporäres Backup
-        import tempfile
-        temp_dir = tempfile.gettempdir()
-        temp_backup_path = os.path.join(temp_dir, backup_filename)
-        
-        # Kopiere Datenbank
-        shutil.copy2(DB_PATH, temp_backup_path)
-        
-        # Sende als Download
-        return send_file(
-            temp_backup_path,
-            as_attachment=True,
-            download_name=backup_filename,
-            mimetype='application/x-sqlite3'
-        )
-    except Exception as e:
-        flash(f'Fehler beim Erstellen des Backups: {str(e)}', 'danger')
-        return redirect(url_for('admin_dashboard'))
-
-
-@app.route('/admin/export/alle-einsaetze-csv')
-@admin_required
-def admin_export_alle_einsaetze_csv():
-    """Exportiert alle Einsätze als CSV für Jahresabschluss"""
-    import io
-    from datetime import datetime
-    
-    try:
-        with MaschinenDBContext(DB_PATH) as db:
-            cursor = db.cursor
-            cursor.execute("""
-                SELECT 
-                    m.datum,
-                    b.name as benutzer,
-                    ma.name as maschine,
-                    z.zweck as einsatzzweck,
-                    ma.abrechnungsart,
-                    ma.preis_pro_einheit,
-                    m.flaeche_menge,
-                    m.treibstoff_liter,
-                    m.treibstoff_preis,
-                    m.treibstoff_kosten,
-                    m.kosten_berechnet as maschinenkosten,
-                    (m.treibstoff_kosten + m.kosten_berechnet) as gesamtkosten,
-                    m.stundenzaehler_start,
-                    m.stundenzaehler_ende,
-                    m.bemerkung
-                FROM maschineneinsaetze m
-                JOIN benutzer b ON m.benutzer_id = b.id
-                JOIN maschinen ma ON m.maschine_id = ma.id
-                JOIN einsatzzwecke z ON m.einsatzzweck_id = z.id
-                ORDER BY m.datum DESC, m.id DESC
-            """)
-            
-            rows = cursor.fetchall()
-            columns = [desc[0] for desc in cursor.description]
-        
-        # CSV erstellen
-        output = io.StringIO()
-        writer = csv.writer(output, delimiter=';')
-        
-        # Header
-        writer.writerow(columns)
-        
-        # Daten
-        for row in rows:
-            writer.writerow(row)
-        
-        # Summenzeile
-        writer.writerow([])
-        writer.writerow(['SUMMEN', '', '', '', '', '', '', '', '',
-                        sum(r[9] for r in rows),  # Treibstoffkosten
-                        sum(r[10] for r in rows),  # Maschinenkosten
-                        sum(r[11] for r in rows),  # Gesamtkosten
-                        '', '', ''])
-        
-        # Download vorbereiten
-        output.seek(0)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        response = make_response(output.getvalue().encode('utf-8-sig'))
-        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
-        response.headers['Content-Disposition'] = f'attachment; filename=alle_einsaetze_{timestamp}.csv'
-        
-        return response
-        
-    except Exception as e:
-        flash(f'Fehler beim Exportieren: {str(e)}', 'danger')
-        return redirect(url_for('admin_dashboard'))
 
 
 if __name__ == '__main__':

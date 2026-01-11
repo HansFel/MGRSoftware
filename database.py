@@ -136,7 +136,9 @@ class MaschinenDB:
                      naechste_wartung: float = None,
                      naechste_wartung_bei: float = None,
                      anmerkungen: str = None,
-                     bemerkungen: str = None) -> int:
+                     bemerkungen: str = None,
+                     abrechnungsart: str = 'stunden',
+                     preis_pro_einheit: float = 0.0) -> int:
         """Neue Maschine hinzufügen"""
         # naechste_wartung hat Vorrang vor naechste_wartung_bei (Kompatibilität)
         wartung = naechste_wartung if naechste_wartung is not None else naechste_wartung_bei
@@ -144,12 +146,14 @@ class MaschinenDB:
         sql = """INSERT INTO maschinen (bezeichnung, hersteller, modell, baujahr,
                                         kennzeichen, anschaffungsdatum, 
                                         stundenzaehler_aktuell, wartungsintervall,
-                                        naechste_wartung_bei, bemerkungen)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                                        naechste_wartung_bei, bemerkungen,
+                                        abrechnungsart, preis_pro_einheit)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
         self.cursor.execute(sql, (bezeichnung, hersteller, modell, baujahr,
                                   kennzeichen, anschaffungsdatum,
                                   stundenzaehler_aktuell, wartungsintervall,
-                                  wartung, anmerkungen or bemerkungen))
+                                  wartung, anmerkungen or bemerkungen,
+                                  abrechnungsart, preis_pro_einheit))
         self.connection.commit()
         return self.cursor.lastrowid
     
@@ -251,19 +255,38 @@ class MaschinenDB:
     def add_einsatz(self, datum: str, benutzer_id: int, maschine_id: int,
                     einsatzzweck_id: int, anfangstand: float, endstand: float,
                     treibstoffverbrauch: float = None, treibstoffkosten: float = None,
-                    anmerkungen: str = None) -> int:
+                    anmerkungen: str = None, flaeche_menge: float = None) -> int:
         """Neuen Maschineneinsatz hinzufügen"""
         if endstand < anfangstand:
             raise ValueError("Endstand muss größer oder gleich Anfangstand sein!")
         
+        # Kosten berechnen basierend auf Maschinen-Abrechnungsart
+        kosten_berechnet = None
+        maschine = self.get_maschine_by_id(maschine_id)
+        if maschine:
+            abrechnungsart = maschine.get('abrechnungsart', 'stunden')
+            preis = maschine.get('preis_pro_einheit', 0) or 0
+            
+            if abrechnungsart == 'stunden':
+                # Berechne basierend auf Betriebsstunden
+                kosten_berechnet = (endstand - anfangstand) * preis
+            elif abrechnungsart in ['hektar', 'kilometer', 'stueck']:
+                # Berechne basierend auf Fläche/Menge, falls vorhanden
+                if flaeche_menge and flaeche_menge > 0:
+                    kosten_berechnet = flaeche_menge * preis
+                else:
+                    # Fallback: 0 Euro wenn keine Menge angegeben
+                    kosten_berechnet = 0.0
+        
         sql = """INSERT INTO maschineneinsaetze (datum, benutzer_id, maschine_id,
                                                  einsatzzweck_id, anfangstand, endstand,
                                                  treibstoffverbrauch, treibstoffkosten,
-                                                 anmerkungen)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                                                 anmerkungen, flaeche_menge, kosten_berechnet)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
         self.cursor.execute(sql, (datum, benutzer_id, maschine_id, einsatzzweck_id,
                                   anfangstand, endstand, treibstoffverbrauch,
-                                  treibstoffkosten, anmerkungen))
+                                  treibstoffkosten, anmerkungen, flaeche_menge,
+                                  kosten_berechnet))
         self.connection.commit()
         
         # Stundenzähler der Maschine automatisch aktualisieren
@@ -314,7 +337,8 @@ class MaschinenDB:
                     COUNT(*) as anzahl_einsaetze,
                     SUM(betriebsstunden) as gesamt_stunden,
                     SUM(treibstoffverbrauch) as gesamt_treibstoff,
-                    SUM(treibstoffkosten) as gesamt_kosten
+                    SUM(treibstoffkosten) as gesamt_kosten,
+                    SUM(kosten_berechnet) as gesamt_maschinenkosten
                  FROM maschineneinsaetze
                  WHERE benutzer_id = ?"""
         self.cursor.execute(sql, (benutzer_id,))

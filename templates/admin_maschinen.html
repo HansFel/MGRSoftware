@@ -25,6 +25,8 @@
                                 <th>Baujahr</th>
                                 <th>Kennzeichen</th>
                                 <th>Stundenzähler</th>
+                                <th>Abrechnung</th>
+                                <th>Preis</th>
                                 <th>Nächste Wartung</th>
                                 <th>Status</th>
                                 <th>Aktionen</th>
@@ -40,6 +42,28 @@
                                 <td>{{ maschine.kennzeichen or '-' }}</td>
                                 <td>
                                     <strong>{{ "%.1f"|format(maschine.stundenzaehler_aktuell or 0) }} h</strong>
+                                </td>
+                                <td>
+                                    {% if maschine.abrechnungsart %}
+                                        {% if maschine.abrechnungsart == 'stunden' %}
+                                            <span class="badge bg-primary">Stunden</span>
+                                        {% elif maschine.abrechnungsart == 'hektar' %}
+                                            <span class="badge bg-success">Hektar</span>
+                                        {% elif maschine.abrechnungsart == 'kilometer' %}
+                                            <span class="badge bg-info">Kilometer</span>
+                                        {% elif maschine.abrechnungsart == 'stueck' %}
+                                            <span class="badge bg-warning">Stück</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if maschine.preis_pro_einheit %}
+                                        <strong>{{ "%.2f"|format(maschine.preis_pro_einheit) }} €</strong>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     {% if maschine.naechste_wartung_bei %}

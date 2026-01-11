@@ -23,9 +23,10 @@
                                 <th>Einsatzzweck</th>
                                 <th>Anfang</th>
                                 <th>Ende</th>
-                                <th>Stunden</th>
+                                <th>Menge</th>
                                 <th>Treibstoff</th>
-                                <th>Kosten</th>
+                                <th>T-Kosten</th>
+                                <th>Berechnet</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -37,7 +38,17 @@
                                 <td><span class="badge bg-info">{{ einsatz.einsatzzweck }}</span></td>
                                 <td>{{ "%.1f"|format(einsatz.anfangstand) }} h</td>
                                 <td>{{ "%.1f"|format(einsatz.endstand) }} h</td>
-                                <td><strong>{{ "%.1f"|format(einsatz.betriebsstunden) }} h</strong></td>
+                                <td>
+                                    {% if einsatz.abrechnungsart == 'hektar' and einsatz.flaeche_menge %}
+                                        <strong>{{ "%.2f"|format(einsatz.flaeche_menge) }} ha</strong>
+                                    {% elif einsatz.abrechnungsart == 'kilometer' and einsatz.flaeche_menge %}
+                                        <strong>{{ "%.2f"|format(einsatz.flaeche_menge) }} km</strong>
+                                    {% elif einsatz.abrechnungsart == 'stueck' and einsatz.flaeche_menge %}
+                                        <strong>{{ "%.0f"|format(einsatz.flaeche_menge) }} St</strong>
+                                    {% else %}
+                                        <strong>{{ "%.1f"|format(einsatz.betriebsstunden) }} h</strong>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if einsatz.treibstoffverbrauch %}
                                         {{ "%.1f"|format(einsatz.treibstoffverbrauch) }} l
@@ -48,6 +59,13 @@
                                 <td>
                                     {% if einsatz.treibstoffkosten %}
                                         {{ "%.2f"|format(einsatz.treibstoffkosten) }} €
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if einsatz.kosten_berechnet %}
+                                        <strong class="text-success">{{ "%.2f"|format(einsatz.kosten_berechnet) }} €</strong>
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
@@ -63,6 +81,22 @@
                                     {% set treibstoff_gesamt = einsaetze|selectattr('treibstoffverbrauch')|sum(attribute='treibstoffverbrauch') %}
                                     {% if treibstoff_gesamt > 0 %}
                                         <strong>{{ "%.1f"|format(treibstoff_gesamt) }} l</strong>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% set kosten_gesamt = einsaetze|selectattr('treibstoffkosten')|sum(attribute='treibstoffkosten') %}
+                                    {% if kosten_gesamt > 0 %}
+                                        <strong>{{ "%.2f"|format(kosten_gesamt) }} €</strong>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% set berechnet_gesamt = einsaetze|selectattr('kosten_berechnet')|sum(attribute='kosten_berechnet') %}
+                                    {% if berechnet_gesamt > 0 %}
+                                        <strong class="text-success">{{ "%.2f"|format(berechnet_gesamt) }} €</strong>
                                     {% else %}
                                         -
                                     {% endif %}

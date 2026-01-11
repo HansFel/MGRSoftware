@@ -60,10 +60,40 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <p class="text-muted mb-1">Kosten (€)</p>
-                        <h3 class="mb-0">{{ "%.2f"|format(statistik.gesamt_kosten or 0) }}</h3>
+                        <p class="text-muted mb-1">Treibstoffkosten</p>
+                        <h3 class="mb-0 text-danger">{{ "%.2f"|format(statistik.gesamt_kosten or 0) }}€</h3>
                     </div>
-                    <i class="bi bi-currency-euro" style="font-size: 2.5rem; color: #667eea;"></i>
+                    <i class="bi bi-fuel-pump-fill" style="font-size: 2.5rem; color: #dc3545;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="text-muted mb-1">Maschinenkosten</p>
+                        <h3 class="mb-0 text-success">{{ "%.2f"|format(statistik.gesamt_maschinenkosten or 0) }}€</h3>
+                    </div>
+                    <i class="bi bi-gear-fill" style="font-size: 2.5rem; color: #28a745;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card stat-card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="mb-1 opacity-75">GESAMTKOSTEN</p>
+                        <h2 class="mb-0">{{ "%.2f"|format(statistik.gesamtkosten or 0) }}€</h2>
+                    </div>
+                    <i class="bi bi-currency-euro" style="font-size: 3rem; opacity: 0.75;"></i>
                 </div>
             </div>
         </div>
@@ -115,7 +145,7 @@
                                 <th>Datum</th>
                                 <th>Maschine</th>
                                 <th>Zweck</th>
-                                <th>Stunden</th>
+                                <th>Menge</th>
                                 <th>Treibstoff</th>
                             </tr>
                         </thead>
@@ -125,7 +155,17 @@
                                 <td>{{ einsatz.datum }}</td>
                                 <td>{{ einsatz.maschine }}</td>
                                 <td>{{ einsatz.einsatzzweck }}</td>
-                                <td>{{ "%.1f"|format(einsatz.betriebsstunden) }} h</td>
+                                <td>
+                                    {% if einsatz.abrechnungsart == 'hektar' and einsatz.flaeche_menge %}
+                                        {{ "%.2f"|format(einsatz.flaeche_menge) }} ha
+                                    {% elif einsatz.abrechnungsart == 'kilometer' and einsatz.flaeche_menge %}
+                                        {{ "%.2f"|format(einsatz.flaeche_menge) }} km
+                                    {% elif einsatz.abrechnungsart == 'stueck' and einsatz.flaeche_menge %}
+                                        {{ "%.0f"|format(einsatz.flaeche_menge) }} St
+                                    {% else %}
+                                        {{ "%.1f"|format(einsatz.betriebsstunden) }} h
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if einsatz.treibstoffverbrauch %}
                                         {{ "%.1f"|format(einsatz.treibstoffverbrauch) }} l

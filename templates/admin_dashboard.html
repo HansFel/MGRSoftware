@@ -143,11 +143,37 @@
                     <a href="{{ url_for('admin_export_csv') }}" class="btn btn-outline-primary">
                         <i class="bi bi-file-earmark-spreadsheet"></i> Export als CSV (ZIP)
                     </a>
-                    <a href="{{ url_for('admin_backup_database') }}" class="btn btn-outline-success">
+                    <a href="{{ url_for('admin_database_backup') }}" class="btn btn-outline-success">
                         <i class="bi bi-database"></i> Datenbank-Backup
                     </a>
+                    <a href="{{ url_for('admin_export_alle_einsaetze_csv') }}" class="btn btn-outline-info">
+                        <i class="bi bi-file-earmark-spreadsheet-fill"></i> Alle Einsätze als CSV
+                    </a>
                 </div>
-                <div class="alert alert-info mt-3 mb-0">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Einsätze löschen -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-exclamation-triangle-fill"></i> Datenbereinigung (Jahresende)
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-3">
+                    <strong>ACHTUNG:</strong> Hier können Sie alte Einsätze permanent löschen (z.B. am Jahresende).
+                    <br>
+                    <span class="text-danger">Erstellen Sie vorher unbedingt ein Backup!</span>
+                </p>
+                <a href="{{ url_for('admin_einsaetze_loeschen') }}" class="btn btn-danger">
+                    <i class="bi bi-trash-fill"></i> Einsätze nach Zeitraum löschen
+                </a>
+                <div class="alert alert-warning mt-3 mb-0">
                     <i class="bi bi-info-circle"></i> 
                     <strong>Hinweis:</strong> Das Datenbank-Backup enthält alle Daten inklusive Passwörter (gehashed) und kann zur Wiederherstellung verwendet werden.
                 </div>

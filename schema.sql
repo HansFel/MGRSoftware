@@ -32,7 +32,10 @@ CREATE TABLE IF NOT EXISTS maschinen (
     naechste_wartung_bei REAL,
     aktiv BOOLEAN DEFAULT 1,
     anmerkungen TEXT,
-    bemerkungen TEXT
+    bemerkungen TEXT,
+    erfassungsmodus TEXT DEFAULT 'fortlaufend',
+    abrechnungsart TEXT DEFAULT 'stunden',
+    preis_pro_einheit REAL DEFAULT 0.0
 );
 
 -- Tabelle für Einsatzzwecke
@@ -55,6 +58,8 @@ CREATE TABLE IF NOT EXISTS maschineneinsaetze (
     betriebsstunden REAL GENERATED ALWAYS AS (endstand - anfangstand) STORED,
     treibstoffverbrauch REAL,
     treibstoffkosten REAL,
+    flaeche_menge REAL,
+    kosten_berechnet REAL,
     anmerkungen TEXT,
     erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     geaendert_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -83,12 +88,16 @@ SELECT
     e.datum,
     b.name || ', ' || COALESCE(b.vorname, '') AS benutzer,
     m.bezeichnung AS maschine,
+    m.abrechnungsart AS abrechnungsart,
+    m.preis_pro_einheit AS preis_pro_einheit,
     ez.bezeichnung AS einsatzzweck,
     e.anfangstand,
     e.endstand,
     e.betriebsstunden,
     e.treibstoffverbrauch,
     e.treibstoffkosten,
+    e.flaeche_menge,
+    e.kosten_berechnet,
     e.anmerkungen
 FROM maschineneinsaetze e
 JOIN benutzer b ON e.benutzer_id = b.id

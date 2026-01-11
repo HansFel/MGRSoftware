@@ -26,7 +26,10 @@
                                 <option value="">Bitte wählen...</option>
                                 {% for maschine in maschinen %}
                                 <option value="{{ maschine.id }}" 
-                                        data-stundenzaehler="{{ maschine.stundenzaehler_aktuell }}">
+                                        data-stundenzaehler="{{ maschine.stundenzaehler_aktuell }}"
+                                        data-abrechnungsart="{{ maschine.abrechnungsart or 'stunden' }}"
+                                        data-preis="{{ maschine.preis_pro_einheit or 0 }}"
+                                        data-erfassungsmodus="{{ maschine.erfassungsmodus or 'fortlaufend' }}">
                                     {{ maschine.bezeichnung }} ({{ maschine.hersteller or 'unbekannt' }})
                                 </option>
                                 {% endfor %}
@@ -44,24 +47,35 @@
                         </select>
                     </div>
 
-                    <div class="row">
+                    <!-- Fortlaufender Modus (Start/Ende) -->
+                    <div class="row" id="fortlaufendContainer" style="display: none;">
                         <div class="col-md-4 mb-3">
                             <label for="anfangstand" class="form-label">Anfangstand (h) *</label>
                             <input type="number" class="form-control" id="anfangstand" 
-                                   name="anfangstand" step="0.1" required>
+                                   name="anfangstand" step="0.1">
                             <small class="text-muted" id="aktuellerStand"></small>
                         </div>
 
                         <div class="col-md-4 mb-3">
                             <label for="endstand" class="form-label">Endstand (h) *</label>
                             <input type="number" class="form-control" id="endstand" 
-                                   name="endstand" step="0.1" required>
+                                   name="endstand" step="0.1">
                         </div>
 
                         <div class="col-md-4 mb-3">
                             <label for="betriebsstunden" class="form-label">Betriebsstunden</label>
                             <input type="text" class="form-control" id="betriebsstunden" 
                                    readonly style="background-color: #e9ecef;">
+                        </div>
+                    </div>
+
+                    <!-- Direkter Modus (direkte Eingabe) -->
+                    <div class="row" id="direktContainer" style="display: none;">
+                        <div class="col-md-6 mb-3">
+                            <label for="direkt_wert" class="form-label" id="direktLabel">Stunden/Menge *</label>
+                            <input type="number" class="form-control" id="direkt_wert" 
+                                   name="direkt_wert" step="0.01" min="0">
+                            <small class="text-muted" id="direktHinweis">z.B. 5.5 Stunden</small>
                         </div>
                     </div>
 
@@ -80,6 +94,24 @@
                             </label>
                             <input type="number" class="form-control" id="treibstoffkosten" 
                                    name="treibstoffkosten" step="0.01">
+                        </div>
+                    </div>
+
+                    <div class="row" id="flaecheContainer" style="display: none;">
+                        <div class="col-md-6 mb-3">
+                            <label for="flaeche_menge" class="form-label" id="flaecheLabel">
+                                Fläche/Menge
+                            </label>
+                            <input type="number" class="form-control" id="flaeche_menge" 
+                                   name="flaeche_menge" step="0.01">
+                            <small class="text-muted" id="flaecheHinweis"></small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="kosten_berechnet" class="form-label">
+                                Berechnete Kosten (€)
+                            </label>
+                            <input type="text" class="form-control" id="kosten_berechnet" 
+                                   readonly style="background-color: #e9ecef;">
                         </div>
                     </div>
 
@@ -124,13 +156,94 @@
 document.getElementById('maschine_id').addEventListener('change', function() {
     const selectedOption = this.options[this.selectedIndex];
     const stundenzaehler = selectedOption.dataset.stundenzaehler;
+    const abrechnungsart = selectedOption.dataset.abrechnungsart || 'stunden';
+    const preis = parseFloat(selectedOption.dataset.preis) || 0;
+    const erfassungsmodus = selectedOption.dataset.erfassungsmodus || 'fortlaufend';
     
-    if (stundenzaehler) {
-        document.getElementById('anfangstand').value = stundenzaehler;
-        document.getElementById('aktuellerStand').textContent = 
-            `Aktueller Stand: ${parseFloat(stundenzaehler).toFixed(1)} h`;
-        berechneBetriebsstunden();
+    // Container für die Erfassungsart anzeigen/verstecken
+    const fortlaufendContainer = document.getElementById('fortlaufendContainer');
+    const direktContainer = document.getElementById('direktContainer');
+    const anfangstandInput = document.getElementById('anfangstand');
+    const endstandInput = document.getElementById('endstand');
+    const direktWertInput = document.getElementById('direkt_wert');
+    const direktLabel = document.getElementById('direktLabel');
+    const direktHinweis = document.getElementById('direktHinweis');
+    
+    if (erfassungsmodus === 'direkt') {
+        // Direkter Modus
+        fortlaufendContainer.style.display = 'none';
+        direktContainer.style.display = 'flex';
+        anfangstandInput.required = false;
+        endstandInput.required = false;
+        direktWertInput.required = true;
+        
+        // Label anpassen
+        switch(abrechnungsart) {
+            case 'stunden':
+                direktLabel.textContent = 'Stunden *';
+                direktHinweis.textContent = preis > 0 ? `Preis: €${preis.toFixed(2)} pro Stunde` : 'z.B. 5.5 Stunden';
+                break;
+            case 'hektar':
+                direktLabel.textContent = 'Fläche (ha) *';
+                direktHinweis.textContent = preis > 0 ? `Preis: €${preis.toFixed(2)} pro Hektar` : 'z.B. 10 Hektar';
+                break;
+            case 'kilometer':
+                direktLabel.textContent = 'Strecke (km) *';
+                direktHinweis.textContent = preis > 0 ? `Preis: €${preis.toFixed(2)} pro Kilometer` : 'z.B. 25 Kilometer';
+                break;
+            case 'stueck':
+                direktLabel.textContent = 'Anzahl (Stück) *';
+                direktHinweis.textContent = preis > 0 ? `Preis: €${preis.toFixed(2)} pro Stück` : 'z.B. 100 Stück';
+                break;
+        }
+    } else {
+        // Fortlaufender Modus
+        fortlaufendContainer.style.display = 'flex';
+        direktContainer.style.display = 'none';
+        anfangstandInput.required = true;
+        endstandInput.required = true;
+        direktWertInput.required = false;
+        
+        if (stundenzaehler) {
+            anfangstandInput.value = stundenzaehler;
+            document.getElementById('aktuellerStand').textContent = 
+                `Aktueller Stand: ${parseFloat(stundenzaehler).toFixed(1)} h`;
+            berechneBetriebsstunden();
+        }
     }
+
+    // Fläche/Menge-Feld anzeigen/verstecken (nur bei fortlaufend UND nicht-Stunden)
+    const flaecheContainer = document.getElementById('flaecheContainer');
+    const flaecheLabel = document.getElementById('flaecheLabel');
+    const flaecheHinweis = document.getElementById('flaecheHinweis');
+    const flaecheInput = document.getElementById('flaeche_menge');
+    
+    if (erfassungsmodus === 'fortlaufend' && abrechnungsart !== 'stunden' && preis > 0) {
+        flaecheContainer.style.display = 'flex';
+        
+        // Label und Hinweis anpassen
+        switch(abrechnungsart) {
+            case 'hektar':
+                flaecheLabel.textContent = 'Fläche (ha) *';
+                flaecheHinweis.textContent = `Preis: €${preis.toFixed(2)} pro Hektar`;
+                break;
+            case 'kilometer':
+                flaecheLabel.textContent = 'Strecke (km) *';
+                flaecheHinweis.textContent = `Preis: €${preis.toFixed(2)} pro Kilometer`;
+                break;
+            case 'stueck':
+                flaecheLabel.textContent = 'Anzahl (Stück) *';
+                flaecheHinweis.textContent = `Preis: €${preis.toFixed(2)} pro Stück`;
+                break;
+        }
+        flaecheInput.required = true;
+    } else {
+        flaecheContainer.style.display = 'none';
+        flaecheInput.required = false;
+        flaecheInput.value = '';
+    }
+    
+    berechneKosten();
 });
 
 // Automatische Berechnung der Betriebsstunden
@@ -139,10 +252,43 @@ function berechneBetriebsstunden() {
     const ende = parseFloat(document.getElementById('endstand').value) || 0;
     const stunden = Math.max(0, ende - anfang);
     document.getElementById('betriebsstunden').value = stunden.toFixed(1) + ' h';
+    berechneKosten();
+}
+
+// Berechnung der Kosten
+function berechneKosten() {
+    const selectedOption = document.getElementById('maschine_id').options[document.getElementById('maschine_id').selectedIndex];
+    const abrechnungsart = selectedOption.dataset.abrechnungsart || 'stunden';
+    const preis = parseFloat(selectedOption.dataset.preis) || 0;
+    const erfassungsmodus = selectedOption.dataset.erfassungsmodus || 'fortlaufend';
+    
+    let kosten = 0;
+    
+    if (preis > 0) {
+        if (erfassungsmodus === 'direkt') {
+            // Direkter Modus - Wert direkt eingegeben
+            const direktWert = parseFloat(document.getElementById('direkt_wert').value) || 0;
+            kosten = direktWert * preis;
+        } else if (abrechnungsart === 'stunden') {
+            // Fortlaufend, Stundenabrechnung
+            const anfang = parseFloat(document.getElementById('anfangstand').value) || 0;
+            const ende = parseFloat(document.getElementById('endstand').value) || 0;
+            const stunden = Math.max(0, ende - anfang);
+            kosten = stunden * preis;
+        } else {
+            // Fortlaufend, andere Abrechnungsart (Fläche)
+            const flaeche = parseFloat(document.getElementById('flaeche_menge').value) || 0;
+            kosten = flaeche * preis;
+        }
+    }
+    
+    document.getElementById('kosten_berechnet').value = kosten > 0 ? `€${kosten.toFixed(2)}` : '';
 }
 
 document.getElementById('anfangstand').addEventListener('input', berechneBetriebsstunden);
 document.getElementById('endstand').addEventListener('input', berechneBetriebsstunden);
+document.getElementById('flaeche_menge').addEventListener('input', berechneKosten);
+document.getElementById('direkt_wert').addEventListener('input', berechneKosten);
 
 // Validierung vor dem Absenden
 document.getElementById('einsatzForm').addEventListener('submit', function(e) {

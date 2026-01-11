@@ -10,9 +10,14 @@
                 <h4 class="mb-0">
                     <i class="bi bi-list-ul"></i> Meine Einsätze
                 </h4>
-                <a href="{{ url_for('neuer_einsatz') }}" class="btn btn-primary btn-sm">
-                    <i class="bi bi-plus-circle"></i> Neuer Einsatz
-                </a>
+                <div>
+                    <a href="{{ url_for('meine_einsaetze_csv') }}" class="btn btn-success btn-sm me-2">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> CSV Export
+                    </a>
+                    <a href="{{ url_for('neuer_einsatz') }}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-circle"></i> Neuer Einsatz
+                    </a>
+                </div>
             </div>
             <div class="card-body">
                 {% if einsaetze %}
@@ -23,11 +28,13 @@
                                 <th>Datum</th>
                                 <th>Maschine</th>
                                 <th>Einsatzzweck</th>
+                                <th>Preis/Einh.</th>
                                 <th>Anfang</th>
                                 <th>Ende</th>
-                                <th>Stunden</th>
+                                <th>Menge</th>
                                 <th>Treibstoff</th>
-                                <th>Kosten</th>
+                                <th>T-Kosten</th>
+                                <th>M-Kosten</th>
                                 <th>Anmerkungen</th>
                             </tr>
                         </thead>
@@ -41,10 +48,31 @@
                                 <td>
                                     <span class="badge bg-info">{{ einsatz.einsatzzweck }}</span>
                                 </td>
+                                <td>
+                                    {% if einsatz.preis_pro_einheit %}
+                                        <small>{{ "%.2f"|format(einsatz.preis_pro_einheit) }}€
+                                        {% if einsatz.abrechnungsart == 'hektar' %}/ha
+                                        {% elif einsatz.abrechnungsart == 'kilometer' %}/km
+                                        {% elif einsatz.abrechnungsart == 'stueck' %}/St
+                                        {% else %}/h
+                                        {% endif %}
+                                        </small>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ "%.1f"|format(einsatz.anfangstand) }} h</td>
                                 <td>{{ "%.1f"|format(einsatz.endstand) }} h</td>
                                 <td>
-                                    <strong>{{ "%.1f"|format(einsatz.betriebsstunden) }} h</strong>
+                                    {% if einsatz.abrechnungsart == 'hektar' and einsatz.flaeche_menge %}
+                                        <strong>{{ "%.2f"|format(einsatz.flaeche_menge) }} ha</strong>
+                                    {% elif einsatz.abrechnungsart == 'kilometer' and einsatz.flaeche_menge %}
+                                        <strong>{{ "%.2f"|format(einsatz.flaeche_menge) }} km</strong>
+                                    {% elif einsatz.abrechnungsart == 'stueck' and einsatz.flaeche_menge %}
+                                        <strong>{{ "%.0f"|format(einsatz.flaeche_menge) }} St</strong>
+                                    {% else %}
+                                        <strong>{{ "%.1f"|format(einsatz.betriebsstunden) }} h</strong>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     {% if einsatz.treibstoffverbrauch %}
@@ -61,6 +89,13 @@
                                     {% endif %}
                                 </td>
                                 <td>
+                                    {% if einsatz.kosten_berechnet %}
+                                        <strong class="text-success">{{ "%.2f"|format(einsatz.kosten_berechnet) }} €</strong>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
                                     {% if einsatz.anmerkungen %}
                                         <small class="text-muted">{{ einsatz.anmerkungen[:50] }}{% if einsatz.anmerkungen|length > 50 %}...{% endif %}</small>
                                     {% else %}
@@ -72,7 +107,7 @@
                         </tbody>
                         <tfoot class="table-light">
                             <tr>
-                                <td colspan="5" class="text-end"><strong>Gesamt:</strong></td>
+                                <td colspan="6" class="text-end"><strong>Gesamt:</strong></td>
                                 <td><strong>{{ "%.1f"|format(einsaetze|sum(attribute='betriebsstunden')) }} h</strong></td>
                                 <td>
                                     {% set treibstoff_gesamt = einsaetze|selectattr('treibstoffverbrauch')|sum(attribute='treibstoffverbrauch') %}
@@ -83,14 +118,18 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% set kosten_gesamt = einsaetze|selectattr('treibstoffkosten')|sum(attribute='treibstoffkosten') %}
-                                    {% if kosten_gesamt > 0 %}
-                                        <strong>{{ "%.2f"|format(kosten_gesamt) }} €</strong>
-                                    {% else %}
-                                        -
-                                    {% endif %}
+                                    <strong class="text-danger">{{ "%.2f"|format(summe_treibstoff) }} €</strong>
+                                </td>
+                                <td>
+                                    <strong class="text-success">{{ "%.2f"|format(summe_maschine) }} €</strong>
                                 </td>
                                 <td></td>
+                            </tr>
+                            <tr class="table-info">
+                                <td colspan="8" class="text-end"><strong>GESAMTKOSTEN:</strong></td>
+                                <td colspan="3">
+                                    <strong class="text-primary" style="font-size: 1.1em;">{{ "%.2f"|format(summe_gesamt) }} €</strong>
+                                </td>
                             </tr>
                         </tfoot>
                     </table>
