@@ -173,6 +173,18 @@ def login():
                 else:
                     session['gemeinschafts_admin_ids'] = []
                 
+                # Lade Gemeinschaften des Benutzers für das Menü
+                cursor = db.connection.cursor()
+                cursor.execute("""
+                    SELECT g.id, g.name
+                    FROM gemeinschaften g
+                    JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
+                    WHERE mg.mitglied_id = ? AND g.aktiv = 1
+                    ORDER BY g.name
+                """, (benutzer['id'],))
+                gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
+                session['gemeinschaften'] = gemeinschaften
+                
                 flash(f"Willkommen, {benutzer['vorname']}!", 'success')
                 return redirect(url_for('dashboard'))
             else:
@@ -2260,6 +2272,439 @@ def admin_gemeinschaften_edit(gemeinschaft_id):
     return render_template('admin_gemeinschaften_form.html', gemeinschaft=gemeinschaft)
 
 
+@app.route('/admin/gemeinschaften/<int:gemeinschaft_id>/konten')
+@admin_required
+def admin_konten(gemeinschaft_id):
+    """Mitgliederkonten-Übersicht"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Gemeinschaft laden
+        cursor.execute("SELECT * FROM gemeinschaften WHERE id = ?", (gemeinschaft_id,))
+        columns = [desc[0] for desc in cursor.description]
+        gemeinschaft = dict(zip(columns, cursor.fetchone()))
+        
+        # Konten mit Details
+        cursor.execute("""
+            SELECT 
+                mk.benutzer_id,
+                b.vorname || ' ' || b.name as mitglied_name,
+                b.email,
+                mk.saldo,
+                (SELECT COUNT(*) FROM mitglieder_abrechnungen 
+                 WHERE benutzer_id = mk.benutzer_id 
+                 AND gemeinschaft_id = mk.gemeinschaft_id 
+                 AND status = 'offen') as offene_abrechnungen,
+                (SELECT COUNT(*) FROM buchungen 
+                 WHERE benutzer_id = mk.benutzer_id 
+                 AND gemeinschaft_id = mk.gemeinschaft_id) as anzahl_buchungen,
+                (SELECT MAX(datum) FROM buchungen 
+                 WHERE benutzer_id = mk.benutzer_id 
+                 AND gemeinschaft_id = mk.gemeinschaft_id) as letzte_buchung
+            FROM mitglieder_konten mk
+            JOIN benutzer b ON mk.benutzer_id = b.id
+            WHERE mk.gemeinschaft_id = ?
+            ORDER BY mk.saldo ASC
+        """, (gemeinschaft_id,))
+        
+        columns = [desc[0] for desc in cursor.description]
+        konten = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        
+        # Statistiken
+        cursor.execute("""
+            SELECT 
+                SUM(CASE WHEN saldo > 0 THEN saldo ELSE 0 END) as guthaben,
+                SUM(CASE WHEN saldo < 0 THEN saldo ELSE 0 END) as schulden,
+                SUM(saldo) as saldo_gesamt,
+                COUNT(CASE WHEN saldo > 0.01 THEN 1 END) as anzahl_guthaben,
+                COUNT(CASE WHEN saldo < -0.01 THEN 1 END) as anzahl_schulden,
+                COUNT(CASE WHEN saldo >= -0.01 AND saldo <= 0.01 THEN 1 END) as anzahl_ausgeglichen
+            FROM mitglieder_konten
+            WHERE gemeinschaft_id = ?
+        """, (gemeinschaft_id,))
+        
+        stat_row = cursor.fetchone()
+        statistik = {
+            'guthaben': stat_row[0] or 0,
+            'schulden': stat_row[1] or 0,
+            'saldo_gesamt': stat_row[2] or 0,
+            'anzahl_guthaben': stat_row[3] or 0,
+            'anzahl_schulden': stat_row[4] or 0,
+            'anzahl_ausgeglichen': stat_row[5] or 0
+        }
+        
+        # Letzte 20 Buchungen
+        cursor.execute("""
+            SELECT 
+                bu.datum,
+                b.vorname || ' ' || b.name as mitglied_name,
+                bu.typ,
+                bu.beschreibung,
+                bu.betrag,
+                erstellt.vorname || ' ' || erstellt.name as erstellt_von
+            FROM buchungen bu
+            JOIN benutzer b ON bu.benutzer_id = b.id
+            JOIN benutzer erstellt ON bu.erstellt_von = erstellt.id
+            WHERE bu.gemeinschaft_id = ?
+            ORDER BY bu.erstellt_am DESC
+            LIMIT 20
+        """, (gemeinschaft_id,))
+        
+        columns = [desc[0] for desc in cursor.description]
+        letzte_buchungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    
+    return render_template('admin_konten.html', 
+                         gemeinschaft=gemeinschaft,
+                         konten=konten,
+                         statistik=statistik,
+                         letzte_buchungen=letzte_buchungen)
+
+
+@app.route('/admin/gemeinschaften/<int:gemeinschaft_id>/konten/buchung-neu', methods=['GET', 'POST'])
+@admin_required
+def admin_konten_buchung_neu(gemeinschaft_id):
+    """Neue manuelle Buchung erstellen"""
+    benutzer_id = session.get('benutzer_id')
+    
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Gemeinschaft laden
+        cursor.execute("SELECT * FROM gemeinschaften WHERE id = ?", (gemeinschaft_id,))
+        columns = [desc[0] for desc in cursor.description]
+        gemeinschaft = dict(zip(columns, cursor.fetchone()))
+        
+        if request.method == 'POST':
+            mitglied_id = request.form['benutzer_id']
+            typ = request.form['typ']
+            betrag_input = float(request.form['betrag'])
+            datum = request.form['datum']
+            beschreibung = request.form['beschreibung']
+            
+            # Betrag je nach Typ anpassen
+            if typ == 'einzahlung':
+                betrag = betrag_input  # Positiv = Guthaben für Mitglied
+            elif typ == 'auszahlung':
+                betrag = -betrag_input  # Negativ = Schulden für Mitglied
+            elif typ == 'korrektur':
+                # Bei Korrektur kann Admin entscheiden (hier positiv wie eingegeben)
+                betrag = betrag_input
+            else:
+                flash('Ungültiger Buchungstyp!', 'danger')
+                return redirect(url_for('admin_konten_buchung_neu', gemeinschaft_id=gemeinschaft_id))
+            
+            # Buchung erstellen
+            cursor.execute("""
+                INSERT INTO buchungen (
+                    benutzer_id,
+                    gemeinschaft_id,
+                    datum,
+                    betrag,
+                    typ,
+                    beschreibung,
+                    referenz_typ,
+                    referenz_id,
+                    erstellt_von
+                ) VALUES (?, ?, ?, ?, ?, ?, 'manually', NULL, ?)
+            """, (mitglied_id, gemeinschaft_id, datum, betrag, typ, beschreibung, benutzer_id))
+            
+            # Konto aktualisieren
+            cursor.execute("""
+                INSERT INTO mitglieder_konten (benutzer_id, gemeinschaft_id, saldo, saldo_vorjahr)
+                VALUES (?, ?, ?, 0)
+                ON CONFLICT(benutzer_id, gemeinschaft_id) 
+                DO UPDATE SET 
+                    saldo = saldo + ?,
+                    letzte_aktualisierung = CURRENT_TIMESTAMP
+            """, (mitglied_id, gemeinschaft_id, betrag, betrag))
+            
+            db.connection.commit()
+            
+            flash(f'Buchung erfolgreich erstellt: {betrag:,.2f} €', 'success')
+            return redirect(url_for('admin_konten', gemeinschaft_id=gemeinschaft_id))
+        
+        # GET: Mitglieder mit aktuellen Salden laden
+        cursor.execute("""
+            SELECT 
+                b.id,
+                b.vorname || ' ' || b.name as name,
+                COALESCE(mk.saldo, 0) as saldo
+            FROM benutzer b
+            JOIN mitglied_gemeinschaft mg ON b.id = mg.mitglied_id
+            LEFT JOIN mitglieder_konten mk ON b.id = mk.benutzer_id 
+                AND mk.gemeinschaft_id = mg.gemeinschaft_id
+            WHERE mg.gemeinschaft_id = ?
+            ORDER BY b.name
+        """, (gemeinschaft_id,))
+        
+        columns = [desc[0] for desc in cursor.description]
+        mitglieder = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        
+        from datetime import datetime
+        heute = datetime.now().strftime('%Y-%m-%d')
+    
+    return render_template('admin_konten_buchung_neu.html',
+                         gemeinschaft=gemeinschaft,
+                         mitglieder=mitglieder,
+                         heute=heute)
+
+
+@app.route('/admin/gemeinschaften/<int:gemeinschaft_id>/konten/zahlung/<int:benutzer_id>', methods=['GET', 'POST'])
+@admin_required
+def admin_konten_zahlung(gemeinschaft_id, benutzer_id):
+    """Zahlung für offene Abrechnungen verbuchen"""
+    admin_id = session.get('benutzer_id')
+    
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Gemeinschaft und Mitglied laden
+        cursor.execute("SELECT * FROM gemeinschaften WHERE id = ?", (gemeinschaft_id,))
+        columns = [desc[0] for desc in cursor.description]
+        gemeinschaft = dict(zip(columns, cursor.fetchone()))
+        
+        cursor.execute("SELECT * FROM benutzer WHERE id = ?", (benutzer_id,))
+        columns = [desc[0] for desc in cursor.description]
+        mitglied = dict(zip(columns, cursor.fetchone()))
+        
+        if request.method == 'POST':
+            betrag = float(request.form['betrag'])
+            datum = request.form['datum']
+            beschreibung = request.form.get('beschreibung', f'Zahlung von {mitglied["vorname"]} {mitglied["name"]}')
+            
+            # Einzahlungsbuchung
+            cursor.execute("""
+                INSERT INTO buchungen (
+                    benutzer_id,
+                    gemeinschaft_id,
+                    datum,
+                    betrag,
+                    typ,
+                    beschreibung,
+                    referenz_typ,
+                    erstellt_von
+                ) VALUES (?, ?, ?, ?, 'einzahlung', ?, 'payment', ?)
+            """, (benutzer_id, gemeinschaft_id, datum, betrag, beschreibung, admin_id))
+            
+            # Konto aktualisieren
+            cursor.execute("""
+                INSERT INTO mitglieder_konten (benutzer_id, gemeinschaft_id, saldo)
+                VALUES (?, ?, ?)
+                ON CONFLICT(benutzer_id, gemeinschaft_id) 
+                DO UPDATE SET 
+                    saldo = saldo + ?,
+                    letzte_aktualisierung = CURRENT_TIMESTAMP
+            """, (benutzer_id, gemeinschaft_id, betrag, betrag))
+            
+            # Prüfe ob damit Abrechnungen beglichen werden können
+            cursor.execute("""
+                SELECT id, betrag_gesamt 
+                FROM mitglieder_abrechnungen
+                WHERE benutzer_id = ? 
+                AND gemeinschaft_id = ?
+                AND status = 'offen'
+                ORDER BY zeitraum_bis
+            """, (benutzer_id, gemeinschaft_id))
+            
+            offene_abrechnungen = cursor.fetchall()
+            verbleibend = betrag
+            
+            for abr_id, abr_betrag in offene_abrechnungen:
+                if verbleibend >= abr_betrag:
+                    # Abrechnung vollständig bezahlt
+                    cursor.execute("""
+                        UPDATE mitglieder_abrechnungen
+                        SET status = 'bezahlt'
+                        WHERE id = ?
+                    """, (abr_id,))
+                    verbleibend -= abr_betrag
+                else:
+                    break  # Nicht genug für diese Abrechnung
+            
+            db.connection.commit()
+            
+            flash(f'Zahlung von {betrag:,.2f} € erfolgreich verbucht!', 'success')
+            return redirect(url_for('admin_konten', gemeinschaft_id=gemeinschaft_id))
+        
+        # GET: Offene Abrechnungen laden
+        cursor.execute("""
+            SELECT 
+                id,
+                zeitraum_von,
+                zeitraum_bis,
+                betrag_gesamt,
+                erstellt_am
+            FROM mitglieder_abrechnungen
+            WHERE benutzer_id = ?
+            AND gemeinschaft_id = ?
+            AND status = 'offen'
+            ORDER BY zeitraum_bis
+        """, (benutzer_id, gemeinschaft_id))
+        
+        columns = [desc[0] for desc in cursor.description]
+        offene_abrechnungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        
+        # Aktueller Saldo
+        cursor.execute("""
+            SELECT COALESCE(saldo, 0)
+            FROM mitglieder_konten
+            WHERE benutzer_id = ? AND gemeinschaft_id = ?
+        """, (benutzer_id, gemeinschaft_id))
+        saldo = cursor.fetchone()[0]
+        
+        from datetime import datetime
+        heute = datetime.now().strftime('%Y-%m-%d')
+    
+    return render_template('admin_konten_zahlung.html',
+                         gemeinschaft=gemeinschaft,
+                         mitglied=mitglied,
+                         offene_abrechnungen=offene_abrechnungen,
+                         saldo=saldo,
+                         heute=heute)
+
+
+@app.route('/admin/gemeinschaften/<int:gemeinschaft_id>/konten/detail/<int:benutzer_id>')
+@admin_required
+def admin_konten_detail(gemeinschaft_id, benutzer_id):
+    """Detaillierter Kontoverlauf eines Mitglieds"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Gemeinschaft und Mitglied laden
+        cursor.execute("SELECT * FROM gemeinschaften WHERE id = ?", (gemeinschaft_id,))
+        columns = [desc[0] for desc in cursor.description]
+        gemeinschaft = dict(zip(columns, cursor.fetchone()))
+        
+        cursor.execute("SELECT * FROM benutzer WHERE id = ?", (benutzer_id,))
+        columns = [desc[0] for desc in cursor.description]
+        mitglied = dict(zip(columns, cursor.fetchone()))
+        
+        # Konto und Saldo
+        cursor.execute("""
+            SELECT saldo, saldo_vorjahr
+            FROM mitglieder_konten
+            WHERE benutzer_id = ? AND gemeinschaft_id = ?
+        """, (benutzer_id, gemeinschaft_id))
+        konto_row = cursor.fetchone()
+        saldo = konto_row[0] if konto_row else 0
+        saldo_vorjahr = konto_row[1] if konto_row else 0
+        
+        # Buchungen
+        cursor.execute("""
+            SELECT 
+                datum,
+                typ,
+                beschreibung,
+                betrag,
+                referenz_typ,
+                referenz_id,
+                erstellt_am
+            FROM buchungen
+            WHERE benutzer_id = ? AND gemeinschaft_id = ?
+            ORDER BY datum DESC, erstellt_am DESC
+        """, (benutzer_id, gemeinschaft_id))
+        
+        columns = [desc[0] for desc in cursor.description]
+        alle_bewegungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        
+        # Statistiken
+        cursor.execute("""
+            SELECT COUNT(*) FROM mitglieder_abrechnungen
+            WHERE benutzer_id = ? AND gemeinschaft_id = ? AND status = 'offen'
+        """, (benutzer_id, gemeinschaft_id))
+        offene_abrechnungen_count = cursor.fetchone()[0]
+    
+    return render_template('admin_konten_detail.html',
+                         gemeinschaft=gemeinschaft,
+                         mitglied=mitglied,
+                         saldo=saldo,
+                         saldo_vorjahr=saldo_vorjahr,
+                         buchungen=alle_bewegungen,
+                         offene_abrechnungen_count=offene_abrechnungen_count)
+
+
+@app.route('/mein-konto/<int:gemeinschaft_id>')
+@login_required
+def mein_konto(gemeinschaft_id):
+    """Mein Konto für eine Gemeinschaft"""
+    benutzer_id = session.get('benutzer_id')
+    
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Gemeinschaft laden
+        cursor.execute("SELECT * FROM gemeinschaften WHERE id = ?", (gemeinschaft_id,))
+        columns = [desc[0] for desc in cursor.description]
+        gemeinschaft_row = cursor.fetchone()
+        if not gemeinschaft_row:
+            flash('Gemeinschaft nicht gefunden!', 'danger')
+            return redirect(url_for('dashboard'))
+        gemeinschaft = dict(zip(columns, gemeinschaft_row))
+        
+        # Prüfe ob Mitglied in dieser Gemeinschaft ist
+        cursor.execute("""
+            SELECT 1 FROM mitglied_gemeinschaft
+            WHERE mitglied_id = ? AND gemeinschaft_id = ?
+        """, (benutzer_id, gemeinschaft_id))
+        if not cursor.fetchone():
+            flash('Sie sind kein Mitglied dieser Gemeinschaft!', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        # Konto und Saldo
+        cursor.execute("""
+            SELECT saldo, saldo_vorjahr
+            FROM mitglieder_konten
+            WHERE benutzer_id = ? AND gemeinschaft_id = ?
+        """, (benutzer_id, gemeinschaft_id))
+        konto_row = cursor.fetchone()
+        saldo = konto_row[0] if konto_row else 0
+        saldo_vorjahr = konto_row[1] if konto_row else 0
+        
+        # Buchungen
+        cursor.execute("""
+            SELECT 
+                datum,
+                typ,
+                beschreibung,
+                betrag,
+                referenz_typ,
+                referenz_id
+            FROM buchungen
+            WHERE benutzer_id = ? AND gemeinschaft_id = ?
+            ORDER BY datum DESC, erstellt_am DESC
+        """, (benutzer_id, gemeinschaft_id))
+        
+        columns = [desc[0] for desc in cursor.description]
+        buchungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        
+        # Offene Abrechnungen
+        cursor.execute("""
+            SELECT 
+                id,
+                zeitraum_von,
+                zeitraum_bis,
+                betrag_maschinen,
+                betrag_treibstoff,
+                betrag_gesamt,
+                erstellt_am
+            FROM mitglieder_abrechnungen
+            WHERE benutzer_id = ? 
+            AND gemeinschaft_id = ?
+            AND status = 'offen'
+            ORDER BY zeitraum_bis DESC
+        """, (benutzer_id, gemeinschaft_id))
+        
+        columns = [desc[0] for desc in cursor.description]
+        offene_abrechnungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    
+    return render_template('mein_konto.html',
+                         gemeinschaft=gemeinschaft,
+                         saldo=saldo,
+                         saldo_vorjahr=saldo_vorjahr,
+                         buchungen=buchungen,
+                         offene_abrechnungen=offene_abrechnungen)
+
+
 @app.route('/admin/gemeinschaften/<int:gemeinschaft_id>/abrechnung')
 @admin_required
 def admin_gemeinschaften_abrechnung(gemeinschaft_id):
@@ -3042,6 +3487,42 @@ def abrechnungen_erstellen(gemeinschaft_id):
                     """, (gemeinschaft_id, benutzer_id, abrechnungszeitraum,
                           zeitraum_von, zeitraum_bis, betrag_gesamt,
                           betrag_treibstoff, betrag_maschinen, session['benutzer_id']))
+                    
+                    abrechnung_id = cursor.lastrowid
+                    
+                    # Erstelle Buchung für diese Abrechnung
+                    cursor.execute("""
+                        INSERT INTO buchungen (
+                            benutzer_id,
+                            gemeinschaft_id,
+                            datum,
+                            betrag,
+                            typ,
+                            beschreibung,
+                            referenz_typ,
+                            referenz_id,
+                            erstellt_von
+                        ) VALUES (?, ?, ?, ?, 'abrechnung', ?, 'abrechnung', ?, ?)
+                    """, (
+                        benutzer_id,
+                        gemeinschaft_id,
+                        zeitraum_bis,  # Buchungsdatum = Ende des Abrechnungszeitraums
+                        -betrag_gesamt,  # Negativ = Mitglied schuldet der Gemeinschaft
+                        f'Abrechnung #{abrechnung_id} für {abrechnungszeitraum}',
+                        abrechnung_id,
+                        session['benutzer_id']
+                    ))
+                    
+                    # Aktualisiere Mitgliederkonto
+                    cursor.execute("""
+                        INSERT INTO mitglieder_konten (benutzer_id, gemeinschaft_id, saldo, saldo_vorjahr)
+                        VALUES (?, ?, ?, 0)
+                        ON CONFLICT(benutzer_id, gemeinschaft_id) 
+                        DO UPDATE SET 
+                            saldo = saldo + ?,
+                            letzte_aktualisierung = CURRENT_TIMESTAMP
+                    """, (benutzer_id, gemeinschaft_id, -betrag_gesamt, -betrag_gesamt))
+                    
                     erstellt += 1
             
             db.connection.commit()
@@ -3126,7 +3607,7 @@ def abrechnungen_liste(gemeinschaft_id):
                 flash('Keine Berechtigung!', 'danger')
                 return redirect(url_for('admin_abrechnungen'))
         
-        # Abrechnungen laden
+        # Abrechnungen laden mit Zahlungsinformationen
         cursor.execute("""
             SELECT 
                 ma.id, 
@@ -3138,6 +3619,7 @@ def abrechnungen_liste(gemeinschaft_id):
                 ma.status,
                 ma.erstellt_am,
                 ma.bezahlt_am,
+                ma.benutzer_id,
                 b.name,
                 b.vorname,
                 b.email
@@ -3154,6 +3636,32 @@ def abrechnungen_liste(gemeinschaft_id):
         for row in cursor.fetchall():
             betrag_maschinen = row[3] or 0
             betrag_treibstoff = row[4] or 0
+            benutzer_id = row[9]
+            
+            # Hole Zahlungen für diese Abrechnung
+            cursor.execute("""
+                SELECT 
+                    datum,
+                    betrag,
+                    beschreibung,
+                    typ
+                FROM buchungen
+                WHERE benutzer_id = ?
+                AND gemeinschaft_id = ?
+                AND typ = 'einzahlung'
+                AND datum >= ?
+                ORDER BY datum DESC
+                LIMIT 5
+            """, (benutzer_id, gemeinschaft_id, row[1]))  # ab zeitraum_von
+            
+            zahlungen = []
+            for z in cursor.fetchall():
+                zahlungen.append({
+                    'datum': z[0],
+                    'betrag': z[1],
+                    'beschreibung': z[2],
+                    'typ': z[3]
+                })
             
             abrechnungen.append({
                 'id': row[0],
@@ -3165,8 +3673,9 @@ def abrechnungen_liste(gemeinschaft_id):
                 'status': row[6],
                 'erstellt_am': row[7],
                 'bezahlt_am': row[8],
-                'mitglied_name': f"{row[10] or ''} {row[9]}".strip(),
-                'mitglied_email': row[11]
+                'mitglied_name': f"{row[11] or ''} {row[10]}".strip(),
+                'mitglied_email': row[12],
+                'zahlungen': zahlungen
             })
             
             summe_maschinen += betrag_maschinen

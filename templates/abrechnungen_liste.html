@@ -42,7 +42,7 @@
                                 <th class="text-end">Treibstoff</th>
                                 <th class="text-end">Gesamt</th>
                                 <th>Status</th>
-                                <th>Erstellt am</th>
+                                <th>Zahlungen</th>
                                 <th>Aktionen</th>
                             </tr>
                         </thead>
@@ -76,6 +76,9 @@
                                     <span class="badge bg-warning text-dark">Offen</span>
                                     {% elif abr.status == 'bezahlt' %}
                                     <span class="badge bg-success">Bezahlt</span>
+                                    {% if abr.bezahlt_am %}
+                                    <br><small class="text-muted">{{ abr.bezahlt_am[:10] }}</small>
+                                    {% endif %}
                                     {% elif abr.status == 'storniert' %}
                                     <span class="badge bg-danger">Storniert</span>
                                     {% else %}
@@ -83,12 +86,33 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <small class="text-muted">
-                                        {{ abr.erstellt_am[:10] }}
-                                    </small>
+                                    {% if abr.zahlungen %}
+                                    <button class="btn btn-sm btn-outline-primary" type="button" 
+                                            data-bs-toggle="collapse" data-bs-target="#zahlungen{{ abr.id }}">
+                                        <i class="bi bi-cash-stack"></i> {{ abr.zahlungen|length }} Zahlung(en)
+                                    </button>
+                                    <div class="collapse mt-2" id="zahlungen{{ abr.id }}">
+                                        <div class="card card-body p-2">
+                                            {% for z in abr.zahlungen %}
+                                            <div class="text-start small">
+                                                <strong>{{ z.datum }}</strong>: 
+                                                <span class="text-success">+{{ "%.2f"|format(z.betrag) }} €</span>
+                                                <br>
+                                                <span class="text-muted">{{ z.beschreibung[:40] }}{% if z.beschreibung|length > 40 %}...{% endif %}</span>
+                                            </div>
+                                            {% if not loop.last %}<hr class="my-1">{% endif %}
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    {% else %}
+                                    <small class="text-muted">Keine Zahlungen</small>
+                                    {% endif %}
                                 </td>
                                 <td>
-                                    <small class="text-muted">Keine Aktionen</small>
+                                    <a href="{{ url_for('abrechnung_pdf', abrechnung_id=abr.id) }}" 
+                                       class="btn btn-sm btn-outline-secondary" target="_blank">
+                                        <i class="bi bi-file-pdf"></i>
+                                    </a>
                                 </td>
                             </tr>
                             {% endfor %}

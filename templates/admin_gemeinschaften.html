@@ -58,6 +58,11 @@
                                            title="Mitglieder verwalten">
                                             <i class="bi bi-people"></i>
                                         </a>
+                                        <a href="{{ url_for('admin_konten', gemeinschaft_id=gem.id) }}" 
+                                           class="btn btn-sm btn-outline-warning"
+                                           title="Mitgliederkonten">
+                                            <i class="bi bi-cash-coin"></i>
+                                        </a>
                                         <a href="{{ url_for('admin_gemeinschaften_abrechnung', gemeinschaft_id=gem.id) }}" 
                                            class="btn btn-sm btn-outline-success"
                                            title="Abrechnung">

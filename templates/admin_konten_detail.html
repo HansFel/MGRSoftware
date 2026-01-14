@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Kontoverlauf - {{ mitglied.vorname }} {{ mitglied.name }} - Admin{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2><i class="bi bi-card-list"></i> Kontoverlauf</h2>
+                <p class="text-muted">
+                    {{ gemeinschaft.name }} - {{ mitglied.vorname }} {{ mitglied.name }}
+                </p>
+            </div>
+            <a href="{{ url_for('admin_konten', gemeinschaft_id=gemeinschaft.id) }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Zurück
+            </a>
+        </div>
+
+        <!-- Kontostand -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card {% if saldo < 0 %}border-danger{% elif saldo > 0 %}border-success{% endif %}">
+                    <div class="card-body text-center">
+                        <h5>Aktueller Kontostand</h5>
+                        <h2 class="{% if saldo < 0 %}text-danger{% elif saldo > 0 %}text-success{% else %}text-secondary{% endif %}">
+                            {{ "%.2f"|format(saldo) }} €
+                        </h2>
+                        {% if saldo < -0.01 %}
+                        <p class="text-muted mb-0">Schulden</p>
+                        {% elif saldo > 0.01 %}
+                        <p class="text-muted mb-0">Guthaben</p>
+                        {% else %}
+                        <p class="text-muted mb-0">Ausgeglichen</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5>Offene Abrechnungen</h5>
+                        <h2>{{ offene_abrechnungen_count }}</h2>
+                        <p class="text-muted mb-0">&nbsp;</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5>Anzahl Bewegungen</h5>
+                        <h2>{{ buchungen|length }}</h2>
+                        <p class="text-muted mb-0">&nbsp;</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Kontobewegungen -->
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-list-ul"></i> Alle Kontobewegungen</h5>
+                <small class="text-muted">Buchungen und Maschineneinsätze chronologisch sortiert</small>
+            </div>
+            <div class="card-body">
+                {% if buchungen %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm">
+                        <thead>
+                            <tr>
+                                <th>Datum</th>
+                                <th>Typ</th>
+                                <th>Beschreibung</th>
+                                <th class="text-end">Betrag</th>
+                                <th class="text-end">Saldo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set running_saldo = saldo_vorjahr %}
+                            {% for buchung in buchungen %}
+                            {% set running_saldo = running_saldo + buchung.betrag %}
+                            <tr>
+                                <td>{{ buchung.datum }}</td>
+                                <td>
+                                    {% if buchung.typ == 'abrechnung' %}
+                                    <span class="badge bg-warning text-dark">Abrechnung</span>
+                                    {% elif buchung.typ == 'einzahlung' %}
+                                    <span class="badge bg-success">Einzahlung</span>
+                                    {% elif buchung.typ == 'auszahlung' %}
+                                    <span class="badge bg-info">Auszahlung</span>
+                                    {% elif buchung.typ == 'korrektur' %}
+                                    <span class="badge bg-secondary">Korrektur</span>
+                                    {% elif buchung.typ == 'jahresuebertrag' %}
+                                    <span class="badge bg-primary">Jahresübertrag</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ buchung.beschreibung }}
+                                </td>
+                                <td class="text-end">
+                                    {% if buchung.betrag < 0 %}
+                                    <span class="text-danger">{{ "%.2f"|format(buchung.betrag) }} €</span>
+                                    {% else %}
+                                    <span class="text-success">+{{ "%.2f"|format(buchung.betrag) }} €</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <strong class="{% if running_saldo < 0 %}text-danger{% elif running_saldo > 0 %}text-success{% endif %}">
+                                        {{ "%.2f"|format(running_saldo) }} €
+                                    </strong>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">Noch keine Bewegungen vorhanden</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
