@@ -69,15 +69,25 @@
                             <i class="bi bi-calendar-check"></i> Reservierungen
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('reservierungen_kalender') }}">
-                            <i class="bi bi-calendar3"></i> Kalender
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="reservierungenDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-calendar3"></i> Kalender & Archiv
                         </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('reservierungen_balken') }}">
-                            <i class="bi bi-clock-history"></i> Timeline
-                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('reservierungen_kalender') }}">
+                                <i class="bi bi-calendar3"></i> Kalender
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('reservierungen_balken') }}">
+                                <i class="bi bi-clock-history"></i> Timeline
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('abgelaufene_reservierungen') }}">
+                                <i class="bi bi-clock-history"></i> Abgelaufene Reservierungen
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('geloeschte_reservierungen') }}">
+                                <i class="bi bi-trash"></i> Gelöschte Reservierungen
+                            </a></li>
+                        </ul>
                     </li>
                     <li class="nav-item">                        <a class="nav-link" href="{{ url_for('nachrichten') }}">
                             <i class="bi bi-chat-dots"></i> Nachrichten

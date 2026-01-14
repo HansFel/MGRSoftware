@@ -83,9 +83,68 @@ def hauptadmin_required(f):
     return decorated_function
 
 
+def archiviere_abgelaufene_reservierungen():
+    """Verschiebt abgelaufene Reservierungen in die Archiv-Tabelle"""
+    try:
+        with MaschinenDBContext(DB_PATH) as db:
+            cursor = db.connection.cursor()
+            
+            # Finde alle abgelaufenen Reservierungen (Datum + Endzeit liegt in der Vergangenheit)
+            cursor.execute("""
+                SELECT r.*, m.bezeichnung as maschine_bezeichnung, 
+                       b.name || ' ' || COALESCE(b.vorname, '') as benutzer_name
+                FROM maschinen_reservierungen r
+                JOIN maschinen m ON r.maschine_id = m.id
+                JOIN benutzer b ON r.benutzer_id = b.id
+                WHERE r.status = 'aktiv'
+                AND datetime(r.datum || ' ' || r.uhrzeit_bis) < datetime('now', 'localtime')
+            """)
+            
+            abgelaufene = cursor.fetchall()
+            
+            if abgelaufene:
+                columns = [desc[0] for desc in cursor.description]
+                
+                for row in abgelaufene:
+                    reservierung = dict(zip(columns, row))
+                    
+                    # In Archiv-Tabelle kopieren
+                    cursor.execute("""
+                        INSERT INTO reservierungen_abgelaufen 
+                        (reservierung_id, maschine_id, maschine_bezeichnung, benutzer_id, 
+                         benutzer_name, datum, uhrzeit_von, uhrzeit_bis, nutzungsdauer_stunden, 
+                         zweck, bemerkung, erstellt_am)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (reservierung['id'], reservierung['maschine_id'], 
+                          reservierung['maschine_bezeichnung'], reservierung['benutzer_id'],
+                          reservierung['benutzer_name'], reservierung['datum'], 
+                          reservierung['uhrzeit_von'], reservierung['uhrzeit_bis'],
+                          reservierung['nutzungsdauer_stunden'], reservierung.get('zweck'),
+                          reservierung.get('bemerkung'), reservierung['erstellt_am']))
+                    
+                    # Status auf 'abgelaufen' setzen
+                    cursor.execute("""
+                        UPDATE maschinen_reservierungen
+                        SET status = 'abgelaufen', geaendert_am = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    """, (reservierung['id'],))
+                
+                db.connection.commit()
+                return len(abgelaufene)
+            
+            return 0
+            
+    except Exception as e:
+        print(f"Fehler beim Archivieren abgelaufener Reservierungen: {e}")
+        return 0
+
+
 @app.route('/')
 def index():
     """Startseite - Weiterleitung"""
+    # Archiviere abgelaufene Reservierungen beim Seitenaufruf
+    archiviere_abgelaufene_reservierungen()
+    
     if 'benutzer_id' in session:
         return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
@@ -134,6 +193,9 @@ def logout():
 @login_required
 def dashboard():
     """Dashboard - Ãœbersicht fÃ¼r den Benutzer"""
+    # Archiviere abgelaufene Reservierungen
+    archiviere_abgelaufene_reservierungen()
+    
     with MaschinenDBContext(DB_PATH) as db:
         benutzer_id = session['benutzer_id']
         
@@ -469,6 +531,9 @@ def maschine_reservieren(maschine_id):
     """Maschine reservieren"""
     from datetime import datetime, timedelta
     
+    # Archiviere abgelaufene Reservierungen
+    archiviere_abgelaufene_reservierungen()
+    
     with MaschinenDBContext(DB_PATH) as db:
         cursor = db.connection.cursor()
         maschine = db.get_maschine_by_id(maschine_id)
@@ -765,6 +830,31 @@ def geloeschte_reservierungen():
     
     return render_template('geloeschte_reservierungen.html', 
                          geloeschte=geloeschte,
+                         today=datetime.now().strftime('%Y-%m-%d'))
+
+
+@app.route('/abgelaufene-reservierungen')
+@login_required
+def abgelaufene_reservierungen():
+    """Übersicht aller abgelaufenen Reservierungen"""
+    from datetime import datetime
+    
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Alle abgelaufenen Reservierungen des Benutzers
+        cursor.execute("""
+            SELECT * FROM reservierungen_abgelaufen
+            WHERE benutzer_id = ?
+            ORDER BY abgelaufen_am DESC
+            LIMIT 100
+        """, (session['benutzer_id'],))
+        
+        columns = [desc[0] for desc in cursor.description]
+        abgelaufene = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    
+    return render_template('abgelaufene_reservierungen.html', 
+                         abgelaufene=abgelaufene,
                          today=datetime.now().strftime('%Y-%m-%d'))
 
 

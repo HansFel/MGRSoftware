@@ -833,6 +833,31 @@ def geloeschte_reservierungen():
                          today=datetime.now().strftime('%Y-%m-%d'))
 
 
+@app.route('/abgelaufene-reservierungen')
+@login_required
+def abgelaufene_reservierungen():
+    """Übersicht aller abgelaufenen Reservierungen"""
+    from datetime import datetime
+    
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Alle abgelaufenen Reservierungen des Benutzers
+        cursor.execute("""
+            SELECT * FROM reservierungen_abgelaufen
+            WHERE benutzer_id = ?
+            ORDER BY abgelaufen_am DESC
+            LIMIT 100
+        """, (session['benutzer_id'],))
+        
+        columns = [desc[0] for desc in cursor.description]
+        abgelaufene = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    
+    return render_template('abgelaufene_reservierungen.html', 
+                         abgelaufene=abgelaufene,
+                         today=datetime.now().strftime('%Y-%m-%d'))
+
+
 @app.route('/api/maschine/<int:maschine_id>/stundenzaehler')
 @login_required
 def get_stundenzaehler(maschine_id):
