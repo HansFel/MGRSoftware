@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Anfangssaldo - {{ gemeinschaft.name }} - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="text-white">
+                <i class="bi bi-piggy-bank"></i> Anfangssaldo: {{ gemeinschaft.name }}
+            </h2>
+            <a href="{{ url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft.id) }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Zurück
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-cash-stack"></i> Banksaldo eingeben
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Was ist der Anfangssaldo?</strong><br>
+                    Der Anfangssaldo ist der Kontostand Ihres Gemeinschaftskontos, bevor Sie mit dem Import 
+                    von Transaktionen beginnen. Er dient als Ausgangspunkt für die Saldo-Berechnung.
+                </div>
+                
+                <form method="POST">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="anfangssaldo" class="form-label">
+                                <strong>Anfangssaldo in Euro</strong> *
+                            </label>
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text">€</span>
+                                <input type="text" 
+                                       class="form-control form-control-lg" 
+                                       id="anfangssaldo" 
+                                       name="anfangssaldo" 
+                                       value="{{ '%.2f'|format(gemeinschaft.anfangssaldo)|replace('.', ',') }}"
+                                       placeholder="0,00"
+                                       required>
+                            </div>
+                            <div class="form-text">
+                                Verwenden Sie Komma als Dezimaltrennzeichen (z.B. 5432,18)
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="anfangssaldo_datum" class="form-label">
+                                <strong>Stichtag</strong>
+                            </label>
+                            <input type="date" 
+                                   class="form-control form-control-lg" 
+                                   id="anfangssaldo_datum" 
+                                   name="anfangssaldo_datum"
+                                   value="{{ gemeinschaft.anfangssaldo_datum or '' }}">
+                            <div class="form-text">
+                                Datum des Kontostands (optional)
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-check-circle"></i> Anfangssaldo speichern
+                        </button>
+                        <a href="{{ url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft.id) }}" 
+                           class="btn btn-secondary">
+                            Abbrechen
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card bg-info text-white mb-3">
+            <div class="card-body">
+                <h5><i class="bi bi-lightbulb"></i> So funktioniert's</h5>
+                <ol class="mb-0">
+                    <li>Schauen Sie auf Ihren aktuellen Kontoauszug</li>
+                    <li>Notieren Sie den Kontostand</li>
+                    <li>Geben Sie diesen Betrag hier ein</li>
+                    <li>Ab jetzt zeigt das System: <br>
+                        <strong>Aktueller Saldo = Anfangssaldo + Transaktionen</strong>
+                    </li>
+                </ol>
+            </div>
+        </div>
+        
+        <div class="card mb-3">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-calculator"></i> Beispiel
+                </h5>
+            </div>
+            <div class="card-body">
+                <h6>Ausgangssituation:</h6>
+                <pre class="bg-light p-2 rounded">Kontostand am 01.01.2026: 5.000,00 €</pre>
+                
+                <h6 class="mt-3">Nach Import:</h6>
+                <table class="table table-sm">
+                    <tr>
+                        <td>Anfangssaldo:</td>
+                        <td class="text-end"><strong>5.000,00 €</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Eingänge:</td>
+                        <td class="text-end text-success">+ 2.500,00 €</td>
+                    </tr>
+                    <tr>
+                        <td>Ausgänge:</td>
+                        <td class="text-end text-danger">- 1.200,00 €</td>
+                    </tr>
+                    <tr class="table-primary">
+                        <td><strong>Aktueller Saldo:</strong></td>
+                        <td class="text-end"><strong>6.300,00 €</strong></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <h5><i class="bi bi-exclamation-triangle"></i> Wichtig</h5>
+                <ul class="mb-0 small">
+                    <li>Der Anfangssaldo muss nur einmal eingegeben werden</li>
+                    <li>Sie können ihn jederzeit korrigieren</li>
+                    <li>Änderungen wirken sich auf alle Saldo-Anzeigen aus</li>
+                    <li>Transaktionen bleiben unverändert</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

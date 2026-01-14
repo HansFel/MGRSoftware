@@ -121,6 +121,69 @@
     </div>
 </div>
 
+<!-- Zahlungsreferenzen -->
+{% if zahlungsreferenzen %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-success">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-credit-card"></i> Ihre Zahlungsreferenzen
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-3">
+                    <i class="bi bi-info-circle"></i> 
+                    Verwenden Sie diese Referenznummer bei Überweisungen, damit Ihre Zahlung automatisch zugeordnet werden kann.
+                </p>
+                <div class="row">
+                    {% for ref in zahlungsreferenzen %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-2">{{ ref.gemeinschaft_name }}</h6>
+                                <div class="input-group">
+                                    <input type="text" class="form-control form-control-lg fw-bold" 
+                                           value="{{ ref.referenznummer }}" 
+                                           id="ref_{{ ref.id }}" 
+                                           readonly>
+                                    <button class="btn btn-outline-success" type="button"
+                                            onclick="copyToClipboard('ref_{{ ref.id }}', this)">
+                                        <i class="bi bi-clipboard"></i> Kopieren
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyToClipboard(elementId, button) {
+    var copyText = document.getElementById(elementId);
+    copyText.select();
+    copyText.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(copyText.value);
+    
+    // Feedback
+    var originalHtml = button.innerHTML;
+    button.innerHTML = '<i class="bi bi-check"></i> Kopiert!';
+    button.classList.remove('btn-outline-success');
+    button.classList.add('btn-success');
+    
+    setTimeout(function() {
+        button.innerHTML = originalHtml;
+        button.classList.remove('btn-success');
+        button.classList.add('btn-outline-success');
+    }, 2000);
+}
+</script>
+{% endif %}
+
 <!-- Forderungen nach Gemeinschaft -->
 {% if schulden_nach_gemeinschaft %}
 <div class="row mb-4">

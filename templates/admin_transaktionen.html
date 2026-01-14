@@ -1,0 +1,428 @@
+{% extends "base.html" %}
+
+{% block title %}Transaktionen - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="text-white">
+                <i class="bi bi-list-ul"></i> Banktransaktionen
+            </h2>
+            <div>
+                <a href="{{ url_for('anfangssaldo_bearbeiten', gemeinschaft_id=gemeinschaft_id) }}" class="btn btn-info">
+                    <i class="bi bi-piggy-bank"></i> Anfangssaldo
+                </a>
+                <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#importsModal">
+                    <i class="bi bi-trash"></i> Importe verwalten
+                </button>
+                <a href="{{ url_for('admin_csv_import', gemeinschaft_id=gemeinschaft_id) }}" class="btn btn-success">
+                    <i class="bi bi-upload"></i> CSV importieren
+                </a>
+                <a href="{{ url_for('admin_abrechnungen') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Zurück
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter-Buttons -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id, typ='alle') }}" 
+               class="btn btn-{% if filter_typ == 'alle' %}primary{% else %}outline-primary{% endif %}">
+                <i class="bi bi-list"></i> Alle
+            </a>
+            <a href="{{ url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id, typ='eingaenge') }}" 
+               class="btn btn-{% if filter_typ == 'eingaenge' %}success{% else %}outline-success{% endif %}">
+                <i class="bi bi-arrow-down-circle"></i> Eingänge
+                {% if statistik.unzugeordnete_eingaenge > 0 %}
+                <span class="badge bg-warning text-dark">{{ statistik.unzugeordnete_eingaenge }}</span>
+                {% endif %}
+            </a>
+            <a href="{{ url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id, typ='ausgaenge') }}" 
+               class="btn btn-{% if filter_typ == 'ausgaenge' %}danger{% else %}outline-danger{% endif %}">
+                <i class="bi bi-arrow-up-circle"></i> Ausgänge
+                {% if statistik.unzugeordnete_ausgaenge > 0 %}
+                <span class="badge bg-warning text-dark">{{ statistik.unzugeordnete_ausgaenge }}</span>
+                {% endif %}
+            </a>
+            <a href="{{ url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id, typ='unzugeordnet') }}" 
+               class="btn btn-{% if filter_typ == 'unzugeordnet' %}warning{% else %}outline-warning{% endif %}">
+                <i class="bi bi-question-circle"></i> Unzugeordnet
+                <span class="badge bg-danger">{{ statistik.unzugeordnete_eingaenge + statistik.unzugeordnete_ausgaenge }}</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Statistik -->
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="card bg-secondary text-white">
+            <div class="card-body text-center py-2">
+                <h5>{{ "%.2f"|format(statistik.anfangssaldo) }} €</h5>
+                <small>Anfangssaldo</small>
+                {% if statistik.anfangssaldo_datum %}
+                <div class="mt-1"><small>{{ statistik.anfangssaldo_datum }}</small></div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center py-2">
+                <h5>{{ statistik.anzahl_gesamt }}</h5>
+                <small>Transaktionen</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center py-2">
+                <h5>{{ "%.2f"|format(statistik.summe_eingaenge) }} €</h5>
+                <small>Eingänge</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card bg-danger text-white">
+            <div class="card-body text-center py-2">
+                <h5>{{ "%.2f"|format(statistik.summe_ausgaenge) }} €</h5>
+                <small>Ausgänge</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center py-2">
+                <h5>{{ "%.2f"|format(statistik.summe_gesamt) }} €</h5>
+                <small>Bewegungen</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card bg-dark text-white">
+            <div class="card-body text-center py-2">
+                <h5>{{ "%.2f"|format(statistik.aktueller_saldo) }} €</h5>
+                <small>Aktueller Saldo</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transaktionsliste -->
+{% if transaktionen %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 100px;">Datum</th>
+                                <th style="width: 120px;">Betrag</th>
+                                <th>Verwendungszweck</th>
+                                <th style="width: 200px;">Zuordnung</th>
+                                <th style="width: 80px;" class="text-center">Status</th>
+                                <th style="width: 150px;" class="text-center">Aktion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for trans in transaktionen %}
+                            <tr class="{% if not trans.zugeordnet %}table-warning{% endif %}">
+                                <td>
+                                    <small>{{ trans.buchungsdatum }}</small>
+                                </td>
+                                <td>
+                                    <strong class="{% if trans.betrag > 0 %}text-success{% else %}text-danger{% endif %}">
+                                        {{ "%.2f"|format(trans.betrag) }} €
+                                    </strong>
+                                </td>
+                                <td>
+                                    <small>{{ trans.verwendungszweck[:80] }}</small>
+                                    {% if trans.empfaenger %}
+                                    <br><small class="text-muted">{{ trans.empfaenger[:50] }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if trans.zugeordnet %}
+                                        {% if trans.zuordnung_typ == 'benutzer' and trans.benutzer_name %}
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-person-check"></i> {{ trans.benutzer_name }}
+                                            </span>
+                                        {% elif trans.zuordnung_typ == 'maschine' and trans.maschine_name %}
+                                            <span class="badge bg-primary">
+                                                <i class="bi bi-gear"></i> {{ trans.maschine_name }}
+                                            </span>
+                                        {% elif trans.zuordnung_typ == 'gemeinschaft' %}
+                                            <span class="badge bg-info">
+                                                <i class="bi bi-people"></i> Gemeinschaft
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Zugeordnet</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="bi bi-question-circle"></i> Offen
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if trans.zugeordnet %}
+                                        <i class="bi bi-check-circle-fill text-success"></i>
+                                    {% else %}
+                                        <i class="bi bi-exclamation-circle-fill text-warning"></i>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if not trans.zugeordnet %}
+                                        <button type="button" class="btn btn-sm btn-primary" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#zuordnenModal{{ trans.id }}">
+                                            <i class="bi bi-link-45deg"></i> Zuordnen
+                                        </button>
+                                    {% else %}
+                                        <form method="POST" action="{{ url_for('transaktion_zuordnung_aufheben', transaktion_id=trans.id) }}" 
+                                              style="display: inline;"
+                                              onsubmit="return confirm('Zuordnung wirklich aufheben?');">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="bi bi-x-circle"></i> Aufheben
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                    
+                                    <form method="POST" action="{{ url_for('transaktion_loeschen', transaktion_id=trans.id) }}" 
+                                          style="display: inline;"
+                                          onsubmit="return confirm('Transaktion wirklich löschen? Dies kann nicht rückgängig gemacht werden!');">
+                                        <button type="submit" class="btn btn-sm btn-danger" title="Transaktion löschen">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Zuordnungs-Modals -->
+{% for trans in transaktionen if not trans.zugeordnet %}
+<div class="modal fade" id="zuordnenModal{{ trans.id }}" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header {% if trans.betrag > 0 %}bg-success{% else %}bg-danger{% endif %} text-white">
+                <h5 class="modal-title">
+                    {% if trans.betrag > 0 %}
+                        <i class="bi bi-arrow-down-circle"></i> Eingang zuordnen
+                    {% else %}
+                        <i class="bi bi-arrow-up-circle"></i> Ausgang zuordnen
+                    {% endif %}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('transaktion_zuordnen', transaktion_id=trans.id) }}" id="zuordnungForm{{ trans.id }}">
+                <div class="modal-body">
+                    <div class="alert alert-info mb-3">
+                        <strong>Betrag:</strong> {{ "%.2f"|format(trans.betrag) }} €<br>
+                        <strong>Datum:</strong> {{ trans.buchungsdatum }}<br>
+                        <strong>Verwendungszweck:</strong> {{ trans.verwendungszweck[:150] }}
+                    </div>
+                    
+                    {% if trans.betrag > 0 %}
+                        <!-- EINGANG: Benutzer zuordnen -->
+                        <div class="mb-3">
+                            <label class="form-label"><strong>Benutzer auswählen:</strong></label>
+                            <select name="benutzer_id" class="form-select form-select-lg" required>
+                                <option value="">-- Bitte wählen --</option>
+                                {% for user in benutzer %}
+                                <option value="{{ user.id }}">{{ user.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Der Betrag wird dem Mitgliedskonto gutgeschrieben</small>
+                        </div>
+                    {% else %}
+                        <!-- AUSGANG: Maschine oder Gemeinschaftskosten -->
+                        <div class="mb-3">
+                            <label class="form-label"><strong>Zuordnung:</strong></label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="zuordnung_typ" id="maschineBtn{{ trans.id }}" 
+                                       value="maschine" onchange="toggleAusgangOptions({{ trans.id }}, 'maschine')" required>
+                                <label class="btn btn-outline-primary" for="maschineBtn{{ trans.id }}">
+                                    <i class="bi bi-gear"></i> Maschine
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="zuordnung_typ" id="gemeinschaftBtn{{ trans.id }}" 
+                                       value="gemeinschaft" onchange="toggleAusgangOptions({{ trans.id }}, 'gemeinschaft')" required>
+                                <label class="btn btn-outline-info" for="gemeinschaftBtn{{ trans.id }}">
+                                    <i class="bi bi-people"></i> Gemeinschaftskosten
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div id="maschinenDiv{{ trans.id }}" style="display: none;">
+                            <div class="mb-3">
+                                <label class="form-label">Maschine:</label>
+                                <select name="maschine_id" class="form-select" id="maschinenSelect{{ trans.id }}">
+                                    <option value="">-- Bitte wählen --</option>
+                                    {% for maschine in maschinen %}
+                                    <option value="{{ maschine.id }}">{{ maschine.bezeichnung }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div id="gemeinschaftDiv{{ trans.id }}" style="display: none;">
+                            <div class="mb-3">
+                                <label class="form-label">Kategorie:</label>
+                                <select name="kategorie" class="form-select">
+                                    <option value="sonstiges">Sonstiges</option>
+                                    <option value="versicherung">Versicherung</option>
+                                    <option value="reparatur">Reparatur</option>
+                                    <option value="treibstoff">Treibstoff</option>
+                                    <option value="wartung">Wartung</option>
+                                    <option value="verwaltung">Verwaltung</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Beschreibung (optional):</label>
+                            <textarea name="beschreibung" class="form-control" rows="2" placeholder="Zusätzliche Informationen..."></textarea>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg"></i> Abbrechen
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Zuordnen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Noch keine Transaktionen vorhanden.
+    <a href="{{ url_for('admin_csv_import', gemeinschaft_id=gemeinschaft_id) }}">Jetzt CSV importieren</a>
+</div>
+{% endif %}
+
+<script>
+function toggleAusgangOptions(transId, typ) {
+    const maschinenDiv = document.getElementById('maschinenDiv' + transId);
+    const gemeinschaftDiv = document.getElementById('gemeinschaftDiv' + transId);
+    const maschinenSelect = document.getElementById('maschinenSelect' + transId);
+    
+    maschinenDiv.style.display = 'none';
+    gemeinschaftDiv.style.display = 'none';
+    
+    if (typ === 'maschine') {
+        maschinenDiv.style.display = 'block';
+        maschinenSelect.required = true;
+    } else if (typ === 'gemeinschaft') {
+        gemeinschaftDiv.style.display = 'block';
+        maschinenSelect.required = false;
+    }
+}
+
+// Benutzer und Maschinen per AJAX laden wenn Modal geöffnet wird
+document.addEventListener('DOMContentLoaded', function() {
+    const modals = document.querySelectorAll('[id^="zuordnenModal"]');
+    modals.forEach(modal => {
+        modal.addEventListener('show.bs.modal', function(event) {
+            const modalId = this.id.replace('zuordnenModal', '');
+            loadDropdownData(modalId);
+        });
+    });
+});
+
+function loadDropdownData(transId) {
+    // Hier würde AJAX-Call kommen um Benutzer und Maschinen zu laden
+    // Für jetzt mit statischen Daten
+}
+</script>
+
+<!-- Modal für Import-Verwaltung -->
+<div class="modal fade" id="importsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="bi bi-trash"></i> Importe verwalten
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Achtung:</strong> Das Löschen eines Imports entfernt alle Transaktionen dieses Import-Durchgangs. 
+                    Dies kann nicht rückgängig gemacht werden!
+                </div>
+                
+                {% if imports %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Import-Datum</th>
+                                <th>Importiert von</th>
+                                <th>Anzahl Transaktionen</th>
+                                <th class="text-center">Aktion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for imp in imports %}
+                            <tr>
+                                <td>
+                                    <strong>{{ imp.datum }}</strong>
+                                </td>
+                                <td>
+                                    <i class="bi bi-person"></i> {{ imp.importiert_von_name }}
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary">{{ imp.anzahl }} Transaktionen</span>
+                                </td>
+                                <td class="text-center">
+                                    <form method="POST" action="{{ url_for('import_loeschen', gemeinschaft_id=gemeinschaft_id) }}"
+                                          onsubmit="return confirm('Wirklich {{ imp.anzahl }} Transaktionen vom {{ imp.datum }} löschen? Dies kann nicht rückgängig gemacht werden!');">
+                                        <input type="hidden" name="import_datum" value="{{ imp.datum }}">
+                                        <input type="hidden" name="importiert_von" value="{{ imp.importiert_von_id }}">
+                                        <button type="submit" class="btn btn-sm btn-danger">
+                                            <i class="bi bi-trash"></i> Import löschen
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Keine Importe vorhanden.
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg"></i> Schließen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

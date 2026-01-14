@@ -117,6 +117,25 @@
                             </div>
                         </div>
 
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="treibstoff_berechnen" 
+                                           name="treibstoff_berechnen" value="1"
+                                           {{ 'checked' if maschine and maschine.treibstoff_berechnen else '' }}>
+                                    <label class="form-check-label" for="treibstoff_berechnen">
+                                        <strong>Treibstoffkosten in Abrechnungen berücksichtigen</strong>
+                                    </label>
+                                    <div class="form-text">
+                                        <i class="bi bi-info-circle"></i> 
+                                        Wenn aktiviert, werden die Treibstoffkosten dem Mitglied in Rechnung gestellt.
+                                        <br>
+                                        <strong>Standard: NICHT aktiviert</strong> - da die meisten Mitglieder den Treibstoff selbst kaufen.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <hr>
                         <h5 class="mb-3"><i class="bi bi-currency-euro"></i> Rentabilität</h5>
 

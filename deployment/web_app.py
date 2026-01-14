@@ -263,13 +263,26 @@ def dashboard():
         """, (benutzer_id, benutzer_id))
         
         ungelesene_nachrichten = cursor.fetchone()[0]
+        
+        # Zahlungsreferenzen des Benutzers laden
+        cursor.execute("""
+            SELECT z.*, g.name as gemeinschaft_name
+            FROM zahlungsreferenzen z
+            JOIN gemeinschaften g ON z.gemeinschaft_id = g.id
+            WHERE z.benutzer_id = ? AND z.aktiv = 1
+            ORDER BY g.name
+        """, (benutzer_id,))
+        
+        columns = [desc[0] for desc in cursor.description]
+        zahlungsreferenzen = [dict(zip(columns, row)) for row in cursor.fetchall()]
     
     return render_template('dashboard.html', 
                          statistik=statistik,
                          einsaetze=letzte_einsaetze,
                          schulden_nach_gemeinschaft=schulden_nach_gemeinschaft,
                          reservierungen=reservierungen,
-                         ungelesene_nachrichten=ungelesene_nachrichten)
+                         ungelesene_nachrichten=ungelesene_nachrichten,
+                         zahlungsreferenzen=zahlungsreferenzen)
 
 
 @app.route('/neuer-einsatz', methods=['GET', 'POST'])
@@ -2691,6 +2704,817 @@ def admin_rollen_remove_gemeinschaft():
     return redirect(url_for('admin_rollen'))
 
 
+# ===== Abrechnungssystem für Gemeinschaftsadministratoren =====
+
+@app.route('/admin/abrechnungen')
+@admin_required
+def admin_abrechnungen():
+    """Abrechnungsübersicht für Gemeinschaftsadministratoren"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Gemeinschaften des Admins laden
+        if session.get('admin_level', 0) >= 2:
+            # Hauptadmin sieht alle Gemeinschaften
+            cursor.execute("SELECT id, name FROM gemeinschaften WHERE aktiv = 1")
+        else:
+            # Gemeinschafts-Admin sieht nur seine Gemeinschaften
+            cursor.execute("""
+                SELECT g.id, g.name 
+                FROM gemeinschaften g
+                JOIN gemeinschafts_admin ga ON g.id = ga.gemeinschaft_id
+                WHERE ga.benutzer_id = ? AND g.aktiv = 1
+            """, (session['benutzer_id'],))
+        
+        gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
+        
+        # Statistiken
+        statistiken = {}
+        for gem in gemeinschaften:
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) as anzahl_offen,
+                    COALESCE(SUM(betrag_gesamt), 0) as summe_offen
+                FROM mitglieder_abrechnungen
+                WHERE gemeinschaft_id = ? AND status = 'offen'
+            """, (gem['id'],))
+            
+            row = cursor.fetchone()
+            statistiken[gem['id']] = {
+                'anzahl_offen': row[0],
+                'summe_offen': row[1]
+            }
+    
+    return render_template('admin_abrechnungen.html',
+                         gemeinschaften=gemeinschaften,
+                         statistiken=statistiken)
+
+
+@app.route('/admin/abrechnungen/<int:gemeinschaft_id>/csv-import', methods=['GET', 'POST'])
+@admin_required
+def admin_csv_import(gemeinschaft_id):
+    """CSV-Import für Banktransaktionen mit konfigurierbarem Format"""
+    import hashlib
+    from io import StringIO
+    from datetime import datetime as dt
+    
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Prüfe Berechtigung
+        if session.get('admin_level', 0) < 2:
+            cursor.execute("""
+                SELECT COUNT(*) FROM gemeinschafts_admin
+                WHERE benutzer_id = ? AND gemeinschaft_id = ?
+            """, (session['benutzer_id'], gemeinschaft_id))
+            if cursor.fetchone()[0] == 0:
+                flash('Keine Berechtigung für diese Gemeinschaft!', 'danger')
+                return redirect(url_for('admin_abrechnungen'))
+        
+        # CSV-Konfiguration laden
+        cursor.execute("""
+            SELECT * FROM csv_import_konfiguration
+            WHERE gemeinschaft_id = ?
+        """, (gemeinschaft_id,))
+        
+        result = cursor.fetchone()
+        if result:
+            columns = [desc[0] for desc in cursor.description]
+            config = dict(zip(columns, result))
+        else:
+            # Standard-Konfiguration erstellen
+            cursor.execute("""
+                INSERT INTO csv_import_konfiguration (gemeinschaft_id)
+                VALUES (?)
+            """, (gemeinschaft_id,))
+            db.connection.commit()
+            return redirect(request.url)
+        
+        if request.method == 'POST':
+            if 'csv_file' not in request.files:
+                flash('Keine Datei ausgewählt!', 'danger')
+                return redirect(request.url)
+            
+            file = request.files['csv_file']
+            if file.filename == '':
+                flash('Keine Datei ausgewählt!', 'danger')
+                return redirect(request.url)
+            
+            if file and file.filename.endswith('.csv'):
+                try:
+                    # CSV mit Konfiguration einlesen
+                    content = file.read().decode(config['kodierung'])
+                    
+                    # Zeilen überspringen falls konfiguriert
+                    lines = content.split('\n')
+                    if config['zeilen_ueberspringen'] > 0:
+                        lines = lines[config['zeilen_ueberspringen']:]
+                        content = '\n'.join(lines)
+                    
+                    # CSV Reader erstellen - mit oder ohne Kopfzeile
+                    if config['hat_kopfzeile']:
+                        # Mit Kopfzeile - normale Spaltennamen
+                        csv_reader = csv.DictReader(
+                            StringIO(content), 
+                            delimiter=config['trennzeichen']
+                        )
+                    else:
+                        # OHNE Kopfzeile - künstliche Spaltennamen (Spalte1, Spalte2, etc.)
+                        csv_data = csv.reader(StringIO(content), delimiter=config['trennzeichen'])
+                        # Bestimme Anzahl Spalten aus erster Zeile
+                        first_row = None
+                        temp_reader = csv.reader(StringIO(content), delimiter=config['trennzeichen'])
+                        for row in temp_reader:
+                            if row:  # Erste nicht-leere Zeile
+                                first_row = row
+                                break
+                        
+                        if first_row:
+                            num_cols = len(first_row)
+                            fieldnames = [f'Spalte{i+1}' for i in range(num_cols)]
+                            csv_reader = csv.DictReader(
+                                StringIO(content), 
+                                delimiter=config['trennzeichen'],
+                                fieldnames=fieldnames
+                            )
+                        else:
+                            flash('CSV-Datei ist leer!', 'danger')
+                            return redirect(request.url)
+                    
+                    importiert = 0
+                    duplikate = 0
+                    fehler = []
+                    
+                    for row_num, row in enumerate(csv_reader, start=2):
+                        try:
+                            # Felder mit Konfiguration auslesen
+                            buchungsdatum = row.get(config['spalte_buchungsdatum'], '')
+                            verwendungszweck = row.get(config['spalte_verwendungszweck'], '')
+                            betrag_str = row.get(config['spalte_betrag'], '')
+                            
+                            if not buchungsdatum or not betrag_str:
+                                fehler.append(f"Zeile {row_num}: Fehlende Pflichtfelder")
+                                continue
+                            
+                            # Betrag konvertieren mit konfigurierbaren Trennzeichen
+                            betrag_str = betrag_str.replace(config['tausendertrennzeichen'], '')
+                            betrag_str = betrag_str.replace(config['dezimaltrennzeichen'], '.')
+                            betrag = float(betrag_str)
+                            
+                            # Datum parsen
+                            try:
+                                buchungsdatum_parsed = dt.strptime(buchungsdatum, config['datumsformat'])
+                                buchungsdatum = buchungsdatum_parsed.strftime('%Y-%m-%d')
+                            except:
+                                fehler.append(f"Zeile {row_num}: Ungültiges Datumsformat '{buchungsdatum}'")
+                                continue
+                            
+                            # Hash für Duplikatserkennung
+                            hash_string = f"{buchungsdatum}{betrag}{verwendungszweck}{row.get(config['spalte_kontonummer'], '')}"
+                            trans_hash = hashlib.md5(hash_string.encode()).hexdigest()
+                            
+                            # Prüfe auf Duplikat
+                            cursor.execute("""
+                                SELECT COUNT(*) FROM bank_transaktionen
+                                WHERE transaktions_hash = ?
+                            """, (trans_hash,))
+                            
+                            if cursor.fetchone()[0] > 0:
+                                duplikate += 1
+                                continue
+                            
+                            # Automatische Zahlungsreferenz-Erkennung nur für positive Beträge
+                            benutzer_id = None
+                            if betrag > 0:  # Nur Eingänge automatisch zuordnen
+                                cursor.execute("""
+                                    SELECT benutzer_id FROM zahlungsreferenzen
+                                    WHERE referenznummer IN (
+                                        SELECT referenznummer FROM zahlungsreferenzen
+                                        WHERE instr(?, referenznummer) > 0
+                                    ) AND gemeinschaft_id = ?
+                                """, (verwendungszweck, gemeinschaft_id))
+                                result = cursor.fetchone()
+                                if result:
+                                    benutzer_id = result[0]
+                            
+                            # Valutadatum auslesen
+                            valutadatum = row.get(config['spalte_valutadatum'], buchungsdatum)
+                            if valutadatum and valutadatum != buchungsdatum:
+                                try:
+                                    valutadatum_parsed = dt.strptime(valutadatum, config['datumsformat'])
+                                    valutadatum = valutadatum_parsed.strftime('%Y-%m-%d')
+                                except:
+                                    valutadatum = buchungsdatum
+                            
+                            # Transaktion einfügen
+                            cursor.execute("""
+                                INSERT INTO bank_transaktionen
+                                (gemeinschaft_id, buchungsdatum, valutadatum, verwendungszweck,
+                                 empfaenger, kontonummer, betrag, transaktions_hash,
+                                 benutzer_id, zugeordnet, importiert_von)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """, (
+                                gemeinschaft_id,
+                                buchungsdatum,
+                                valutadatum,
+                                verwendungszweck,
+                                row.get(config['spalte_empfaenger'], ''),
+                                row.get(config['spalte_kontonummer'], ''),
+                                betrag,
+                                trans_hash,
+                                benutzer_id,
+                                1 if benutzer_id else 0,
+                                session['benutzer_id']
+                            ))
+                            
+                            importiert += 1
+                            
+                        except Exception as e:
+                            fehler.append(f"Zeile {row_num}: {str(e)}")
+                    
+                    db.connection.commit()
+                    
+                    # Erfolgsmeldung
+                    msg = f"✅ {importiert} Transaktionen importiert"
+                    if duplikate > 0:
+                        msg += f", {duplikate} Duplikate übersprungen"
+                    if fehler:
+                        msg += f", {len(fehler)} Fehler"
+                        for f in fehler[:5]:
+                            flash(f, 'warning')
+                    
+                    flash(msg, 'success')
+                    return redirect(url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id))
+                    
+                except Exception as e:
+                    flash(f'Fehler beim Import: {str(e)}', 'danger')
+            else:
+                flash('Bitte nur CSV-Dateien hochladen!', 'danger')
+        
+        # Gemeinschaftsname laden
+        cursor.execute("SELECT name FROM gemeinschaften WHERE id = ?", (gemeinschaft_id,))
+        gemeinschaft_name = cursor.fetchone()[0]
+    
+    return render_template('admin_csv_import.html',
+                         gemeinschaft_id=gemeinschaft_id,
+                         gemeinschaft_name=gemeinschaft_name,
+                         config=config)
+
+
+@app.route('/admin/abrechnungen/<int:gemeinschaft_id>/transaktionen')
+@admin_required
+def admin_transaktionen(gemeinschaft_id):
+    """Übersicht aller Transaktionen einer Gemeinschaft"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Prüfe Berechtigung
+        if session.get('admin_level', 0) < 2:
+            cursor.execute("""
+                SELECT COUNT(*) FROM gemeinschafts_admin
+                WHERE benutzer_id = ? AND gemeinschaft_id = ?
+            """, (session['benutzer_id'], gemeinschaft_id))
+            if cursor.fetchone()[0] == 0:
+                flash('Keine Berechtigung für diese Gemeinschaft!', 'danger')
+                return redirect(url_for('admin_abrechnungen'))
+        
+        # Filter-Parameter
+        filter_typ = request.args.get('typ', 'alle')  # alle, eingaenge, ausgaenge, unzugeordnet
+        
+        # Transaktionen laden mit erweiterten Zuordnungsinfos
+        query = """
+            SELECT 
+                t.*,
+                b.name || ' ' || COALESCE(b.vorname, '') as benutzer_name,
+                m.bezeichnung as maschine_name,
+                g.name as gemeinschaft_name
+            FROM bank_transaktionen t
+            LEFT JOIN benutzer b ON t.benutzer_id = b.id
+            LEFT JOIN maschinen m ON t.zuordnung_typ = 'maschine' AND t.zuordnung_id = m.id
+            JOIN gemeinschaften g ON t.gemeinschaft_id = g.id
+            WHERE t.gemeinschaft_id = ?
+        """
+        
+        params = [gemeinschaft_id]
+        
+        if filter_typ == 'eingaenge':
+            query += " AND t.betrag > 0"
+        elif filter_typ == 'ausgaenge':
+            query += " AND t.betrag < 0"
+        elif filter_typ == 'unzugeordnet':
+            query += " AND (t.zugeordnet = 0 OR t.zugeordnet IS NULL)"
+        
+        query += " ORDER BY t.buchungsdatum DESC, t.id DESC LIMIT 500"
+        
+        cursor.execute(query, params)
+        
+        columns = [desc[0] for desc in cursor.description]
+        transaktionen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        
+        # Statistiken
+        cursor.execute("""
+            SELECT 
+                COUNT(*) as anzahl_gesamt,
+                COUNT(CASE WHEN zugeordnet = 1 THEN 1 END) as anzahl_zugeordnet,
+                COALESCE(SUM(betrag), 0) as summe_gesamt,
+                COALESCE(SUM(CASE WHEN zugeordnet = 1 THEN betrag ELSE 0 END), 0) as summe_zugeordnet,
+                COALESCE(SUM(CASE WHEN betrag > 0 THEN betrag ELSE 0 END), 0) as summe_eingaenge,
+                COALESCE(SUM(CASE WHEN betrag < 0 THEN betrag ELSE 0 END), 0) as summe_ausgaenge,
+                COUNT(CASE WHEN betrag > 0 AND zugeordnet = 0 THEN 1 END) as unzugeordnete_eingaenge,
+                COUNT(CASE WHEN betrag < 0 AND zugeordnet = 0 THEN 1 END) as unzugeordnete_ausgaenge
+            FROM bank_transaktionen
+            WHERE gemeinschaft_id = ?
+        """, (gemeinschaft_id,))
+        
+        row = cursor.fetchone()
+        
+        # Anfangssaldo laden
+        cursor.execute("""
+            SELECT anfangssaldo_bank, anfangssaldo_datum
+            FROM gemeinschaften
+            WHERE id = ?
+        """, (gemeinschaft_id,))
+        saldo_row = cursor.fetchone()
+        anfangssaldo = saldo_row[0] if saldo_row else 0.0
+        anfangssaldo_datum = saldo_row[1] if saldo_row else None
+        
+        statistik = {
+            'anzahl_gesamt': row[0],
+            'anzahl_zugeordnet': row[1],
+            'summe_gesamt': row[2],
+            'summe_zugeordnet': row[3],
+            'summe_eingaenge': row[4],
+            'summe_ausgaenge': row[5],
+            'unzugeordnete_eingaenge': row[6],
+            'unzugeordnete_ausgaenge': row[7],
+            'anfangssaldo': anfangssaldo,
+            'anfangssaldo_datum': anfangssaldo_datum,
+            'aktueller_saldo': anfangssaldo + row[2]
+        }
+        # Gemeinschaftsname laden
+        cursor.execute("SELECT name FROM gemeinschaften WHERE id = ?", (gemeinschaft_id,))
+        gemeinschaft_name = cursor.fetchone()[0]
+        
+        # Benutzer der Gemeinschaft laden (für Zuordnung)
+        cursor.execute("""
+            SELECT DISTINCT b.id, b.name, b.vorname
+            FROM benutzer b
+            JOIN mitglied_gemeinschaft mg ON b.id = mg.mitglied_id
+            WHERE mg.gemeinschaft_id = ?
+            ORDER BY b.name, b.vorname
+        """, (gemeinschaft_id,))
+        benutzer = [{'id': row[0], 'name': f"{row[1]} {row[2] or ''}"} for row in cursor.fetchall()]
+        
+        # Maschinen der Gemeinschaft laden
+        cursor.execute("""
+            SELECT id, bezeichnung
+            FROM maschinen
+            WHERE gemeinschaft_id = ?
+            ORDER BY bezeichnung
+        """, (gemeinschaft_id,))
+        maschinen = [{'id': row[0], 'bezeichnung': row[1]} for row in cursor.fetchall()]
+        
+        # Import-Übersicht laden (für "Import löschen" Funktion)
+        cursor.execute("""
+            SELECT 
+                date(importiert_am) as import_datum,
+                importiert_von,
+                COUNT(*) as anzahl,
+                b.name || ' ' || COALESCE(b.vorname, '') as importiert_von_name
+            FROM bank_transaktionen t
+            LEFT JOIN benutzer b ON t.importiert_von = b.id
+            WHERE t.gemeinschaft_id = ?
+            GROUP BY date(importiert_am), importiert_von
+            ORDER BY importiert_am DESC
+        """, (gemeinschaft_id,))
+        
+        imports = []
+        for row in cursor.fetchall():
+            imports.append({
+                'datum': row[0],
+                'importiert_von_id': row[1],
+                'anzahl': row[2],
+                'importiert_von_name': row[3] or 'Unbekannt'
+            })
+    
+    return render_template('admin_transaktionen.html',
+                         gemeinschaft_id=gemeinschaft_id,
+                         transaktionen=transaktionen,
+                         statistik=statistik,
+                         filter_typ=filter_typ,
+                         benutzer=benutzer,
+                         maschinen=maschinen,
+                         imports=imports)
+
+
+@app.route('/admin/abrechnungen/<int:gemeinschaft_id>/csv-konfiguration', methods=['GET', 'POST'])
+@admin_required
+def admin_csv_konfiguration(gemeinschaft_id):
+    """CSV-Import-Format konfigurieren"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Prüfe Berechtigung
+        if session.get('admin_level', 0) < 2:
+            cursor.execute("""
+                SELECT COUNT(*) FROM gemeinschafts_admin
+                WHERE benutzer_id = ? AND gemeinschaft_id = ?
+            """, (session['benutzer_id'], gemeinschaft_id))
+            if cursor.fetchone()[0] == 0:
+                flash('Keine Berechtigung für diese Gemeinschaft!', 'danger')
+                return redirect(url_for('admin_abrechnungen'))
+        
+        if request.method == 'POST':
+            # Konfiguration speichern
+            cursor.execute("""
+                UPDATE csv_import_konfiguration
+                SET trennzeichen = ?,
+                    kodierung = ?,
+                    spalte_buchungsdatum = ?,
+                    spalte_valutadatum = ?,
+                    spalte_betrag = ?,
+                    spalte_verwendungszweck = ?,
+                    spalte_empfaenger = ?,
+                    spalte_kontonummer = ?,
+                    spalte_bic = ?,
+                    dezimaltrennzeichen = ?,
+                    tausendertrennzeichen = ?,
+                    datumsformat = ?,
+                    hat_kopfzeile = ?,
+                    zeilen_ueberspringen = ?
+                WHERE gemeinschaft_id = ?
+            """, (
+                request.form.get('trennzeichen'),
+                request.form.get('kodierung'),
+                request.form.get('spalte_buchungsdatum'),
+                request.form.get('spalte_valutadatum'),
+                request.form.get('spalte_betrag'),
+                request.form.get('spalte_verwendungszweck'),
+                request.form.get('spalte_empfaenger'),
+                request.form.get('spalte_kontonummer'),
+                request.form.get('spalte_bic'),
+                request.form.get('dezimaltrennzeichen'),
+                request.form.get('tausendertrennzeichen'),
+                request.form.get('datumsformat'),
+                1 if request.form.get('hat_kopfzeile') else 0,
+                int(request.form.get('zeilen_ueberspringen', 0)),
+                gemeinschaft_id
+            ))
+            
+            db.connection.commit()
+            flash('CSV-Konfiguration gespeichert!', 'success')
+            return redirect(url_for('admin_csv_import', gemeinschaft_id=gemeinschaft_id))
+        
+        # Konfiguration laden
+        cursor.execute("""
+            SELECT * FROM csv_import_konfiguration
+            WHERE gemeinschaft_id = ?
+        """, (gemeinschaft_id,))
+        
+        result = cursor.fetchone()
+        if result:
+            columns = [desc[0] for desc in cursor.description]
+            config = dict(zip(columns, result))
+        else:
+            # Standard-Konfiguration erstellen
+            cursor.execute("""
+                INSERT INTO csv_import_konfiguration (gemeinschaft_id)
+                VALUES (?)
+            """, (gemeinschaft_id,))
+            db.connection.commit()
+            return redirect(request.url)
+        
+        # Gemeinschaftsname laden
+        cursor.execute("SELECT name FROM gemeinschaften WHERE id = ?", (gemeinschaft_id,))
+        gemeinschaft_name = cursor.fetchone()[0]
+    
+    return render_template('admin_csv_konfiguration.html',
+                         gemeinschaft_id=gemeinschaft_id,
+                         gemeinschaft_name=gemeinschaft_name,
+                         config=config)
+
+
+@app.route('/admin/transaktion/<int:transaktion_id>/zuordnen', methods=['POST'])
+@admin_required
+def transaktion_zuordnen(transaktion_id):
+    """Ordnet eine Transaktion einem Benutzer, einer Maschine oder Gemeinschaftskosten zu"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Transaktion laden
+        cursor.execute("""
+            SELECT gemeinschaft_id, betrag FROM bank_transaktionen
+            WHERE id = ?
+        """, (transaktion_id,))
+        result = cursor.fetchone()
+        if not result:
+            flash('Transaktion nicht gefunden!', 'danger')
+            return redirect(url_for('admin_abrechnungen'))
+        
+        gemeinschaft_id, betrag = result
+        
+        # Prüfe Berechtigung
+        if session.get('admin_level', 0) < 2:
+            cursor.execute("""
+                SELECT COUNT(*) FROM gemeinschafts_admin
+                WHERE benutzer_id = ? AND gemeinschaft_id = ?
+            """, (session['benutzer_id'], gemeinschaft_id))
+            if cursor.fetchone()[0] == 0:
+                flash('Keine Berechtigung!', 'danger')
+                return redirect(url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id))
+        
+        zuordnung_typ = request.form.get('zuordnung_typ')
+        
+        if betrag > 0:  # EINGANG - Benutzer zuordnen
+            benutzer_id = request.form.get('benutzer_id')
+            if not benutzer_id:
+                flash('Bitte Benutzer auswählen!', 'warning')
+                return redirect(url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id))
+            
+            # Update Transaktion
+            cursor.execute("""
+                UPDATE bank_transaktionen
+                SET benutzer_id = ?, zugeordnet = 1, 
+                    zuordnung_typ = 'benutzer', zuordnung_id = ?
+                WHERE id = ?
+            """, (benutzer_id, benutzer_id, transaktion_id))
+            
+            db.connection.commit()
+            flash('✅ Eingang dem Benutzer zugeordnet', 'success')
+            
+        else:  # AUSGANG - Maschine oder Gemeinschaftskosten
+            if zuordnung_typ == 'maschine':
+                maschine_id = request.form.get('maschine_id')
+                if not maschine_id:
+                    flash('Bitte Maschine auswählen!', 'warning')
+                    return redirect(url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id))
+                
+                beschreibung = request.form.get('beschreibung', '')
+                
+                # Gemeinschaftskosten eintragen
+                cursor.execute("""
+                    INSERT INTO gemeinschafts_kosten
+                    (gemeinschaft_id, transaktion_id, maschine_id, kategorie, betrag, datum, beschreibung, erstellt_von)
+                    VALUES (?, ?, ?, 'maschine', ?, date('now'), ?, ?)
+                """, (gemeinschaft_id, transaktion_id, maschine_id, abs(betrag), beschreibung, session['benutzer_id']))
+                
+                # Update Transaktion
+                cursor.execute("""
+                    UPDATE bank_transaktionen
+                    SET zugeordnet = 1, zuordnung_typ = 'maschine', zuordnung_id = ?
+                    WHERE id = ?
+                """, (maschine_id, transaktion_id))
+                
+                db.connection.commit()
+                flash('✅ Ausgang der Maschine zugeordnet', 'success')
+                
+            elif zuordnung_typ == 'gemeinschaft':
+                kategorie = request.form.get('kategorie', 'sonstiges')
+                beschreibung = request.form.get('beschreibung', '')
+                
+                # Gemeinschaftskosten eintragen
+                cursor.execute("""
+                    INSERT INTO gemeinschafts_kosten
+                    (gemeinschaft_id, transaktion_id, kategorie, betrag, datum, beschreibung, erstellt_von)
+                    VALUES (?, ?, ?, ?, date('now'), ?, ?)
+                """, (gemeinschaft_id, transaktion_id, kategorie, abs(betrag), beschreibung, session['benutzer_id']))
+                
+                # Update Transaktion
+                cursor.execute("""
+                    UPDATE bank_transaktionen
+                    SET zugeordnet = 1, zuordnung_typ = 'gemeinschaft', zuordnung_id = NULL
+                    WHERE id = ?
+                """, (transaktion_id,))
+                
+                db.connection.commit()
+                flash('✅ Ausgang als Gemeinschaftskosten verbucht', 'success')
+    
+    return redirect(url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id))
+
+
+@app.route('/admin/transaktion/<int:transaktion_id>/zuordnung-aufheben', methods=['POST'])
+@admin_required
+def transaktion_zuordnung_aufheben(transaktion_id):
+    """Hebt die Zuordnung einer Transaktion auf"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Transaktion laden
+        cursor.execute("""
+            SELECT gemeinschaft_id, zuordnung_typ, zuordnung_id
+            FROM bank_transaktionen
+            WHERE id = ?
+        """, (transaktion_id,))
+        result = cursor.fetchone()
+        if not result:
+            flash('Transaktion nicht gefunden!', 'danger')
+            return redirect(url_for('admin_abrechnungen'))
+        
+        gemeinschaft_id, zuordnung_typ, zuordnung_id = result
+        
+        # Prüfe Berechtigung
+        if session.get('admin_level', 0) < 2:
+            cursor.execute("""
+                SELECT COUNT(*) FROM gemeinschafts_admin
+                WHERE benutzer_id = ? AND gemeinschaft_id = ?
+            """, (session['benutzer_id'], gemeinschaft_id))
+            if cursor.fetchone()[0] == 0:
+                flash('Keine Berechtigung!', 'danger')
+                return redirect(url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id))
+        
+        # Zuordnung aufheben
+        cursor.execute("""
+            UPDATE bank_transaktionen
+            SET zugeordnet = 0, zuordnung_typ = NULL, zuordnung_id = NULL, benutzer_id = NULL
+            WHERE id = ?
+        """, (transaktion_id,))
+        
+        # Gemeinschaftskosten löschen falls vorhanden
+        if zuordnung_typ in ['maschine', 'gemeinschaft']:
+            cursor.execute("""
+                DELETE FROM gemeinschafts_kosten
+                WHERE transaktion_id = ?
+            """, (transaktion_id,))
+        
+        db.connection.commit()
+        flash('✅ Zuordnung aufgehoben', 'info')
+    
+    return redirect(url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id))
+
+
+@app.route('/admin/transaktion/<int:transaktion_id>/loeschen', methods=['POST'])
+@admin_required
+def transaktion_loeschen(transaktion_id):
+    """Löscht eine einzelne Transaktion"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Transaktion laden
+        cursor.execute("""
+            SELECT gemeinschaft_id, zuordnung_typ
+            FROM bank_transaktionen
+            WHERE id = ?
+        """, (transaktion_id,))
+        result = cursor.fetchone()
+        if not result:
+            flash('Transaktion nicht gefunden!', 'danger')
+            return redirect(url_for('admin_abrechnungen'))
+        
+        gemeinschaft_id, zuordnung_typ = result
+        
+        # Prüfe Berechtigung
+        if session.get('admin_level', 0) < 2:
+            cursor.execute("""
+                SELECT COUNT(*) FROM gemeinschafts_admin
+                WHERE benutzer_id = ? AND gemeinschaft_id = ?
+            """, (session['benutzer_id'], gemeinschaft_id))
+            if cursor.fetchone()[0] == 0:
+                flash('Keine Berechtigung!', 'danger')
+                return redirect(url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id))
+        
+        # Gemeinschaftskosten löschen falls vorhanden
+        if zuordnung_typ in ['maschine', 'gemeinschaft']:
+            cursor.execute("""
+                DELETE FROM gemeinschafts_kosten
+                WHERE transaktion_id = ?
+            """, (transaktion_id,))
+        
+        # Transaktion löschen
+        cursor.execute("""
+            DELETE FROM bank_transaktionen
+            WHERE id = ?
+        """, (transaktion_id,))
+        
+        db.connection.commit()
+        flash('✅ Transaktion gelöscht', 'success')
+    
+    return redirect(url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id))
+
+
+@app.route('/admin/abrechnungen/<int:gemeinschaft_id>/import-loeschen', methods=['POST'])
+@admin_required
+def import_loeschen(gemeinschaft_id):
+    """Löscht alle Transaktionen eines bestimmten Imports"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Prüfe Berechtigung
+        if session.get('admin_level', 0) < 2:
+            cursor.execute("""
+                SELECT COUNT(*) FROM gemeinschafts_admin
+                WHERE benutzer_id = ? AND gemeinschaft_id = ?
+            """, (session['benutzer_id'], gemeinschaft_id))
+            if cursor.fetchone()[0] == 0:
+                flash('Keine Berechtigung!', 'danger')
+                return redirect(url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id))
+        
+        import_datum = request.form.get('import_datum')
+        importiert_von = request.form.get('importiert_von')
+        
+        if not import_datum or not importiert_von:
+            flash('Fehlende Parameter!', 'danger')
+            return redirect(url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id))
+        
+        # Zähle zu löschende Transaktionen
+        cursor.execute("""
+            SELECT COUNT(*) FROM bank_transaktionen
+            WHERE gemeinschaft_id = ?
+            AND date(importiert_am) = ?
+            AND importiert_von = ?
+        """, (gemeinschaft_id, import_datum, importiert_von))
+        anzahl = cursor.fetchone()[0]
+        
+        if anzahl == 0:
+            flash('Keine Transaktionen zum Löschen gefunden!', 'warning')
+            return redirect(url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id))
+        
+        # Lade IDs der zu löschenden Transaktionen
+        cursor.execute("""
+            SELECT id FROM bank_transaktionen
+            WHERE gemeinschaft_id = ?
+            AND date(importiert_am) = ?
+            AND importiert_von = ?
+        """, (gemeinschaft_id, import_datum, importiert_von))
+        trans_ids = [row[0] for row in cursor.fetchall()]
+        
+        # Lösche zugehörige Gemeinschaftskosten
+        if trans_ids:
+            placeholders = ','.join('?' * len(trans_ids))
+            cursor.execute(f"""
+                DELETE FROM gemeinschafts_kosten
+                WHERE transaktion_id IN ({placeholders})
+            """, trans_ids)
+        
+        # Lösche Transaktionen
+        cursor.execute("""
+            DELETE FROM bank_transaktionen
+            WHERE gemeinschaft_id = ?
+            AND date(importiert_am) = ?
+            AND importiert_von = ?
+        """, (gemeinschaft_id, import_datum, importiert_von))
+        
+        db.connection.commit()
+        flash(f'✅ {anzahl} Transaktionen des Imports vom {import_datum} gelöscht', 'success')
+    
+    return redirect(url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id))
+
+
+@app.route('/admin/abrechnungen/<int:gemeinschaft_id>/anfangssaldo', methods=['GET', 'POST'])
+@admin_required
+def anfangssaldo_bearbeiten(gemeinschaft_id):
+    """Anfangssaldo für Gemeinschaft eingeben/bearbeiten"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Prüfe Berechtigung
+        if session.get('admin_level', 0) < 2:
+            cursor.execute("""
+                SELECT COUNT(*) FROM gemeinschafts_admin
+                WHERE benutzer_id = ? AND gemeinschaft_id = ?
+            """, (session['benutzer_id'], gemeinschaft_id))
+            if cursor.fetchone()[0] == 0:
+                flash('Keine Berechtigung!', 'danger')
+                return redirect(url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id))
+        
+        if request.method == 'POST':
+            anfangssaldo = request.form.get('anfangssaldo', '0')
+            anfangssaldo_datum = request.form.get('anfangssaldo_datum', None)
+            
+            try:
+                anfangssaldo = float(anfangssaldo.replace(',', '.'))
+            except ValueError:
+                flash('Ungültiger Betrag!', 'danger')
+                return redirect(request.url)
+            
+            # Update Gemeinschaft
+            cursor.execute("""
+                UPDATE gemeinschaften
+                SET anfangssaldo_bank = ?, anfangssaldo_datum = ?
+                WHERE id = ?
+            """, (anfangssaldo, anfangssaldo_datum, gemeinschaft_id))
+            
+            db.connection.commit()
+            flash(f'✅ Anfangssaldo auf {anfangssaldo:.2f} € gesetzt', 'success')
+            return redirect(url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id))
+        
+        # GET - Formular anzeigen
+        cursor.execute("""
+            SELECT name, anfangssaldo_bank, anfangssaldo_datum
+            FROM gemeinschaften
+            WHERE id = ?
+        """, (gemeinschaft_id,))
+        row = cursor.fetchone()
+        
+        gemeinschaft = {
+            'id': gemeinschaft_id,
+            'name': row[0],
+            'anfangssaldo': row[1] or 0.0,
+            'anfangssaldo_datum': row[2]
+        }
+    
+    return render_template('anfangssaldo_bearbeiten.html', gemeinschaft=gemeinschaft)
+
+
 if __name__ == '__main__':
     # Port aus Umgebungsvariable (für Launcher) oder Standard
     port = int(os.environ.get('FLASK_PORT', 5000))
@@ -2707,6 +3531,9 @@ if __name__ == '__main__':
     
     # threaded=True verhindert Hostname-Auflösung-Probleme
     app.run(host=host, port=port, debug=False, threaded=True, use_reloader=False)
+
+
+
 
 
 

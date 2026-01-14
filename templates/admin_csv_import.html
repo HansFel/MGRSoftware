@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}CSV-Import - {{ gemeinschaft_name }} - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="text-white">
+                <i class="bi bi-upload"></i> CSV-Import: {{ gemeinschaft_name }}
+            </h2>
+            <div>
+                <a href="{{ url_for('admin_csv_konfiguration', gemeinschaft_id=gemeinschaft_id) }}" class="btn btn-warning">
+                    <i class="bi bi-gear"></i> Format konfigurieren
+                </a>
+                <a href="{{ url_for('admin_abrechnungen') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Zurück
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-file-earmark-spreadsheet"></i> Bankdaten importieren
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="csv_file" class="form-label">CSV-Datei auswählen</label>
+                        <input type="file" class="form-control" id="csv_file" name="csv_file" 
+                               accept=".csv" required>
+                        <div class="form-text">
+                            Wählen Sie die CSV-Exportdatei Ihrer Bank aus.
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <strong><i class="bi bi-info-circle"></i> Wichtig:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Datei muss im CSV-Format vorliegen</li>
+                            <li>Aktuelles Format: <strong>{{ config.trennzeichen }}</strong> als Trennzeichen, 
+                                <strong>{{ config.dezimaltrennzeichen }}</strong> als Dezimaltrennzeichen</li>
+                            <li>Duplikate werden automatisch erkannt und übersprungen</li>
+                            <li>Transaktionen mit Zahlungsreferenz werden automatisch zugeordnet</li>
+                            <li><a href="{{ url_for('admin_csv_konfiguration', gemeinschaft_id=gemeinschaft_id) }}" 
+                                   class="alert-link">Format anpassen</a>, falls Ihr Bankenformat abweicht</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-upload"></i> CSV hochladen und importieren
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-question-circle"></i> Hilfe
+                </h5>
+            </div>
+            <div class="card-body">
+                <h6>Erwartetes CSV-Format:</h6>
+                <p class="small">
+                    <strong>Trennzeichen:</strong> {{ config.trennzeichen }}<br>
+                    <strong>Dezimaltrennzeichen:</strong> {{ config.dezimaltrennzeichen }}<br>
+                    <strong>Datumsformat:</strong> 
+                    {% if config.datumsformat == '%d.%m.%Y' %}TT.MM.JJJJ{% endif %}
+                    {% if config.datumsformat == '%Y-%m-%d' %}JJJJ-MM-TT{% endif %}
+                    {% if config.datumsformat == '%m/%d/%Y' %}MM/TT/JJJJ{% endif %}
+                    {% if config.datumsformat == '%d/%m/%Y' %}TT/MM/JJJJ{% endif %}
+                </p>
+                
+                <p class="small">
+                    <strong>Erforderliche Spalten:</strong><br>
+                    • {{ config.spalte_buchungsdatum }}<br>
+                    • {{ config.spalte_betrag }}<br>
+                    • {{ config.spalte_verwendungszweck }}
+                </p>
+                
+                <p class="small">
+                    <strong>Optionale Spalten:</strong><br>
+                    • Valutadatum<br>
+                    • Beguenstigter/Zahlungspflichtiger<br>
+                    • Kontonummer<br>
+                    • BIC
+                </p>
+                
+                <hr>
+                
+                <h6>Automatische Zuordnung:</h6>
+                <p class="small">
+                    Wenn der Verwendungszweck eine gültige Zahlungsreferenz enthält 
+                    (Format: MGR-X-Y-ZZ), wird die Transaktion automatisch dem 
+                    entsprechenden Mitglied zugeordnet.
+                </p>
+                
+                <hr>
+                
+                <h6>Duplikatsschutz:</h6>
+                <p class="small">
+                    Jede Transaktion wird anhand von Datum, Betrag und Verwendungszweck 
+                    eindeutig identifiziert. Bereits importierte Transaktionen werden 
+                    automatisch übersprungen.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
