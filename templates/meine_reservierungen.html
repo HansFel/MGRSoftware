@@ -9,6 +9,14 @@
             <h2 class="text-white">
                 <i class="bi bi-calendar-check"></i> Meine Reservierungen
             </h2>
+            <div>
+                <a href="{{ url_for('reservierungen_kalender') }}" class="btn btn-info">
+                    <i class="bi bi-calendar3"></i> Kalender-Ansicht
+                </a>
+                <a href="{{ url_for('geloeschte_reservierungen') }}" class="btn btn-secondary">
+                    <i class="bi bi-trash"></i> Gelöschte Reservierungen
+                </a>
+            </div>
         </div>
     </div>
 </div>

@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Reservierungen Timeline - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="text-white">
+                <i class="bi bi-clock-history"></i> Reservierungen Timeline
+            </h2>
+            <div>
+                <a href="{{ url_for('reservierungen_kalender') }}" class="btn btn-light">
+                    <i class="bi bi-calendar3"></i> Kalender
+                </a>
+                <a href="{{ url_for('meine_reservierungen') }}" class="btn btn-light">
+                    <i class="bi bi-list-check"></i> Meine Reservierungen
+                </a>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                    <i class="bi bi-house"></i> Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter & Controls -->
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('reservierungen_balken') }}" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label fw-bold">Startdatum:</label>
+                <input type="date" name="start_datum" class="form-control" value="{{ start_datum }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-bold">Anzahl Tage:</label>
+                <input type="number" name="tage" class="form-control" value="{{ tage_anzahl }}" min="1" max="14">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> Anzeigen
+                </button>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label fw-bold">Legende:</label>
+                <div class="d-flex gap-3">
+                    <div><span class="badge" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">Eigene</span></div>
+                    <div><span class="badge" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">Andere</span></div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Timeline -->
+<div class="card">
+    <div class="card-body p-0" style="overflow-x: auto;">
+        <table class="table table-bordered mb-0" style="min-width: 2000px;">
+            <thead>
+                <tr class="table-light">
+                    <th style="width: 150px; position: sticky; left: 0; background: white; z-index: 20;">Maschine</th>
+                    {% for hour in range(24) %}
+                    <th colspan="2" class="text-center" style="width: 80px; font-size: 0.85em;">{{ "%02d"|format(hour) }}:00</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for tag in tage_liste %}
+                    <!-- Tag-Überschrift -->
+                    <tr class="table-primary">
+                        <td colspan="49" class="fw-bold">
+                            <i class="bi bi-calendar-day"></i> {{ tag.wochentag }}, {{ tag.datum }}
+                        </td>
+                    </tr>
+                    
+                    <!-- Reservierungen für diesen Tag -->
+                    {% set tag_hat_reservierungen = false %}
+                    {% for maschine in maschinen %}
+                        {% set maschinen_reservierungen = [] %}
+                        {% for res in reservierungen %}
+                            {% if res.maschine_id == maschine.id and res.datum == tag.datum %}
+                                {% set _ = maschinen_reservierungen.append(res) %}
+                                {% set tag_hat_reservierungen = true %}
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if maschinen_reservierungen %}
+                        <tr>
+                            <td class="fw-bold" style="position: sticky; left: 0; background: white; z-index: 10;">
+                                {{ maschine.bezeichnung }}
+                            </td>
+                            {% for hour in range(24) %}
+                                {% for half in [0, 30] %}
+                                    {% set current_time = "%02d:%02d"|format(hour, half) %}
+                                    {% set cell_has_reservation = false %}
+                                    {% set reservation_data = {} %}
+                                    
+                                    {% for res in maschinen_reservierungen %}
+                                        {% set start_parts = res.uhrzeit_von.split(':') %}
+                                        {% set end_parts = res.uhrzeit_bis.split(':') %}
+                                        {% set start_hour = start_parts[0]|int %}
+                                        {% set start_minute = start_parts[1]|int %}
+                                        {% set end_hour = end_parts[0]|int %}
+                                        {% set end_minute = end_parts[1]|int %}
+                                        
+                                        {% set start_total = start_hour * 60 + start_minute %}
+                                        {% set end_total = end_hour * 60 + end_minute %}
+                                        {% set current_total = hour * 60 + half %}
+                                        
+                                        {% if current_total >= start_total and current_total < end_total %}
+                                            {% set cell_has_reservation = true %}
+                                            {% set _ = reservation_data.update({'res': res, 'start_total': start_total}) %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    {% if cell_has_reservation %}
+                                        {% set current_total = hour * 60 + half %}
+                                        {% if current_total == reservation_data.start_total %}
+                                            {% set res = reservation_data.res %}
+                                            {% set start_parts = res.uhrzeit_von.split(':') %}
+                                            {% set end_parts = res.uhrzeit_bis.split(':') %}
+                                            {% set start_hour = start_parts[0]|int %}
+                                            {% set start_minute = start_parts[1]|int %}
+                                            {% set end_hour = end_parts[0]|int %}
+                                            {% set end_minute = end_parts[1]|int %}
+                                            {% set duration_minutes = (end_hour * 60 + end_minute) - (start_hour * 60 + start_minute) %}
+                                            {% set colspan = (duration_minutes // 30)|int %}
+                                            
+                                            {% if res.benutzer_id == session.benutzer_id %}
+                                                {% set bg_color = "background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;" %}
+                                            {% else %}
+                                                {% set bg_color = "background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;" %}
+                                            {% endif %}
+                                            
+                                            <td colspan="{{ colspan }}" style="{{ bg_color }} font-weight: 600; font-size: 0.85em; text-align: center; padding: 8px 4px;"
+                                                title="{{ res.maschine_bezeichnung }} - {{ res.benutzer_name }} ({{ res.uhrzeit_von }}-{{ res.uhrzeit_bis }})">
+                                                {{ res.benutzer_name.split(' ')[0] }}<br>
+                                                <small>{{ res.uhrzeit_von }}-{{ res.uhrzeit_bis }}</small>
+                                            </td>
+                                        {% endif %}
+                                    {% else %}
+                                        <td style="background: #fafafa;"></td>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endfor %}
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if not tag_hat_reservierungen %}
+                    <tr>
+                        <td colspan="49" class="text-center text-muted fst-italic">
+                            Keine Reservierungen an diesem Tag
+                        </td>
+                    </tr>
+                    {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Info -->
+<div class="alert alert-light mt-3">
+    <strong><i class="bi bi-info-circle"></i> Hinweise:</strong>
+    <ul class="mb-0 mt-2">
+        <li>Jede Spalte entspricht 30 Minuten</li>
+        <li>Reservierungen werden mit farbigen Blöcken dargestellt</li>
+        <li>Grün = Ihre Reservierungen, Lila = Andere Benutzer</li>
+        <li>Scrollen Sie horizontal, um alle Uhrzeiten zu sehen</li>
+    </ul>
+</div>
+
+{% endblock %}

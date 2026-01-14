@@ -23,6 +23,8 @@ Die Hauptnavigation oben bietet folgende Menüpunkte:
 - **Neuer Einsatz** - Maschineneinsatz erfassen
 - **Meine Einsätze** - Alle Ihre Einsätze anzeigen
 - **Reservierungen** - Maschinenreservierungen verwalten
+- **Kalender** - Kalenderansicht aller Reservierungen
+- **Balkenansicht** - Gantt-Chart-Übersicht der Maschinenauslastung
 - **Einstellungen** - Passwort und Treibstoffkosten ändern
 
 ---
@@ -176,6 +178,85 @@ Zeigt alle Ihre aktiven Reservierungen:
 - Stornierungsmöglichkeit für zukünftige Termine
 - Direktlink zum Erstellen weiterer Reservierungen für dieselbe Maschine
 
+#### Gelöschte Reservierungen anzeigen
+
+Alle stornierten Reservierungen bleiben für Ihre Übersicht erhalten:
+
+1. **Zugang:** Klicken Sie auf "Gelöschte Reservierungen" auf der Reservierungsseite
+2. **Anzeige:** Zeigt die letzten 100 gelöschten Reservierungen
+3. **Informationen:** 
+   - Wann wurde storniert
+   - Alle Details der ursprünglichen Reservierung
+   - Grund der Stornierung
+
+**Nutzen:** Nachvollziehbarkeit aller Ihrer Planungen und Änderungen
+
+---
+
+## Reservierungen visualisieren
+
+### Kalenderansicht
+
+Die Kalenderansicht bietet eine chronologische Übersicht aller Reservierungen:
+
+1. **Zugang:** Klicken Sie auf "Kalender" im Hauptmenü
+2. **Ansicht:** 
+   - Zeigt alle Reservierungen der nächsten 30 Tage
+   - Gruppiert nach Datum
+   - Übersichtliche Tagesansicht
+
+3. **Farbcodierung:**
+   - 🟣 **Lila:** Reservierungen anderer Benutzer
+   - 🟢 **Grün:** Ihre eigenen Reservierungen
+
+4. **Filter:** Wählen Sie eine Maschine aus, um nur deren Reservierungen zu sehen
+
+5. **Details:** Jede Karte zeigt:
+   - Maschinenbezeichnung
+   - Zeitraum (von-bis) und Dauer
+   - Benutzer
+   - Verwendungszweck
+
+**Ideal für:** Schneller Überblick über die nächsten Wochen
+
+### Balkenansicht (Gantt-Chart)
+
+Die Balkenansicht zeigt alle Maschinen und deren Auslastung in einer Gantt-Chart-ähnlichen Darstellung:
+
+1. **Zugang:** Klicken Sie auf "Balkenansicht" im Hauptmenü
+
+2. **Darstellung:**
+   - Maschinen auf der Y-Achse (vertikal)
+   - Zeit/Tage auf der X-Achse (horizontal)
+   - Reservierungen als farbige Balken
+   - Standard: 10 Tage Ansicht
+
+3. **Farbcodierung:**
+   - 🟣 **Lila:** Reservierungen anderer Benutzer
+   - 🟢 **Grün:** Ihre eigenen Reservierungen
+   - ⬜ **Grau hinterlegt:** Wochenenden
+
+4. **Interaktion:**
+   - Hover über Balken für Details (Benutzer, genaue Zeit)
+   - Startdatum frei wählbar
+   - Anzahl Tage anpassbar (3-30 Tage)
+
+5. **Einstellungen:**
+   - **Startdatum:** Beliebiges Datum wählen
+   - **Anzahl Tage:** Zwischen 3 und 30 Tagen
+   - Klick auf "Anzeigen" aktualisiert die Ansicht
+
+**Ideal für:** 
+- Planung mehrerer Maschinen
+- Erkennen von Engpässen
+- Koordination mit anderen Mitgliedern
+- Übersicht der Maschinenauslastung
+
+**Tipps:**
+- Wochenenden sind grau hinterlegt für bessere Orientierung
+- Nutzen Sie verschiedene Zeiträume für Kurz- und Langfristplanung
+- Die Ansicht zeigt alle Maschinen gleichzeitig - perfekt für Gesamtübersicht
+
 ---
 
 ## Einstellungen
@@ -221,6 +302,12 @@ A:
 **F: Muss ich immer reservieren?**
 A: Nein, Reservierungen sind optional. Sie helfen aber, Konflikte zu vermeiden und zeigen anderen Mitgliedern, wann eine Maschine benötigt wird.
 
+**F: Wie finde ich schnell heraus, wann eine Maschine frei ist?**
+A: Nutzen Sie die Balkenansicht! Sie zeigt auf einen Blick die Auslastung aller Maschinen über mehrere Tage hinweg.
+
+**F: Kann ich sehen, welche Reservierungen ich storniert habe?**
+A: Ja, unter "Gelöschte Reservierungen" finden Sie alle Ihre stornierten Reservierungen der letzten Zeit.
+
 **F: Warum werden meine Treibstoffkosten nicht der Gemeinschaft zugerechnet?**
 A: Die Treibstoffkosten bezahlt jedes Mitglied selbst. Nur die Maschinenkosten werden der Gemeinschaft zugeordnet.
 
@@ -232,4 +319,9 @@ Bei Fragen oder Problemen wenden Sie sich an:
 - **Ihren Administrator** für Benutzerverwaltung und Berechtigungen
 - **Technischen Support** bei technischen Problemen
 
-**Version:** 2.0 (Januar 2026)
+**Version:** 2.1 (Januar 2026)
+
+**Neue Features in Version 2.1:**
+- Kalenderansicht für bessere Übersicht
+- Balkenansicht (Gantt-Chart) zur Maschinenauslastung
+- Archivierung gelöschter Reservierungen

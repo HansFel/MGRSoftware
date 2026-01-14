@@ -22,8 +22,20 @@ if DB_PATH:
     # Launcher-Modus: Verwende gewählte Datenbank
     DATABASE = DB_PATH
 else:
-    # Server-Modus: Verwende Standard-Datenbank
-    DATABASE = os.path.join(os.path.dirname(__file__), 'data', 'maschinengemeinschaft.db')
+    # Server-Modus: Prüfe mehrere mögliche Pfade
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), 'maschinengemeinschaft.db'),  # Hauptverzeichnis
+        os.path.join(os.path.dirname(__file__), 'data', 'maschinengemeinschaft.db'),  # data-Ordner
+    ]
+    DATABASE = None
+    for path in possible_paths:
+        if os.path.exists(path):
+            DATABASE = path
+            break
+    
+    # Falls keine existiert, verwende Hauptverzeichnis als Standard
+    if DATABASE is None:
+        DATABASE = possible_paths[0]
     
 # Für Kompatibilität mit bestehendem Code
 DB_PATH = DATABASE
@@ -71,9 +83,68 @@ def hauptadmin_required(f):
     return decorated_function
 
 
+def archiviere_abgelaufene_reservierungen():
+    """Verschiebt abgelaufene Reservierungen in die Archiv-Tabelle"""
+    try:
+        with MaschinenDBContext(DB_PATH) as db:
+            cursor = db.connection.cursor()
+            
+            # Finde alle abgelaufenen Reservierungen (Datum + Endzeit liegt in der Vergangenheit)
+            cursor.execute("""
+                SELECT r.*, m.bezeichnung as maschine_bezeichnung, 
+                       b.name || ' ' || COALESCE(b.vorname, '') as benutzer_name
+                FROM maschinen_reservierungen r
+                JOIN maschinen m ON r.maschine_id = m.id
+                JOIN benutzer b ON r.benutzer_id = b.id
+                WHERE r.status = 'aktiv'
+                AND datetime(r.datum || ' ' || r.uhrzeit_bis) < datetime('now', 'localtime')
+            """)
+            
+            abgelaufene = cursor.fetchall()
+            
+            if abgelaufene:
+                columns = [desc[0] for desc in cursor.description]
+                
+                for row in abgelaufene:
+                    reservierung = dict(zip(columns, row))
+                    
+                    # In Archiv-Tabelle kopieren
+                    cursor.execute("""
+                        INSERT INTO reservierungen_abgelaufen 
+                        (reservierung_id, maschine_id, maschine_bezeichnung, benutzer_id, 
+                         benutzer_name, datum, uhrzeit_von, uhrzeit_bis, nutzungsdauer_stunden, 
+                         zweck, bemerkung, erstellt_am)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (reservierung['id'], reservierung['maschine_id'], 
+                          reservierung['maschine_bezeichnung'], reservierung['benutzer_id'],
+                          reservierung['benutzer_name'], reservierung['datum'], 
+                          reservierung['uhrzeit_von'], reservierung['uhrzeit_bis'],
+                          reservierung['nutzungsdauer_stunden'], reservierung.get('zweck'),
+                          reservierung.get('bemerkung'), reservierung['erstellt_am']))
+                    
+                    # Status auf 'abgelaufen' setzen
+                    cursor.execute("""
+                        UPDATE maschinen_reservierungen
+                        SET status = 'abgelaufen', geaendert_am = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    """, (reservierung['id'],))
+                
+                db.connection.commit()
+                return len(abgelaufene)
+            
+            return 0
+            
+    except Exception as e:
+        print(f"Fehler beim Archivieren abgelaufener Reservierungen: {e}")
+        return 0
+
+
 @app.route('/')
 def index():
     """Startseite - Weiterleitung"""
+    # Archiviere abgelaufene Reservierungen beim Seitenaufruf
+    archiviere_abgelaufene_reservierungen()
+    
     if 'benutzer_id' in session:
         return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
@@ -122,6 +193,9 @@ def logout():
 @login_required
 def dashboard():
     """Dashboard - Ãœbersicht fÃ¼r den Benutzer"""
+    # Archiviere abgelaufene Reservierungen
+    archiviere_abgelaufene_reservierungen()
+    
     with MaschinenDBContext(DB_PATH) as db:
         benutzer_id = session['benutzer_id']
         
@@ -457,6 +531,9 @@ def maschine_reservieren(maschine_id):
     """Maschine reservieren"""
     from datetime import datetime, timedelta
     
+    # Archiviere abgelaufene Reservierungen
+    archiviere_abgelaufene_reservierungen()
+    
     with MaschinenDBContext(DB_PATH) as db:
         cursor = db.connection.cursor()
         maschine = db.get_maschine_by_id(maschine_id)
@@ -535,6 +612,120 @@ def maschine_reservieren(maschine_id):
                          heute=datetime.now().strftime('%Y-%m-%d'))
 
 
+@app.route('/reservierungen-kalender')
+@login_required
+def reservierungen_kalender():
+    """Kalenderansicht aller Reservierungen (alle Maschinen)"""
+    from datetime import datetime, timedelta
+    
+    # Optional: Maschinen-Filter
+    maschine_id = request.args.get('maschine_id', type=int)
+    
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Alle aktiven Maschinen für Filter
+        maschinen = db.get_all_maschinen()
+        
+        # Reservierungen der nächsten 30 Tage laden
+        heute = datetime.now()
+        bis_datum = (heute + timedelta(days=30)).strftime('%Y-%m-%d')
+        
+        if maschine_id:
+            cursor.execute("""
+                SELECT r.*, m.bezeichnung as maschine_bezeichnung,
+                       b.name || ' ' || COALESCE(b.vorname, '') as benutzer_name
+                FROM maschinen_reservierungen r
+                JOIN maschinen m ON r.maschine_id = m.id
+                JOIN benutzer b ON r.benutzer_id = b.id
+                WHERE r.maschine_id = ?
+                  AND r.datum >= date('now')
+                  AND r.datum <= ?
+                  AND r.status = 'aktiv'
+                ORDER BY r.datum, r.uhrzeit_von
+            """, (maschine_id, bis_datum))
+        else:
+            cursor.execute("""
+                SELECT r.*, m.bezeichnung as maschine_bezeichnung,
+                       b.name || ' ' || COALESCE(b.vorname, '') as benutzer_name
+                FROM maschinen_reservierungen r
+                JOIN maschinen m ON r.maschine_id = m.id
+                JOIN benutzer b ON r.benutzer_id = b.id
+                WHERE r.datum >= date('now')
+                  AND r.datum <= ?
+                  AND r.status = 'aktiv'
+                ORDER BY r.datum, m.bezeichnung, r.uhrzeit_von
+            """, (bis_datum,))
+        
+        columns = [desc[0] for desc in cursor.description]
+        reservierungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    
+    return render_template('reservierungen_kalender.html',
+                         reservierungen=reservierungen,
+                         maschinen=maschinen,
+                         selected_maschine_id=maschine_id,
+                         heute=heute.strftime('%Y-%m-%d'))
+
+
+@app.route('/reservierungen-balken')
+@login_required
+def reservierungen_balken():
+    """Balkendiagramm-Ansicht der Reservierungen (10 Tage)"""
+    from datetime import datetime, timedelta
+    
+    # Zeitraum-Parameter
+    tage = int(request.args.get('tage', 10))
+    start_datum = request.args.get('start_datum')
+    
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Alle aktiven Maschinen
+        maschinen = db.get_all_maschinen()
+        
+        # Start- und Enddatum berechnen
+        if start_datum:
+            start = datetime.strptime(start_datum, '%Y-%m-%d')
+        else:
+            # Standard: Gestern starten, damit man auch vergangene Reservierungen sieht
+            start = datetime.now() - timedelta(days=1)
+        
+        ende = start + timedelta(days=tage)
+        
+        # Alle Reservierungen im Zeitraum laden
+        cursor.execute("""
+            SELECT r.*, m.bezeichnung as maschine_bezeichnung,
+                   b.name || ' ' || COALESCE(b.vorname, '') as benutzer_name
+            FROM maschinen_reservierungen r
+            JOIN maschinen m ON r.maschine_id = m.id
+            JOIN benutzer b ON r.benutzer_id = b.id
+            WHERE r.datum >= ?
+              AND r.datum < ?
+              AND r.status = 'aktiv'
+            ORDER BY m.bezeichnung, r.datum, r.uhrzeit_von
+        """, (start.strftime('%Y-%m-%d'), ende.strftime('%Y-%m-%d')))
+        
+        columns = [desc[0] for desc in cursor.description]
+        reservierungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    
+    # Tage für Timeline generieren
+    tage_liste = []
+    for i in range(tage):
+        tag = start + timedelta(days=i)
+        tage_liste.append({
+            'datum': tag.strftime('%Y-%m-%d'),
+            'tag': tag.strftime('%d.%m'),
+            'wochentag': ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][tag.weekday()]
+        })
+    
+    return render_template('reservierungen_balken.html',
+                         reservierungen=reservierungen,
+                         maschinen=maschinen,
+                         tage_liste=tage_liste,
+                         start_datum=start.strftime('%Y-%m-%d'),
+                         tage_anzahl=tage)
+
+
 @app.route('/meine-reservierungen')
 @login_required
 def meine_reservierungen():
@@ -569,10 +760,14 @@ def reservierung_stornieren(reservierung_id):
     with MaschinenDBContext(DB_PATH) as db:
         cursor = db.connection.cursor()
         
-        # PrÃ¼fen ob Reservierung dem Benutzer gehÃ¶rt
+        # Reservierung vollständig laden
         cursor.execute("""
-            SELECT maschine_id FROM maschinen_reservierungen
-            WHERE id = ? AND benutzer_id = ?
+            SELECT r.*, m.bezeichnung as maschine_bezeichnung, 
+                   b.name || ' ' || COALESCE(b.vorname, '') as benutzer_name
+            FROM maschinen_reservierungen r
+            JOIN maschinen m ON r.maschine_id = m.id
+            JOIN benutzer b ON r.benutzer_id = b.id
+            WHERE r.id = ? AND r.benutzer_id = ?
         """, (reservierung_id, session['benutzer_id']))
         
         result = cursor.fetchone()
@@ -580,7 +775,25 @@ def reservierung_stornieren(reservierung_id):
             flash('Reservierung nicht gefunden oder keine Berechtigung!', 'danger')
             return redirect(url_for('dashboard'))
         
-        maschine_id = result[0]
+        # Als Dictionary speichern
+        columns = [desc[0] for desc in cursor.description]
+        reservierung = dict(zip(columns, result))
+        maschine_id = reservierung['maschine_id']
+        
+        # In Archiv-Tabelle kopieren
+        cursor.execute("""
+            INSERT INTO reservierungen_geloescht 
+            (reservierung_id, maschine_id, maschine_bezeichnung, benutzer_id, 
+             benutzer_name, datum, uhrzeit_von, uhrzeit_bis, nutzungsdauer_stunden, 
+             zweck, bemerkung, erstellt_am, geloescht_von, grund)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (reservierung_id, reservierung['maschine_id'], 
+              reservierung['maschine_bezeichnung'], reservierung['benutzer_id'],
+              reservierung['benutzer_name'], reservierung['datum'], 
+              reservierung['uhrzeit_von'], reservierung['uhrzeit_bis'],
+              reservierung['nutzungsdauer_stunden'], reservierung.get('zweck'),
+              reservierung.get('bemerkung'), reservierung['erstellt_am'],
+              session['benutzer_id'], 'Benutzer-Stornierung'))
         
         # Status auf 'storniert' setzen
         cursor.execute("""
@@ -590,9 +803,34 @@ def reservierung_stornieren(reservierung_id):
         """, (reservierung_id,))
         
         db.connection.commit()
-        flash('Reservierung wurde storniert.', 'success')
+        flash('Reservierung wurde storniert und archiviert.', 'success')
         
     return redirect(url_for('maschine_reservieren', maschine_id=maschine_id))
+
+
+@app.route('/geloeschte-reservierungen')
+@login_required
+def geloeschte_reservierungen():
+    """Übersicht aller gelöschten/stornierten Reservierungen"""
+    from datetime import datetime
+    
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Alle gelöschten Reservierungen des Benutzers
+        cursor.execute("""
+            SELECT * FROM reservierungen_geloescht
+            WHERE benutzer_id = ?
+            ORDER BY geloescht_am DESC
+            LIMIT 100
+        """, (session['benutzer_id'],))
+        
+        columns = [desc[0] for desc in cursor.description]
+        geloeschte = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    
+    return render_template('geloeschte_reservierungen.html', 
+                         geloeschte=geloeschte,
+                         today=datetime.now().strftime('%Y-%m-%d'))
 
 
 @app.route('/api/maschine/<int:maschine_id>/stundenzaehler')
@@ -2442,7 +2680,8 @@ if __name__ == '__main__':
     print(f"URL: http://{host}:{port}")
     print(f"{'='*60}\n")
     
-    app.run(host=host, port=port, debug=False)
+    # threaded=True verhindert Hostname-Auflösung-Probleme
+    app.run(host=host, port=port, debug=False, threaded=True, use_reloader=False)
 
 
 
