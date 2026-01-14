@@ -126,6 +126,39 @@ class MaschinenDB:
         )
         self.connection.commit()
     
+    def get_gemeinschafts_admin_ids(self, benutzer_id: int) -> List[int]:
+        """Hole Gemeinschafts-IDs, für die ein Benutzer Admin ist"""
+        self.cursor.execute("""
+            SELECT gemeinschaft_id FROM gemeinschafts_admin
+            WHERE benutzer_id = ?
+        """, (benutzer_id,))
+        return [row[0] for row in self.cursor.fetchall()]
+    
+    def add_gemeinschafts_admin(self, benutzer_id: int, gemeinschaft_id: int):
+        """Benutzer als Gemeinschafts-Admin hinzufügen"""
+        self.cursor.execute("""
+            INSERT OR IGNORE INTO gemeinschafts_admin 
+            (benutzer_id, gemeinschaft_id, erstellt_am)
+            VALUES (?, ?, ?)
+        """, (benutzer_id, gemeinschaft_id, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        self.connection.commit()
+    
+    def remove_gemeinschafts_admin(self, benutzer_id: int, gemeinschaft_id: int):
+        """Gemeinschafts-Admin-Rechte entfernen"""
+        self.cursor.execute("""
+            DELETE FROM gemeinschafts_admin
+            WHERE benutzer_id = ? AND gemeinschaft_id = ?
+        """, (benutzer_id, gemeinschaft_id))
+        self.connection.commit()
+    
+    def is_gemeinschafts_admin(self, benutzer_id: int, gemeinschaft_id: int) -> bool:
+        """Prüfen ob Benutzer Admin einer Gemeinschaft ist"""
+        self.cursor.execute("""
+            SELECT COUNT(*) FROM gemeinschafts_admin
+            WHERE benutzer_id = ? AND gemeinschaft_id = ?
+        """, (benutzer_id, gemeinschaft_id))
+        return self.cursor.fetchone()[0] > 0
+    
     # ==================== MASCHINEN ====================
     
     def add_maschine(self, bezeichnung: str, hersteller: str = None,

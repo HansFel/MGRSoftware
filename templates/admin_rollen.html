@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Administrator-Rollen - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h1 class="text-white mb-4">
+            <i class="bi bi-shield-lock"></i> Administrator-Rollen verwalten
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-people-fill"></i> Benutzer und Rollen
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-info-circle"></i> Rollenbeschreibung:</h6>
+                    <ul class="mb-0">
+                        <li><strong>Kein Admin:</strong> Normaler Benutzer ohne Admin-Rechte</li>
+                        <li><strong>Gemeinschafts-Administrator:</strong> Kann nur seine zugewiesenen Gemeinschaften verwalten</li>
+                        <li><strong>Haupt-Administrator:</strong> Volle Rechte, kann alle Gemeinschaften verwalten, Rollen vergeben und Backups bestätigen</li>
+                    </ul>
+                    <hr>
+                    <p class="mb-0">
+                        <i class="bi bi-exclamation-triangle text-warning"></i>
+                        <strong>Wichtig:</strong> Für Datenbank-Sicherungen müssen <strong>immer zwei Haupt-Administratoren</strong> die Durchführung bestätigen (Zwei-Personen-Regel).
+                    </p>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Benutzername</th>
+                                <th>Admin-Level</th>
+                                <th>Gemeinschafts-Admin für</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in benutzer %}
+                            <tr>
+                                <td>{{ user.vorname }} {{ user.name }}</td>
+                                <td>{{ user.username }}</td>
+                                <td>
+                                    {% if user.admin_level == 2 %}
+                                        <span class="badge bg-danger">
+                                            <i class="bi bi-shield-fill-check"></i> Haupt-Administrator
+                                        </span>
+                                    {% elif user.admin_level == 1 %}
+                                        <span class="badge bg-warning">
+                                            <i class="bi bi-shield-check"></i> Gemeinschafts-Admin
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">
+                                            <i class="bi bi-person"></i> Kein Admin
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.gemeinschaften %}
+                                        <small class="text-muted">{{ user.gemeinschaften }}</small>
+                                    {% else %}
+                                        <small class="text-muted">—</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <!-- Admin-Level ändern -->
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-outline-secondary dropdown-toggle" 
+                                                data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="bi bi-gear"></i> Level
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li>
+                                                <form method="POST" action="{{ url_for('admin_rollen_set_level') }}" class="d-inline">
+                                                    <input type="hidden" name="benutzer_id" value="{{ user.id }}">
+                                                    <input type="hidden" name="level" value="0">
+                                                    <button type="submit" class="dropdown-item" 
+                                                            {% if user.admin_level == 0 %}disabled{% endif %}>
+                                                        <i class="bi bi-person"></i> Kein Admin
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="POST" action="{{ url_for('admin_rollen_set_level') }}" class="d-inline">
+                                                    <input type="hidden" name="benutzer_id" value="{{ user.id }}">
+                                                    <input type="hidden" name="level" value="1">
+                                                    <button type="submit" class="dropdown-item"
+                                                            {% if user.admin_level == 1 %}disabled{% endif %}>
+                                                        <i class="bi bi-shield-check"></i> Gemeinschafts-Admin
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="POST" action="{{ url_for('admin_rollen_set_level') }}" class="d-inline">
+                                                    <input type="hidden" name="benutzer_id" value="{{ user.id }}">
+                                                    <input type="hidden" name="level" value="2">
+                                                    <button type="submit" class="dropdown-item"
+                                                            {% if user.admin_level == 2 %}disabled{% endif %}>
+                                                        <i class="bi bi-shield-fill-check"></i> Haupt-Administrator
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        </ul>
+                                    </div>
+
+                                    <!-- Gemeinschaft zuweisen (nur für Gemeinschafts-Admins) -->
+                                    {% if user.admin_level == 1 %}
+                                    <button type="button" class="btn btn-sm btn-outline-primary" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#gemeinschaftModal{{ user.id }}">
+                                        <i class="bi bi-plus-circle"></i> Gemeinschaft
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                            <!-- Modal für Gemeinschafts-Zuweisung -->
+                            {% if user.admin_level == 1 %}
+                            <div class="modal fade" id="gemeinschaftModal{{ user.id }}" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">
+                                                Gemeinschaft für {{ user.vorname }} {{ user.name }} zuweisen
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <form method="POST" action="{{ url_for('admin_rollen_add_gemeinschaft') }}">
+                                            <div class="modal-body">
+                                                <input type="hidden" name="benutzer_id" value="{{ user.id }}">
+                                                <div class="mb-3">
+                                                    <label for="gemeinschaft_id{{ user.id }}" class="form-label">
+                                                        Gemeinschaft auswählen
+                                                    </label>
+                                                    <select name="gemeinschaft_id" id="gemeinschaft_id{{ user.id }}" 
+                                                            class="form-select" required>
+                                                        <option value="">-- Bitte wählen --</option>
+                                                        {% for gem in gemeinschaften %}
+                                                        <option value="{{ gem.id }}">{{ gem.name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                                    Abbrechen
+                                                </button>
+                                                <button type="submit" class="btn btn-primary">
+                                                    <i class="bi bi-plus-circle"></i> Hinzufügen
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3 mb-5">
+    <div class="col-12">
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück zum Dashboard
+        </a>
+    </div>
+</div>
+
+{% endblock %}

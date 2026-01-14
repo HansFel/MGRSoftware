@@ -107,8 +107,14 @@
                                 Treibstoffkosten (€)
                             </label>
                             <input type="number" class="form-control" id="treibstoffkosten" 
-                                   name="treibstoffkosten" step="0.01">
-                            <small class="text-muted">Preis: {{ treibstoffkosten_preis|round(2) }} EUR/L</small>
+                                   name="treibstoffkosten" step="0.01"
+                                   {% if letzter_treibstoffpreis %}value="{{ letzter_treibstoffpreis|round(2) }}"{% endif %}>
+                            <small class="text-muted">
+                                Preis: {{ treibstoffkosten_preis|round(2) }} EUR/L
+                                {% if letzter_treibstoffpreis %}
+                                | Letzter Wert: {{ letzter_treibstoffpreis|round(2) }} EUR
+                                {% endif %}
+                            </small>
                         </div>
                     </div>
 

@@ -11,6 +11,9 @@
                     <i class="bi bi-list-ul"></i> Meine Einsätze
                 </h4>
                 <div>
+                    <a href="{{ url_for('meine_stornierten_einsaetze') }}" class="btn btn-outline-secondary btn-sm me-2">
+                        <i class="bi bi-archive"></i> Stornierte Einsätze
+                    </a>
                     <a href="{{ url_for('meine_einsaetze_csv') }}" class="btn btn-success btn-sm me-2">
                         <i class="bi bi-file-earmark-spreadsheet"></i> CSV Export
                     </a>
@@ -36,6 +39,7 @@
                                 <th>T-Kosten</th>
                                 <th>M-Kosten</th>
                                 <th>Anmerkungen</th>
+                                <th>Aktion</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -101,6 +105,13 @@
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
+                                <td>
+                                    <a href="{{ url_for('einsatz_stornieren', einsatz_id=einsatz.id) }}" 
+                                       class="btn btn-sm btn-outline-danger"
+                                       onclick="return confirm('Soll dieser Einsatz wirklich storniert werden?')">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </td>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -117,9 +128,10 @@
                                         -
                                     {% endif %}
                                 </td>
-                                <td>
-                                    <strong class="text-danger">{{ "%.2f"|format(summe_treibstoff) }} €</strong>
-                                </td>
+                                <td></td>
+                            </tr>
+                            <tr class="table-info">
+                                <td colspan="9
                                 <td>
                                     <strong class="text-success">{{ "%.2f"|format(summe_maschine) }} €</strong>
                                 </td>

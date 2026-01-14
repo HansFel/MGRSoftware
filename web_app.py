@@ -1,6 +1,6 @@
-"""
-Flask-Webanwendung für Maschinengemeinschaft
-Ermöglicht Benutzern den Zugriff von extern (z.B. Mobiltelefon)
+﻿"""
+Flask-Webanwendung fÃ¼r Maschinengemeinschaft
+ErmÃ¶glicht Benutzern den Zugriff von extern (z.B. Mobiltelefon)
 """
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify, make_response
@@ -14,13 +14,23 @@ from functools import wraps
 import zipfile
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))  # Für Session-Management
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))  # FÃ¼r Session-Management
 
-DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), "maschinengemeinschaft.db"))
+# Übungsmodus: Datenbank-Pfad aus Umgebungsvariable oder Standard-Pfad
+DB_PATH = os.environ.get('DB_PATH')
+if DB_PATH:
+    # Launcher-Modus: Verwende gewählte Datenbank
+    DATABASE = DB_PATH
+else:
+    # Server-Modus: Verwende Standard-Datenbank
+    DATABASE = os.path.join(os.path.dirname(__file__), 'data', 'maschinengemeinschaft.db')
+    
+# Für Kompatibilität mit bestehendem Code
+DB_PATH = DATABASE
 
 
 def login_required(f):
-    """Decorator für geschützte Routen"""
+    """Decorator fÃ¼r geschÃ¼tzte Routen"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'benutzer_id' not in session:
@@ -31,7 +41,7 @@ def login_required(f):
 
 
 def admin_required(f):
-    """Decorator für Admin-Routen"""
+    """Decorator für Admin-Routen - Level 1 oder höher"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'benutzer_id' not in session:
@@ -39,6 +49,23 @@ def admin_required(f):
             return redirect(url_for('login'))
         if not session.get('is_admin'):
             flash('Zugriff verweigert. Administrator-Rechte erforderlich.', 'danger')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def hauptadmin_required(f):
+    """Decorator für Haupt-Administrator-Routen - Level 2"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'benutzer_id' not in session:
+            flash('Bitte melden Sie sich an.', 'warning')
+            return redirect(url_for('login'))
+        if not session.get('is_admin'):
+            flash('Zugriff verweigert. Administrator-Rechte erforderlich.', 'danger')
+            return redirect(url_for('dashboard'))
+        if session.get('admin_level', 0) < 2:
+            flash('Zugriff verweigert. Haupt-Administrator-Rechte erforderlich.', 'danger')
             return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
     return decorated_function
@@ -66,10 +93,19 @@ def login():
                 session['benutzer_id'] = benutzer['id']
                 session['benutzer_name'] = f"{benutzer['name']}, {benutzer['vorname']}"
                 session['is_admin'] = bool(benutzer.get('is_admin', False))
+                session['admin_level'] = benutzer.get('admin_level', 0)
+                
+                # Gemeinschafts-Admin Zuordnungen laden
+                if session['admin_level'] == 1:
+                    gemeinschafts_ids = db.get_gemeinschafts_admin_ids(benutzer['id'])
+                    session['gemeinschafts_admin_ids'] = gemeinschafts_ids
+                else:
+                    session['gemeinschafts_admin_ids'] = []
+                
                 flash(f"Willkommen, {benutzer['vorname']}!", 'success')
                 return redirect(url_for('dashboard'))
             else:
-                flash('Ungültiger Benutzername oder Passwort.', 'danger')
+                flash('UngÃ¼ltiger Benutzername oder Passwort.', 'danger')
     
     return render_template('login.html')
 
@@ -85,7 +121,7 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    """Dashboard - Übersicht für den Benutzer"""
+    """Dashboard - Ãœbersicht fÃ¼r den Benutzer"""
     with MaschinenDBContext(DB_PATH) as db:
         benutzer_id = session['benutzer_id']
         
@@ -97,7 +133,7 @@ def dashboard():
         maschinenkosten = statistik.get('gesamt_maschinenkosten', 0) or 0
         statistik['gesamtkosten'] = treibstoffkosten + maschinenkosten
         
-        # Letzte Einsätze
+        # Letzte EinsÃ¤tze
         einsaetze = db.get_einsaetze_by_benutzer(benutzer_id)
         letzte_einsaetze = einsaetze[:10] if einsaetze else []
         
@@ -126,7 +162,7 @@ def dashboard():
         schulden_nach_gemeinschaft = []
         for row in cursor.fetchall():
             d = dict(zip(columns, row))
-            d['bezeichnung'] = d['name']  # Mapping für Template
+            d['bezeichnung'] = d['name']  # Mapping fÃ¼r Template
             d['gesamtkosten'] = d['maschinenkosten'] or 0
             schulden_nach_gemeinschaft.append(d)
         
@@ -143,12 +179,23 @@ def dashboard():
         
         columns = [desc[0] for desc in cursor.description]
         reservierungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        
+        # Ungelesene Nachrichten zÃ¤hlen
+        cursor.execute("""
+            SELECT COUNT(*) FROM gemeinschafts_nachrichten n
+            JOIN mitglied_gemeinschaft mg ON n.gemeinschaft_id = mg.gemeinschaft_id
+            LEFT JOIN nachricht_gelesen ng ON n.id = ng.nachricht_id AND ng.benutzer_id = ?
+            WHERE mg.mitglied_id = ? AND ng.id IS NULL
+        """, (benutzer_id, benutzer_id))
+        
+        ungelesene_nachrichten = cursor.fetchone()[0]
     
     return render_template('dashboard.html', 
                          statistik=statistik,
                          einsaetze=letzte_einsaetze,
                          schulden_nach_gemeinschaft=schulden_nach_gemeinschaft,
-                         reservierungen=reservierungen)
+                         reservierungen=reservierungen,
+                         ungelesene_nachrichten=ungelesene_nachrichten)
 
 
 @app.route('/neuer-einsatz', methods=['GET', 'POST'])
@@ -165,7 +212,7 @@ def neuer_einsatz():
             kosten = request.form.get('treibstoffkosten')
             flaeche_menge = request.form.get('flaeche_menge')
             
-            # Hole Maschine für Erfassungsmodus
+            # Hole Maschine fÃ¼r Erfassungsmodus
             with MaschinenDBContext(DB_PATH) as db:
                 maschine = db.get_maschine_by_id(maschine_id)
                 erfassungsmodus = maschine.get('erfassungsmodus', 'fortlaufend')
@@ -177,7 +224,7 @@ def neuer_einsatz():
                         flash('Bitte geben Sie einen Wert ein!', 'danger')
                         return redirect(url_for('neuer_einsatz'))
                     
-                    # Verwende aktuellen Stundenzähler als Anfang, berechne Ende
+                    # Verwende aktuellen StundenzÃ¤hler als Anfang, berechne Ende
                     aktueller_stand = maschine.get('stundenzaehler_aktuell', 0) or 0
                     anfangstand = aktueller_stand
                     
@@ -186,7 +233,7 @@ def neuer_einsatz():
                     if maschine.get('abrechnungsart') == 'stunden':
                         endstand = anfangstand + direkt_wert
                     else:
-                        # Bei Hektar/km/Stück: Stunden ≈ Wert (vereinfacht)
+                        # Bei Hektar/km/StÃ¼ck: Stunden â‰ˆ Wert (vereinfacht)
                         endstand = anfangstand + direkt_wert
                         if not flaeche_menge:
                             flaeche_menge = str(direkt_wert)
@@ -196,7 +243,7 @@ def neuer_einsatz():
                     endstand = float(request.form.get('endstand'))
                     
                     if endstand < anfangstand:
-                        flash('Endstand muss größer oder gleich Anfangstand sein!', 'danger')
+                        flash('Endstand muss grÃ¶ÃŸer oder gleich Anfangstand sein!', 'danger')
                         return redirect(url_for('neuer_einsatz'))
                 
                 db.add_einsatz(
@@ -211,6 +258,16 @@ def neuer_einsatz():
                     anmerkungen=anmerkungen if anmerkungen else None,
                     flaeche_menge=float(flaeche_menge) if flaeche_menge else None
                 )
+                
+                # Speichere letzten Treibstoffpreis fÃ¼r Vorschlag
+                if kosten:
+                    cursor = db.connection.cursor()
+                    cursor.execute("""
+                        UPDATE benutzer 
+                        SET letzter_treibstoffpreis = ? 
+                        WHERE id = ?
+                    """, (float(kosten), session['benutzer_id']))
+                    db.connection.commit()
             
             flash('Einsatz wurde erfolgreich gespeichert!', 'success')
             return redirect(url_for('dashboard'))
@@ -238,7 +295,7 @@ def neuer_einsatz():
         columns = [desc[0] for desc in cursor.description]
         maschinen = [dict(zip(columns, row)) for row in cursor.fetchall()]
         
-        # Prüfe aktuelle Reservierungen für heute
+        # PrÃ¼fe aktuelle Reservierungen fÃ¼r heute
         heute_datum = datetime.now().strftime('%Y-%m-%d')
         
         for maschine in maschinen:
@@ -266,18 +323,26 @@ def neuer_einsatz():
         # Hole Treibstoffkosten des Benutzers
         benutzer = db.get_benutzer(session['benutzer_id'])
         treibstoffkosten_preis = benutzer.get('treibstoffkosten_preis', 1.50)
+        
+        # Hole letzten Treibstoffpreis des Benutzers fÃ¼r Vorschlag
+        cursor.execute("""
+            SELECT letzter_treibstoffpreis FROM benutzer WHERE id = ?
+        """, (session['benutzer_id'],))
+        result = cursor.fetchone()
+        letzter_treibstoffpreis = result[0] if result and result[0] else None
     
     return render_template('neuer_einsatz.html',
                          maschinen=maschinen,
                          einsatzzwecke=einsatzzwecke,
                          heute=datetime.now().strftime('%Y-%m-%d'),
-                         treibstoffkosten_preis=treibstoffkosten_preis)
+                         treibstoffkosten_preis=treibstoffkosten_preis,
+                         letzter_treibstoffpreis=letzter_treibstoffpreis)
 
 
 @app.route('/meine-einsaetze')
 @login_required
 def meine_einsaetze():
-    """Liste aller eigenen Einsätze"""
+    """Liste aller eigenen EinsÃ¤tze"""
     with MaschinenDBContext(DB_PATH) as db:
         einsaetze = db.get_einsaetze_by_benutzer(session['benutzer_id'])
         
@@ -291,6 +356,99 @@ def meine_einsaetze():
                          summe_treibstoff=summe_treibstoff,
                          summe_maschine=summe_maschine,
                          summe_gesamt=summe_gesamt)
+
+
+@app.route('/einsatz/<int:einsatz_id>/stornieren', methods=['GET', 'POST'])
+@login_required
+def einsatz_stornieren(einsatz_id):
+    """Einsatz stornieren"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Einsatz laden
+        cursor.execute("""
+            SELECT e.*, m.bezeichnung as maschine_name, 
+                   b.name as benutzer_name, b.vorname as benutzer_vorname
+            FROM maschineneinsaetze e
+            JOIN maschinen m ON e.maschine_id = m.id
+            JOIN benutzer b ON e.benutzer_id = b.id
+            WHERE e.id = ?
+        """, (einsatz_id,))
+        
+        columns = [desc[0] for desc in cursor.description]
+        einsatz = dict(zip(columns, cursor.fetchone()))
+        
+        if not einsatz:
+            flash('Einsatz nicht gefunden.', 'danger')
+            return redirect(url_for('meine_einsaetze'))
+        
+        # BerechtigungsprÃ¼fung: Nur eigener Einsatz oder Admin
+        if einsatz['benutzer_id'] != session['benutzer_id'] and not session.get('is_admin'):
+            flash('Keine Berechtigung zum Stornieren dieses Einsatzes.', 'danger')
+            return redirect(url_for('meine_einsaetze'))
+        
+        if request.method == 'POST':
+            stornierungsgrund = request.form.get('stornierungsgrund', '')
+            
+            # Einsatz in Storno-Tabelle kopieren
+            cursor.execute("""
+                INSERT INTO maschineneinsaetze_storniert 
+                (original_einsatz_id, datum, benutzer_id, maschine_id, einsatzzweck_id,
+                 stundenzaehler_anfang, stundenzaehler_ende, betriebsstunden,
+                 hektar, kilometer, stueck, treibstoffverbrauch, treibstoffkosten,
+                 maschinenkosten, gesamtkosten, bemerkung, storniert_am, storniert_von, stornierungsgrund)
+                SELECT id, datum, benutzer_id, maschine_id, einsatzzweck_id,
+                       anfangstand, endstand, betriebsstunden,
+                       flaeche_menge, flaeche_menge, flaeche_menge, treibstoffverbrauch, treibstoffkosten,
+                       kosten_berechnet, (COALESCE(treibstoffkosten, 0) + COALESCE(kosten_berechnet, 0)), anmerkungen, ?, ?, ?
+                FROM maschineneinsaetze
+                WHERE id = ?
+            """, (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
+                  session['benutzer_id'], 
+                  stornierungsgrund, 
+                  einsatz_id))
+            
+            # Original lÃ¶schen
+            cursor.execute("DELETE FROM maschineneinsaetze WHERE id = ?", (einsatz_id,))
+            db.connection.commit()
+            
+            flash('Einsatz wurde erfolgreich storniert.', 'success')
+            
+            if session.get('is_admin'):
+                return redirect(url_for('admin_alle_einsaetze'))
+            else:
+                return redirect(url_for('meine_einsaetze'))
+        
+        # GET - BestÃ¤tigungsformular anzeigen
+        return render_template('einsatz_stornieren.html', einsatz=einsatz)
+
+
+@app.route('/meine-stornierten-einsaetze')
+@login_required
+def meine_stornierten_einsaetze():
+    """Liste aller eigenen stornierten EinsÃ¤tze"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        cursor.execute("""
+            SELECT s.*, m.bezeichnung as maschine_name,
+                   b.name as benutzer_name, b.vorname as benutzer_vorname,
+                   sv.name as storniert_von_name, sv.vorname as storniert_von_vorname,
+                   ez.bezeichnung as einsatzzweck_name
+            FROM maschineneinsaetze_storniert s
+            JOIN maschinen m ON s.maschine_id = m.id
+            JOIN benutzer b ON s.benutzer_id = b.id
+            JOIN benutzer sv ON s.storniert_von = sv.id
+            LEFT JOIN einsatzzwecke ez ON s.einsatzzweck_id = ez.id
+            WHERE s.benutzer_id = ?
+            ORDER BY s.storniert_am DESC
+        """, (session['benutzer_id'],))
+        
+        columns = [desc[0] for desc in cursor.description]
+        stornierte_einsaetze = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    
+    return render_template('meine_stornierten_einsaetze.html', 
+                         stornierte_einsaetze=stornierte_einsaetze)
 
 
 @app.route('/maschine/<int:maschine_id>/reservieren', methods=['GET', 'POST'])
@@ -311,7 +469,7 @@ def maschine_reservieren(maschine_id):
             zweck = request.form.get('zweck')
             bemerkung = request.form.get('bemerkung')
             
-            # Prüfen ob Zeitraum verfügbar ist
+            # PrÃ¼fen ob Zeitraum verfÃ¼gbar ist
             cursor.execute("""
                 SELECT COUNT(*) FROM maschinen_reservierungen
                 WHERE maschine_id = ? 
@@ -325,7 +483,7 @@ def maschine_reservieren(maschine_id):
             """, (maschine_id, datum, uhrzeit_von, uhrzeit_von, uhrzeit_bis, uhrzeit_bis, uhrzeit_von, uhrzeit_bis))
             
             if cursor.fetchone()[0] > 0:
-                flash('Der gewählte Zeitraum überschneidet sich mit einer bestehenden Reservierung!', 'danger')
+                flash('Der gewÃ¤hlte Zeitraum Ã¼berschneidet sich mit einer bestehenden Reservierung!', 'danger')
                 return redirect(url_for('maschine_reservieren', maschine_id=maschine_id))
             
             # Reservierung erstellen
@@ -336,13 +494,13 @@ def maschine_reservieren(maschine_id):
             """, (maschine_id, session['benutzer_id'], datum, uhrzeit_von, uhrzeit_bis, nutzungsdauer, zweck, bemerkung))
             
             db.connection.commit()
-            flash(f'Maschine "{maschine["bezeichnung"]}" wurde erfolgreich für {datum} reserviert!', 'success')
+            flash(f'Maschine "{maschine["bezeichnung"]}" wurde erfolgreich fÃ¼r {datum} reserviert!', 'success')
             return redirect(url_for('dashboard'))
         
         # GET: Zeige Formular
         einsatzzwecke = db.get_all_einsatzzwecke()
         
-        # Hole aktuelle und zukünftige Reservierungen
+        # Hole aktuelle und zukÃ¼nftige Reservierungen
         cursor.execute("""
             SELECT r.*, b.name || ' ' || COALESCE(b.vorname, '') as benutzer_name
             FROM maschinen_reservierungen r
@@ -356,7 +514,7 @@ def maschine_reservieren(maschine_id):
         columns = [desc[0] for desc in cursor.description]
         reservierungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
         
-        # Meine Reservierungen für diese Maschine
+        # Meine Reservierungen fÃ¼r diese Maschine
         cursor.execute("""
             SELECT * FROM maschinen_reservierungen
             WHERE maschine_id = ? 
@@ -380,7 +538,7 @@ def maschine_reservieren(maschine_id):
 @app.route('/meine-reservierungen')
 @login_required
 def meine_reservierungen():
-    """Übersicht aller eigenen Reservierungen"""
+    """Ãœbersicht aller eigenen Reservierungen"""
     from datetime import datetime
     
     with MaschinenDBContext(DB_PATH) as db:
@@ -411,7 +569,7 @@ def reservierung_stornieren(reservierung_id):
     with MaschinenDBContext(DB_PATH) as db:
         cursor = db.connection.cursor()
         
-        # Prüfen ob Reservierung dem Benutzer gehört
+        # PrÃ¼fen ob Reservierung dem Benutzer gehÃ¶rt
         cursor.execute("""
             SELECT maschine_id FROM maschinen_reservierungen
             WHERE id = ? AND benutzer_id = ?
@@ -440,7 +598,7 @@ def reservierung_stornieren(reservierung_id):
 @app.route('/api/maschine/<int:maschine_id>/stundenzaehler')
 @login_required
 def get_stundenzaehler(maschine_id):
-    """API: Aktuellen Stundenzählerstand abrufen"""
+    """API: Aktuellen StundenzÃ¤hlerstand abrufen"""
     with MaschinenDBContext(DB_PATH) as db:
         maschine = db.get_maschine_by_id(maschine_id)
         if maschine:
@@ -451,7 +609,7 @@ def get_stundenzaehler(maschine_id):
 @app.route('/meine-einsaetze/csv')
 @login_required
 def meine_einsaetze_csv():
-    """Exportiere eigene Einsätze als CSV"""
+    """Exportiere eigene EinsÃ¤tze als CSV"""
     with MaschinenDBContext(DB_PATH) as db:
         einsaetze = db.get_einsaetze_by_benutzer(session['benutzer_id'])
     
@@ -464,8 +622,8 @@ def meine_einsaetze_csv():
         'Datum', 'Benutzer', 'Maschine', 'Einsatzzweck',
         'Abrechnungsart', 'Preis pro Einheit',
         'Anfangstand', 'Endstand', 'Betriebsstunden',
-        'Treibstoffverbrauch (l)', 'Treibstoffkosten (€)',
-        'Fläche/Menge', 'Maschinenkosten (€)', 'Anmerkungen'
+        'Treibstoffverbrauch (l)', 'Treibstoffkosten (â‚¬)',
+        'FlÃ¤che/Menge', 'Maschinenkosten (â‚¬)', 'Anmerkungen'
     ])
     
     # Daten
@@ -487,7 +645,7 @@ def meine_einsaetze_csv():
             e.get('anmerkungen', '')
         ])
     
-    # BytesIO für send_file
+    # BytesIO fÃ¼r send_file
     csv_bytes = BytesIO(csv_buffer.getvalue().encode('utf-8-sig'))
     csv_bytes.seek(0)
     
@@ -503,7 +661,7 @@ def meine_einsaetze_csv():
 @app.route('/api/maschine/<int:maschine_id>')
 @login_required
 def api_maschine_details(maschine_id):
-    """API-Endpunkt für Maschinen-Details (für AJAX)"""
+    """API-Endpunkt fÃ¼r Maschinen-Details (fÃ¼r AJAX)"""
     with MaschinenDBContext(DB_PATH) as db:
         maschine = db.get_maschine(maschine_id)
     
@@ -515,25 +673,195 @@ def api_maschine_details(maschine_id):
     return {'success': False}, 404
 
 
+@app.route('/nachrichten')
+@login_required
+def nachrichten():
+    """Nachrichten der eigenen Gemeinschaften anzeigen"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Hole alle Nachrichten der Gemeinschaften, in denen der Benutzer Mitglied ist
+        cursor.execute("""
+            SELECT DISTINCT n.*, 
+                   g.name as gemeinschaft_name,
+                   b.name as absender_name, b.vorname as absender_vorname,
+                   CASE WHEN ng.gelesen_am IS NOT NULL THEN 1 ELSE 0 END as gelesen
+            FROM gemeinschafts_nachrichten n
+            JOIN gemeinschaften g ON n.gemeinschaft_id = g.id
+            JOIN benutzer b ON n.absender_id = b.id
+            JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
+            LEFT JOIN nachricht_gelesen ng ON n.id = ng.nachricht_id AND ng.benutzer_id = ?
+            WHERE mg.mitglied_id = ?
+            ORDER BY n.erstellt_am DESC
+        """, (session['benutzer_id'], session['benutzer_id']))
+        
+        columns = [desc[0] for desc in cursor.description]
+        nachrichten_list = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        
+        # ZÃ¤hle ungelesene Nachrichten
+        ungelesen = sum(1 for n in nachrichten_list if not n['gelesen'])
+    
+    return render_template('nachrichten.html', 
+                         nachrichten=nachrichten_list,
+                         ungelesen=ungelesen)
+
+
+@app.route('/nachricht/<int:nachricht_id>/lesen')
+@login_required
+def nachricht_lesen(nachricht_id):
+    """Nachricht als gelesen markieren"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # PrÃ¼fe ob Benutzer berechtigt ist
+        cursor.execute("""
+            SELECT n.* FROM gemeinschafts_nachrichten n
+            JOIN mitglied_gemeinschaft mg ON n.gemeinschaft_id = mg.gemeinschaft_id
+            WHERE n.id = ? AND mg.mitglied_id = ?
+        """, (nachricht_id, session['benutzer_id']))
+        
+        if cursor.fetchone():
+            # Als gelesen markieren
+            cursor.execute("""
+                INSERT OR IGNORE INTO nachricht_gelesen (nachricht_id, benutzer_id, gelesen_am)
+                VALUES (?, ?, ?)
+            """, (nachricht_id, session['benutzer_id'], datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+            db.connection.commit()
+    
+    return redirect(url_for('nachrichten'))
+
+
+@app.route('/nachricht/neu', methods=['GET', 'POST'])
+@login_required
+def nachricht_neu():
+    """Neue Nachricht an Gemeinschaft senden"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        if request.method == 'POST':
+            gemeinschaft_id = int(request.form.get('gemeinschaft_id'))
+            betreff = request.form.get('betreff')
+            nachricht = request.form.get('nachricht')
+            
+            # PrÃ¼fe ob Benutzer Mitglied der Gemeinschaft ist
+            cursor.execute("""
+                SELECT COUNT(*) FROM mitglied_gemeinschaft
+                WHERE gemeinschaft_id = ? AND mitglied_id = ?
+            """, (gemeinschaft_id, session['benutzer_id']))
+            
+            if cursor.fetchone()[0] > 0:
+                cursor.execute("""
+                    INSERT INTO gemeinschafts_nachrichten 
+                    (gemeinschaft_id, absender_id, betreff, nachricht, erstellt_am)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (gemeinschaft_id, session['benutzer_id'], betreff, nachricht,
+                      datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+                db.connection.commit()
+                
+                flash('Nachricht wurde an alle Mitglieder der Gemeinschaft gesendet!', 'success')
+                return redirect(url_for('nachrichten'))
+            else:
+                flash('Sie sind nicht Mitglied dieser Gemeinschaft.', 'danger')
+        
+        # Hole Gemeinschaften des Benutzers
+        cursor.execute("""
+            SELECT DISTINCT g.* FROM gemeinschaften g
+            JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
+            WHERE mg.mitglied_id = ? AND g.aktiv = 1
+            ORDER BY g.name
+        """, (session['benutzer_id'],))
+        
+        columns = [desc[0] for desc in cursor.description]
+        gemeinschaften = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    
+    return render_template('nachricht_neu.html', gemeinschaften=gemeinschaften)
+
+
+@app.route('/admin/backup-bestaetigen', methods=['POST'])
+@admin_required
+def admin_backup_bestaetigen():
+    """Backup-Durchführung bestätigen - Alle Administratoren können bestätigen"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        bemerkung = request.form.get('bemerkung', '')
+        
+        # Prüfe ob bereits eine offene Bestätigung existiert
+        cursor.execute("""
+            SELECT * FROM backup_bestaetigung
+            WHERE status = 'wartend'
+            AND datetime(zeitpunkt, '+24 hours') > datetime('now')
+            ORDER BY zeitpunkt DESC
+            LIMIT 1
+        """)
+        offene_bestaetigung = cursor.fetchone()
+        
+        if offene_bestaetigung:
+            # Prüfe ob es vom selben Admin ist
+            if offene_bestaetigung[1] == session['benutzer_id']:
+                flash('Sie haben bereits eine Bestätigung abgegeben. Ein zweiter Administrator muss die Sicherung bestätigen.', 'warning')
+                return redirect(url_for('admin_dashboard'))
+            
+            # Zweiter Admin bestätigt - Backup durchführen
+            cursor.execute('SELECT COUNT(*) FROM maschineneinsaetze')
+            anzahl_einsaetze = cursor.fetchone()[0]
+            
+            # Backup-Eintrag erstellen
+            cursor.execute("""
+                INSERT INTO backup_tracking 
+                (letztes_backup, einsaetze_bei_backup, durchgefuehrt_von, bemerkung)
+                VALUES (?, ?, ?, ?)
+            """, (datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                  anzahl_einsaetze,
+                  f"{offene_bestaetigung[1]}, {session['benutzer_id']}",
+                  f"Admin 1: {offene_bestaetigung[3] or 'keine'} | Admin 2: {bemerkung or 'keine'}"))
+            
+            # Status der Bestätigung auf 'abgeschlossen' setzen
+            cursor.execute("""
+                UPDATE backup_bestaetigung
+                SET status = 'abgeschlossen'
+                WHERE id = ?
+            """, (offene_bestaetigung[0],))
+            
+            db.connection.commit()
+            
+            flash('Backup-Durchführung wurde von zwei Administratoren bestätigt. Warnung wird zurückgesetzt.', 'success')
+        else:
+            # Erster Admin bestätigt - warte auf zweiten
+            cursor.execute("""
+                INSERT INTO backup_bestaetigung 
+                (admin_id, zeitpunkt, bemerkung, status)
+                VALUES (?, ?, ?, 'wartend')
+            """, (session['benutzer_id'],
+                  datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                  bemerkung))
+            
+            db.connection.commit()
+            
+            flash('Ihre BestÃ¤tigung wurde gespeichert. Ein zweiter Haupt-Administrator muss die Sicherung innerhalb von 24 Stunden bestÃ¤tigen.', 'info')
+    
+    return redirect(url_for('admin_dashboard'))
+
+
 @app.route('/passwort-aendern', methods=['GET', 'POST'])
 @login_required
 def passwort_aendern():
-    """Passwort und Einstellungen ändern"""
+    """Passwort und Einstellungen Ã¤ndern"""
     if request.method == 'POST':
         form_type = request.form.get('form_type')
         
         if form_type == 'passwort':
-            # Passwort ändern
+            # Passwort Ã¤ndern
             altes_passwort = request.form.get('altes_passwort')
             neues_passwort = request.form.get('neues_passwort')
             neues_passwort_wdh = request.form.get('neues_passwort_wdh')
             
             if neues_passwort != neues_passwort_wdh:
-                flash('Die Passwörter stimmen nicht überein!', 'danger')
+                flash('Die PasswÃ¶rter stimmen nicht Ã¼berein!', 'danger')
                 return redirect(url_for('passwort_aendern'))
             
             with MaschinenDBContext(DB_PATH) as db:
-                # Altes Passwort überprüfen
+                # Altes Passwort Ã¼berprÃ¼fen
                 benutzer = db.get_benutzer(session['benutzer_id'])
                 if not db.verify_login(benutzer['username'], altes_passwort):
                     flash('Altes Passwort ist falsch!', 'danger')
@@ -541,11 +869,11 @@ def passwort_aendern():
                 
                 # Neues Passwort setzen
                 db.update_password(session['benutzer_id'], neues_passwort)
-                flash('Passwort wurde erfolgreich geändert!', 'success')
+                flash('Passwort wurde erfolgreich geÃ¤ndert!', 'success')
                 return redirect(url_for('dashboard'))
         
         elif form_type == 'treibstoff':
-            # Treibstoffkosten ändern
+            # Treibstoffkosten Ã¤ndern
             treibstoffkosten = request.form.get('treibstoffkosten_preis')
             try:
                 treibstoffkosten = float(treibstoffkosten)
@@ -558,7 +886,27 @@ def passwort_aendern():
                     db.connection.commit()
                 flash(f'Treibstoffkosten wurden auf {treibstoffkosten:.2f} EUR/L gesetzt!', 'success')
             except ValueError:
-                flash('Ungültiger Preis!', 'danger')
+                flash('UngÃ¼ltiger Preis!', 'danger')
+            return redirect(url_for('passwort_aendern'))
+        
+        elif form_type == 'backup_schwellwert':
+            # Backup-Schwellwert Ã¤ndern (nur fÃ¼r Admins)
+            if session.get('is_admin'):
+                schwellwert = request.form.get('backup_schwellwert')
+                try:
+                    schwellwert = int(schwellwert)
+                    if schwellwert < 1:
+                        raise ValueError("Schwellwert muss mindestens 1 sein")
+                    with MaschinenDBContext(DB_PATH) as db:
+                        cursor = db.connection.cursor()
+                        cursor.execute(
+                            "UPDATE benutzer SET backup_schwellwert = ? WHERE id = ?",
+                            (schwellwert, session['benutzer_id'])
+                        )
+                        db.connection.commit()
+                    flash(f'Backup-Warnung wird nun nach {schwellwert} neuen EinsÃ¤tzen angezeigt!', 'success')
+                except ValueError as e:
+                    flash(f'UngÃ¼ltiger Wert: {str(e)}', 'danger')
             return redirect(url_for('passwort_aendern'))
     
     # GET: Zeige Formular mit aktuellen Werten
@@ -575,7 +923,7 @@ def passwort_aendern():
 def admin_dashboard():
     """Admin-Dashboard"""
     with MaschinenDBContext(DB_PATH) as db:
-        # Alle Einsätze
+        # Alle EinsÃ¤tze
         alle_einsaetze = db.get_all_einsaetze(limit=50)
         
         # Statistiken
@@ -592,22 +940,106 @@ def admin_dashboard():
             FROM maschineneinsaetze
         """)
         gesamt_stats = dict(cursor.fetchone())
+        
+        # Backup-Status prÃ¼fen
+        backup_warnung = False
+        einsaetze_seit_backup = 0
+        letztes_backup = None
+        offene_bestaetigung = None
+        
+        # Hole Backup-Schwellwert des aktuellen Admins
+        cursor.execute("""
+            SELECT backup_schwellwert FROM benutzer WHERE id = ?
+        """, (session['benutzer_id'],))
+        schwellwert_row = cursor.fetchone()
+        BACKUP_SCHWELLWERT = schwellwert_row[0] if schwellwert_row and schwellwert_row[0] else 50
+        
+        # Prüfe auf offene Backup-Bestätigung (für alle Admins)
+        cursor.execute("""
+            SELECT b.id, b.admin_id, b.zeitpunkt, b.bemerkung,
+                   u.name, u.vorname
+            FROM backup_bestaetigung b
+            JOIN benutzer u ON b.admin_id = u.id
+            WHERE b.status = 'wartend'
+            AND datetime(b.zeitpunkt, '+24 hours') > datetime('now')
+            ORDER BY b.zeitpunkt DESC
+            LIMIT 1
+        """)
+        offene_row = cursor.fetchone()
+        if offene_row:
+            offene_bestaetigung = {
+                'id': offene_row[0],
+                'admin_id': offene_row[1],
+                'zeitpunkt': offene_row[2],
+                'bemerkung': offene_row[3],
+                'admin_name': f"{offene_row[5]} {offene_row[4]}",
+                'ist_eigene': offene_row[1] == session['benutzer_id']
+            }
+        
+        cursor.execute("""
+            SELECT letztes_backup, einsaetze_bei_backup
+            FROM backup_tracking
+            ORDER BY letztes_backup DESC
+            LIMIT 1
+        """)
+        backup_row = cursor.fetchone()
+        
+        if backup_row:
+            letztes_backup = backup_row[0]
+            einsaetze_bei_letztem_backup = backup_row[1]
+            aktuelle_einsaetze = gesamt_stats.get('gesamt_einsaetze', 0) or 0
+            einsaetze_seit_backup = aktuelle_einsaetze - einsaetze_bei_letztem_backup
+            
+            if einsaetze_seit_backup >= BACKUP_SCHWELLWERT:
+                backup_warnung = True
     
     return render_template('admin_dashboard.html',
                          einsaetze=alle_einsaetze,
                          benutzer=benutzer,
                          maschinen=maschinen,
-                         stats=gesamt_stats)
+                         stats=gesamt_stats,
+                         backup_warnung=backup_warnung,
+                         einsaetze_seit_backup=einsaetze_seit_backup,
+                         letztes_backup=letztes_backup,
+                         backup_schwellwert=BACKUP_SCHWELLWERT,
+                         offene_bestaetigung=offene_bestaetigung)
 
 
 @app.route('/admin/alle-einsaetze')
 @admin_required
 def admin_alle_einsaetze():
-    """Alle Einsätze aller Benutzer"""
+    """Alle EinsÃ¤tze aller Benutzer"""
     with MaschinenDBContext(DB_PATH) as db:
         einsaetze = db.get_all_einsaetze()
     
     return render_template('admin_alle_einsaetze.html', einsaetze=einsaetze)
+
+
+@app.route('/admin/stornierte-einsaetze')
+@admin_required
+def admin_stornierte_einsaetze():
+    """Alle stornierten EinsÃ¤tze"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        cursor.execute("""
+            SELECT s.*, m.bezeichnung as maschine_name,
+                   b.name as benutzer_name, b.vorname as benutzer_vorname,
+                   sv.name as storniert_von_name, sv.vorname as storniert_von_vorname,
+                   ez.bezeichnung as einsatzzweck_name
+            FROM maschineneinsaetze_storniert s
+            JOIN maschinen m ON s.maschine_id = m.id
+            JOIN benutzer b ON s.benutzer_id = b.id
+            JOIN benutzer sv ON s.storniert_von = sv.id
+            LEFT JOIN einsatzzwecke ez ON s.einsatzzweck_id = ez.id
+            ORDER BY s.storniert_am DESC
+        """)
+        
+        columns = [desc[0] for desc in cursor.description]
+        stornierte_einsaetze = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    
+    return render_template('admin_stornierte_einsaetze.html', 
+                         stornierte_einsaetze=stornierte_einsaetze)
 
 
 @app.route('/admin/benutzer')
@@ -654,7 +1086,7 @@ def admin_benutzer_edit(benutzer_id):
                 'telefon': request.form.get('telefon'),
                 'email': request.form.get('email')
             }
-            # Passwort nur ändern wenn angegeben
+            # Passwort nur Ã¤ndern wenn angegeben
             if request.form.get('password'):
                 db.update_password(benutzer_id, request.form['password'])
             db.update_benutzer(benutzer_id, **update_data)
@@ -668,12 +1100,12 @@ def admin_benutzer_edit(benutzer_id):
 @app.route('/admin/benutzer/<int:benutzer_id>/delete', methods=['POST'])
 @admin_required
 def admin_benutzer_delete(benutzer_id):
-    """Benutzer löschen"""
+    """Benutzer lÃ¶schen"""
     with MaschinenDBContext(DB_PATH) as db:
         benutzer = db.get_benutzer_by_id(benutzer_id)
-        # Hard delete: tatsächlich aus Datenbank löschen
+        # Hard delete: tatsÃ¤chlich aus Datenbank lÃ¶schen
         db.delete_benutzer(benutzer_id, soft_delete=False)
-    flash(f'Benutzer {benutzer["name"]} wurde gelöscht.', 'success')
+    flash(f'Benutzer {benutzer["name"]} wurde gelÃ¶scht.', 'success')
     return redirect(url_for('admin_benutzer'))
 
 
@@ -701,7 +1133,7 @@ def admin_maschinen():
 @app.route('/admin/maschinen/<int:maschine_id>/rentabilitaet')
 @admin_required
 def admin_maschinen_rentabilitaet(maschine_id):
-    """Rentabilitätsbericht für eine Maschine"""
+    """RentabilitÃ¤tsbericht fÃ¼r eine Maschine"""
     from datetime import datetime
     
     with MaschinenDBContext(DB_PATH) as db:
@@ -710,7 +1142,7 @@ def admin_maschinen_rentabilitaet(maschine_id):
         # Maschine laden
         maschine = db.get_maschine_by_id(maschine_id)
         
-        # Gesamteinsätze und Einnahmen
+        # GesamteinsÃ¤tze und Einnahmen
         cursor.execute("""
             SELECT 
                 COUNT(e.id) as anzahl_einsaetze,
@@ -750,11 +1182,11 @@ def admin_maschinen_rentabilitaet(maschine_id):
         abschreibung_bisher = min(abschreibung_pro_jahr * alter_jahre, anschaffungspreis)
         restwert = max(anschaffungspreis - abschreibung_bisher, 0)
         
-        # Rentabilität
+        # RentabilitÃ¤t
         deckungsbeitrag = einnahmen - abschreibung_bisher
         rentabilitaet_prozent = (deckungsbeitrag / anschaffungspreis * 100) if anschaffungspreis > 0 else 0
         
-        # Einsätze pro Jahr
+        # EinsÃ¤tze pro Jahr
         cursor.execute("""
             SELECT 
                 strftime('%Y', e.datum) as jahr,
@@ -800,7 +1232,7 @@ def admin_maschinen_rentabilitaet(maschine_id):
             for a in alle_aufwendungen
         )
         
-        # Aufwendungen zu einsaetze_pro_jahr hinzufügen
+        # Aufwendungen zu einsaetze_pro_jahr hinzufÃ¼gen
         aufwendungen_dict = {str(a['jahr']): a for a in alle_aufwendungen}
         for einsatz in einsaetze_pro_jahr:
             jahr = einsatz['jahr']
@@ -814,7 +1246,7 @@ def admin_maschinen_rentabilitaet(maschine_id):
                 einsatz['aufwendungen'] = 0
             einsatz['gewinn'] = einsatz['einnahmen'] - einsatz['aufwendungen']
         
-        # Rentabilität neu berechnen (Einnahmen - Abschreibung - Aufwendungen)
+        # RentabilitÃ¤t neu berechnen (Einnahmen - Abschreibung - Aufwendungen)
         deckungsbeitrag = einnahmen - abschreibung_bisher - aufwendungen_gesamt
         rentabilitaet_prozent = (deckungsbeitrag / anschaffungspreis * 100) if anschaffungspreis > 0 else 0
         
@@ -842,7 +1274,7 @@ def admin_maschinen_rentabilitaet(maschine_id):
 @app.route('/admin/maschinen/<int:maschine_id>/rentabilitaet/pdf')
 @admin_required
 def admin_maschinen_rentabilitaet_pdf(maschine_id):
-    """Rentabilitätsbericht als PDF exportieren"""
+    """RentabilitÃ¤tsbericht als PDF exportieren"""
     from datetime import datetime
     from io import BytesIO
     from reportlab.lib import colors
@@ -910,7 +1342,7 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
             a['steuern'] + a['sonstige_kosten'] for a in alle_aufwendungen
         )
         
-        # Einsätze pro Jahr
+        # EinsÃ¤tze pro Jahr
         cursor.execute("""
             SELECT 
                 strftime('%Y', e.datum) as jahr,
@@ -932,7 +1364,7 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
         columns = [desc[0] for desc in cursor.description]
         einsaetze_pro_jahr = [dict(zip(columns, row)) for row in cursor.fetchall()]
         
-        # Aufwendungen zu Jahresübersicht hinzufügen
+        # Aufwendungen zu JahresÃ¼bersicht hinzufÃ¼gen
         aufwendungen_dict = {str(a['jahr']): a for a in alle_aufwendungen}
         for einsatz in einsaetze_pro_jahr:
             jahr = einsatz['jahr']
@@ -957,7 +1389,7 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
     
     # Titel
     title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=30)
-    elements.append(Paragraph(f"Rentabilitätsbericht: {maschine['bezeichnung']}", title_style))
+    elements.append(Paragraph(f"RentabilitÃ¤tsbericht: {maschine['bezeichnung']}", title_style))
     elements.append(Paragraph(f"Erstellt am: {datetime.now().strftime('%d.%m.%Y %H:%M')}", styles['Normal']))
     elements.append(Spacer(1, 0.5*cm))
     
@@ -981,12 +1413,12 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
     # Kennzahlen
     elements.append(Paragraph("Kennzahlen", styles['Heading2']))
     kennzahlen_data = [
-        ['Anschaffungspreis:', f"{anschaffungspreis:.2f} €"],
-        ['Restwert (aktuell):', f"{restwert:.2f} €"],
-        ['Einnahmen gesamt:', f"{einnahmen:.2f} €"],
-        ['Aufwendungen gesamt:', f"{aufwendungen_gesamt:.2f} €"],
-        ['Deckungsbeitrag:', f"{deckungsbeitrag:.2f} €"],
-        ['Rentabilität:', f"{rentabilitaet_prozent:.1f} %"],
+        ['Anschaffungspreis:', f"{anschaffungspreis:.2f} â‚¬"],
+        ['Restwert (aktuell):', f"{restwert:.2f} â‚¬"],
+        ['Einnahmen gesamt:', f"{einnahmen:.2f} â‚¬"],
+        ['Aufwendungen gesamt:', f"{aufwendungen_gesamt:.2f} â‚¬"],
+        ['Deckungsbeitrag:', f"{deckungsbeitrag:.2f} â‚¬"],
+        ['RentabilitÃ¤t:', f"{rentabilitaet_prozent:.1f} %"],
     ]
     
     kennzahlen_table = Table(kennzahlen_data, colWidths=[10*cm, 7*cm])
@@ -1005,9 +1437,9 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
     elements.append(Paragraph("Abschreibung", styles['Heading2']))
     abschreibung_data = [
         ['Abschreibungsdauer:', f"{abschreibungsdauer} Jahre"],
-        ['Abschreibung pro Jahr:', f"{abschreibung_pro_jahr:.2f} €"],
+        ['Abschreibung pro Jahr:', f"{abschreibung_pro_jahr:.2f} â‚¬"],
         ['Alter der Maschine:', f"{alter_jahre:.1f} Jahre"],
-        ['Abschreibung bisher:', f"{abschreibung_bisher:.2f} €"],
+        ['Abschreibung bisher:', f"{abschreibung_bisher:.2f} â‚¬"],
     ]
     
     abschreibung_table = Table(abschreibung_data, colWidths=[10*cm, 7*cm])
@@ -1020,18 +1452,18 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
     elements.append(abschreibung_table)
     elements.append(Spacer(1, 0.5*cm))
     
-    # Jahresübersicht
+    # JahresÃ¼bersicht
     if einsaetze_pro_jahr:
-        elements.append(Paragraph("Einsätze pro Jahr", styles['Heading2']))
-        jahr_data = [['Jahr', 'Einsätze', 'Stunden', 'Einnahmen', 'Aufwend.', 'Gewinn']]
+        elements.append(Paragraph("EinsÃ¤tze pro Jahr", styles['Heading2']))
+        jahr_data = [['Jahr', 'EinsÃ¤tze', 'Stunden', 'Einnahmen', 'Aufwend.', 'Gewinn']]
         for e in einsaetze_pro_jahr:
             jahr_data.append([
                 e['jahr'],
                 str(e['anzahl']),
                 f"{e['stunden']:.1f}",
-                f"{e['einnahmen']:.2f} €",
-                f"{e['aufwendungen']:.2f} €",
-                f"{e['gewinn']:.2f} €",
+                f"{e['einnahmen']:.2f} â‚¬",
+                f"{e['aufwendungen']:.2f} â‚¬",
+                f"{e['gewinn']:.2f} â‚¬",
             ])
         
         jahr_table = Table(jahr_data, colWidths=[2*cm, 2*cm, 2.5*cm, 3.5*cm, 3.5*cm, 3.5*cm])
@@ -1060,7 +1492,7 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
 @app.route('/admin/maschinen/<int:maschine_id>/aufwendungen', methods=['GET', 'POST'])
 @admin_required
 def admin_maschinen_aufwendungen(maschine_id):
-    """Jährliche Aufwendungen für eine Maschine verwalten"""
+    """JÃ¤hrliche Aufwendungen fÃ¼r eine Maschine verwalten"""
     from datetime import datetime
     
     with MaschinenDBContext(DB_PATH) as db:
@@ -1093,7 +1525,7 @@ def admin_maschinen_aufwendungen(maschine_id):
             """, (maschine_id, jahr, wartungskosten, reparaturkosten, versicherung, steuern, sonstige_kosten, bemerkung))
             
             db.connection.commit()
-            flash(f'Aufwendungen für {jahr} gespeichert.', 'success')
+            flash(f'Aufwendungen fÃ¼r {jahr} gespeichert.', 'success')
             return redirect(url_for('admin_maschinen_aufwendungen', maschine_id=maschine_id))
         
         # Aktuelle Aufwendungen laden
@@ -1108,7 +1540,7 @@ def admin_maschinen_aufwendungen(maschine_id):
             columns = [desc[0] for desc in cursor.description]
             aktuelle_aufwendung = dict(zip(columns, row))
         
-        # Historische Aufwendungen laden (außer aktuelles Jahr)
+        # Historische Aufwendungen laden (auÃŸer aktuelles Jahr)
         cursor.execute("""
             SELECT * FROM maschinen_aufwendungen
             WHERE maschine_id = ? AND jahr != ?
@@ -1140,8 +1572,8 @@ def admin_maschinen_aufwendungen(maschine_id):
 @admin_required
 def admin_maschinen_aufwendungen_bearbeiten(maschine_id, jahr):
     """Bearbeite Aufwendungen eines vergangenen Jahres"""
-    # Einfach zurück zur Hauptseite mit dem Jahr als vorbefülltes Formular
-    # (könnte später erweitert werden)
+    # Einfach zurÃ¼ck zur Hauptseite mit dem Jahr als vorbefÃ¼lltes Formular
+    # (kÃ¶nnte spÃ¤ter erweitert werden)
     return redirect(url_for('admin_maschinen_aufwendungen', maschine_id=maschine_id))
 
 
@@ -1172,7 +1604,7 @@ def admin_maschinen_neu():
             flash('Maschine erfolgreich angelegt!', 'success')
             return redirect(url_for('admin_maschinen'))
         
-        # Hole Gemeinschaften für Dropdown
+        # Hole Gemeinschaften fÃ¼r Dropdown
         cursor = db.cursor
         cursor.execute("SELECT id, name FROM gemeinschaften WHERE aktiv = 1 ORDER BY name")
         gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
@@ -1210,7 +1642,7 @@ def admin_maschinen_edit(maschine_id):
         
         maschine = db.get_maschine_by_id(maschine_id)
         
-        # Hole Gemeinschaften für Dropdown
+        # Hole Gemeinschaften fÃ¼r Dropdown
         cursor = db.cursor
         cursor.execute("SELECT id, name FROM gemeinschaften WHERE aktiv = 1 ORDER BY name")
         gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
@@ -1221,11 +1653,11 @@ def admin_maschinen_edit(maschine_id):
 @app.route('/admin/maschinen/<int:maschine_id>/delete', methods=['POST'])
 @admin_required
 def admin_maschinen_delete(maschine_id):
-    """Maschine löschen"""
+    """Maschine lÃ¶schen"""
     with MaschinenDBContext(DB_PATH) as db:
         maschine = db.get_maschine_by_id(maschine_id)
         db.delete_maschine(maschine_id)
-    flash(f'Maschine {maschine["bezeichnung"]} wurde gelöscht.', 'success')
+    flash(f'Maschine {maschine["bezeichnung"]} wurde gelÃ¶scht.', 'success')
     return redirect(url_for('admin_maschinen'))
 
 
@@ -1278,11 +1710,11 @@ def admin_einsatzzwecke_edit(einsatzzweck_id):
 @app.route('/admin/einsatzzwecke/<int:einsatzzweck_id>/delete', methods=['POST'])
 @admin_required
 def admin_einsatzzwecke_delete(einsatzzweck_id):
-    """Einsatzzweck löschen"""
+    """Einsatzzweck lÃ¶schen"""
     with MaschinenDBContext(DB_PATH) as db:
         einsatzzweck = db.get_einsatzzweck_by_id(einsatzzweck_id)
         db.delete_einsatzzweck(einsatzzweck_id, soft_delete=False)
-    flash(f'Einsatzzweck {einsatzzweck["bezeichnung"]} wurde gelöscht.', 'success')
+    flash(f'Einsatzzweck {einsatzzweck["bezeichnung"]} wurde gelÃ¶scht.', 'success')
     return redirect(url_for('admin_einsatzzwecke'))
 
 
@@ -1358,7 +1790,7 @@ def admin_gemeinschaften_edit(gemeinschaft_id):
 @app.route('/admin/gemeinschaften/<int:gemeinschaft_id>/abrechnung')
 @admin_required
 def admin_gemeinschaften_abrechnung(gemeinschaft_id):
-    """Abrechnung für eine Gemeinschaft"""
+    """Abrechnung fÃ¼r eine Gemeinschaft"""
     with MaschinenDBContext(DB_PATH) as db:
         cursor = db.cursor
         
@@ -1426,7 +1858,7 @@ def admin_gemeinschaften_abrechnung_csv(gemeinschaft_id):
         columns = [desc[0] for desc in cursor.description]
         gemeinschaft = dict(zip(columns, cursor.fetchone()))
         
-        # Abrechnung pro Mitglied (nur Maschinenkosten für CSV)
+        # Abrechnung pro Mitglied (nur Maschinenkosten fÃ¼r CSV)
         cursor.execute("""
             SELECT 
                 b.id,
@@ -1459,7 +1891,7 @@ def admin_gemeinschaften_abrechnung_csv(gemeinschaft_id):
     writer.writerow([f'Abrechnung: {gemeinschaft["name"]}'])
     writer.writerow([f'Erstellt am: {datetime.now().strftime("%d.%m.%Y %H:%M")}'])
     writer.writerow([])
-    writer.writerow(['Name', 'Vorname', 'Anzahl Einsätze', 'Betriebsstunden', 
+    writer.writerow(['Name', 'Vorname', 'Anzahl EinsÃ¤tze', 'Betriebsstunden', 
                     'Maschinenkosten (EUR)'])
     
     # Daten
@@ -1513,7 +1945,7 @@ def admin_gemeinschaften_mitglieder(gemeinschaft_id):
                         VALUES (?, ?)
                     """, (mitglied_id, gemeinschaft_id))
                 db.connection.commit()
-                flash(f'{len(mitglieder)} Mitglied(er) hinzugefügt!', 'success')
+                flash(f'{len(mitglieder)} Mitglied(er) hinzugefÃ¼gt!', 'success')
                 
             elif action == 'entfernen':
                 mitglieder = request.form.getlist('entfernen')
@@ -1542,7 +1974,7 @@ def admin_gemeinschaften_mitglieder(gemeinschaft_id):
         columns = [desc[0] for desc in cursor.description]
         aktuelle_mitglieder = [dict(zip(columns, row)) for row in cursor.fetchall()]
         
-        # Verfügbare Benutzer (noch nicht in Gemeinschaft)
+        # VerfÃ¼gbare Benutzer (noch nicht in Gemeinschaft)
         cursor.execute("""
             SELECT b.* FROM benutzer b
             WHERE b.aktiv = 1 AND b.id NOT IN (
@@ -1636,7 +2068,7 @@ def admin_export_csv():
             writer.writerows(einsatzzwecke)
             zip_file.writestr('einsatzzwecke.csv', csv_buffer.getvalue())
         
-        # Einsätze CSV
+        # EinsÃ¤tze CSV
         if einsaetze:
             csv_buffer = StringIO()
             writer = csv.DictWriter(csv_buffer, fieldnames=einsaetze[0].keys())
@@ -1675,19 +2107,19 @@ def admin_backup_database():
 @app.route('/admin/einsaetze/loeschen', methods=['GET', 'POST'])
 @admin_required
 def admin_einsaetze_loeschen():
-    """Einsätze nach Zeitraum löschen"""
+    """EinsÃ¤tze nach Zeitraum lÃ¶schen"""
     if request.method == 'POST':
         von_datum = request.form.get('von_datum')
         bis_datum = request.form.get('bis_datum')
         bestaetigung = request.form.get('bestaetigung')
         
         if bestaetigung != 'LOESCHEN':
-            flash('Bestätigung nicht korrekt. Bitte "LOESCHEN" eingeben.', 'danger')
+            flash('BestÃ¤tigung nicht korrekt. Bitte "LOESCHEN" eingeben.', 'danger')
             return redirect(url_for('admin_einsaetze_loeschen'))
         
         try:
             with MaschinenDBContext(DB_PATH) as db:
-                # Zähle Einsätze im Zeitraum
+                # ZÃ¤hle EinsÃ¤tze im Zeitraum
                 cursor = db.cursor
                 cursor.execute("""
                     SELECT COUNT(*) FROM maschineneinsaetze 
@@ -1696,27 +2128,27 @@ def admin_einsaetze_loeschen():
                 anzahl = cursor.fetchone()[0]
                 
                 if anzahl == 0:
-                    flash('Keine Einsätze im angegebenen Zeitraum gefunden.', 'warning')
+                    flash('Keine EinsÃ¤tze im angegebenen Zeitraum gefunden.', 'warning')
                     return redirect(url_for('admin_einsaetze_loeschen'))
                 
-                # Lösche Einsätze
+                # LÃ¶sche EinsÃ¤tze
                 cursor.execute("""
                     DELETE FROM maschineneinsaetze 
                     WHERE datum BETWEEN ? AND ?
                 """, (von_datum, bis_datum))
                 db.connection.commit()
                 
-                flash(f'{anzahl} Einsätze erfolgreich gelöscht!', 'success')
+                flash(f'{anzahl} EinsÃ¤tze erfolgreich gelÃ¶scht!', 'success')
                 return redirect(url_for('admin_dashboard'))
                 
         except Exception as e:
-            flash(f'Fehler beim Löschen: {str(e)}', 'danger')
+            flash(f'Fehler beim LÃ¶schen: {str(e)}', 'danger')
             return redirect(url_for('admin_einsaetze_loeschen'))
     
     # GET - Zeige Formular
     with MaschinenDBContext(DB_PATH) as db:
         cursor = db.cursor
-        # Hole ältesten und neuesten Einsatz
+        # Hole Ã¤ltesten und neuesten Einsatz
         cursor.execute("""
             SELECT MIN(datum) as min_datum, MAX(datum) as max_datum, COUNT(*) as anzahl
             FROM maschineneinsaetze
@@ -1757,10 +2189,75 @@ def admin_database_backup():
         return redirect(url_for('admin_dashboard'))
 
 
+@app.route('/admin/restore', methods=['GET', 'POST'])
+@hauptadmin_required
+def admin_database_restore():
+    """Datenbank-Wiederherstellung (nur Haupt-Administratoren)"""
+    if request.method == 'POST':
+        if 'backup_file' not in request.files:
+            flash('Keine Datei ausgewählt!', 'danger')
+            return redirect(url_for('admin_database_restore'))
+        
+        backup_file = request.files['backup_file']
+        
+        if backup_file.filename == '':
+            flash('Keine Datei ausgewählt!', 'danger')
+            return redirect(url_for('admin_database_restore'))
+        
+        if not backup_file.filename.endswith('.db'):
+            flash('Ungültiges Dateiformat! Nur .db Dateien sind erlaubt.', 'danger')
+            return redirect(url_for('admin_database_restore'))
+        
+        try:
+            import shutil
+            import tempfile
+            
+            # Speichere Upload temporär
+            temp_dir = tempfile.gettempdir()
+            temp_upload_path = os.path.join(temp_dir, 'temp_restore.db')
+            backup_file.save(temp_upload_path)
+            
+            # Validiere dass es eine SQLite Datenbank ist
+            try:
+                import sqlite3
+                test_conn = sqlite3.connect(temp_upload_path)
+                test_cursor = test_conn.cursor()
+                test_cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                tables = test_cursor.fetchall()
+                test_conn.close()
+                
+                if not tables:
+                    raise Exception("Keine Tabellen in der Datenbank gefunden")
+            except Exception as e:
+                os.remove(temp_upload_path)
+                flash(f'Ungültige Datenbank-Datei: {str(e)}', 'danger')
+                return redirect(url_for('admin_database_restore'))
+            
+            # Erstelle Backup der aktuellen Datenbank
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_current = f"{DB_PATH}.backup_{timestamp}"
+            shutil.copy2(DB_PATH, backup_current)
+            
+            # Ersetze aktuelle Datenbank
+            shutil.copy2(temp_upload_path, DB_PATH)
+            os.remove(temp_upload_path)
+            
+            flash(f'Datenbank erfolgreich wiederhergestellt! Alte Datenbank gesichert als: {os.path.basename(backup_current)}', 'success')
+            flash('WICHTIG: Bitte starten Sie die Anwendung neu!', 'warning')
+            
+            return redirect(url_for('admin_dashboard'))
+            
+        except Exception as e:
+            flash(f'Fehler bei der Wiederherstellung: {str(e)}', 'danger')
+            return redirect(url_for('admin_database_restore'))
+    
+    return render_template('admin_restore.html')
+
+
 @app.route('/admin/export/alle-einsaetze-csv')
 @admin_required
 def admin_export_alle_einsaetze_csv():
-    """Exportiert alle Einsätze als CSV für Jahresabschluss"""
+    """Exportiert alle EinsÃ¤tze als CSV fÃ¼r Jahresabschluss"""
     import io
     from datetime import datetime
     
@@ -1828,6 +2325,125 @@ def admin_export_alle_einsaetze_csv():
         return redirect(url_for('admin_dashboard'))
 
 
+@app.route('/admin/rollen')
+@hauptadmin_required
+def admin_rollen():
+    """Verwaltung von Admin-Rollen (nur fÃ¼r Haupt-Administratoren)"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Hole alle Benutzer mit ihren Rollen
+        cursor.execute("""
+            SELECT b.id, b.name, b.vorname, b.username, 
+                   b.admin_level, b.is_admin,
+                   GROUP_CONCAT(g.name, ', ') as gemeinschaften
+            FROM benutzer b
+            LEFT JOIN gemeinschafts_admin ga ON b.id = ga.benutzer_id
+            LEFT JOIN gemeinschaften g ON ga.gemeinschaft_id = g.id
+            WHERE b.aktiv = 1
+            GROUP BY b.id, b.name, b.vorname, b.username, b.admin_level, b.is_admin
+            ORDER BY b.admin_level DESC, b.name
+        """)
+        
+        columns = [desc[0] for desc in cursor.description]
+        benutzer = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        
+        # Hole alle Gemeinschaften
+        cursor.execute("SELECT * FROM gemeinschaften WHERE aktiv = 1 ORDER BY name")
+        columns = [desc[0] for desc in cursor.description]
+        gemeinschaften = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    
+    return render_template('admin_rollen.html', 
+                         benutzer=benutzer, 
+                         gemeinschaften=gemeinschaften)
+
+
+@app.route('/admin/rollen/set-level', methods=['POST'])
+@hauptadmin_required
+def admin_rollen_set_level():
+    """Admin-Level eines Benutzers setzen"""
+    benutzer_id = int(request.form.get('benutzer_id'))
+    level = int(request.form.get('level'))
+    
+    if level not in [0, 1, 2]:
+        flash('UngÃ¼ltiger Admin-Level!', 'danger')
+        return redirect(url_for('admin_rollen'))
+    
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # PrÃ¼fe, dass nicht der letzte Haupt-Admin entfernt wird
+        if level < 2:
+            cursor.execute("SELECT COUNT(*) FROM benutzer WHERE admin_level = 2 AND aktiv = 1")
+            anzahl_haupt_admins = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT admin_level FROM benutzer WHERE id = ?", (benutzer_id,))
+            aktueller_level = cursor.fetchone()[0]
+            
+            if aktueller_level == 2 and anzahl_haupt_admins <= 2:
+                flash('Es mÃ¼ssen mindestens 2 Haupt-Administratoren vorhanden bleiben!', 'danger')
+                return redirect(url_for('admin_rollen'))
+        
+        # Level setzen
+        cursor.execute("""
+            UPDATE benutzer 
+            SET admin_level = ?,
+                is_admin = ?
+            WHERE id = ?
+        """, (level, 1 if level > 0 else 0, benutzer_id))
+        
+        db.connection.commit()
+        
+        level_text = {0: 'Kein Admin', 1: 'Gemeinschafts-Administrator', 2: 'Haupt-Administrator'}
+        flash(f'Admin-Level auf "{level_text[level]}" gesetzt!', 'success')
+    
+    return redirect(url_for('admin_rollen'))
+
+
+@app.route('/admin/rollen/add-gemeinschaft', methods=['POST'])
+@hauptadmin_required
+def admin_rollen_add_gemeinschaft():
+    """Gemeinschafts-Admin-Rechte hinzufÃ¼gen"""
+    benutzer_id = int(request.form.get('benutzer_id'))
+    gemeinschaft_id = int(request.form.get('gemeinschaft_id'))
+    
+    with MaschinenDBContext(DB_PATH) as db:
+        db.add_gemeinschafts_admin(benutzer_id, gemeinschaft_id)
+        flash('Gemeinschafts-Admin-Rechte hinzugefÃ¼gt!', 'success')
+    
+    return redirect(url_for('admin_rollen'))
+
+
+@app.route('/admin/rollen/remove-gemeinschaft', methods=['POST'])
+@hauptadmin_required
+def admin_rollen_remove_gemeinschaft():
+    """Gemeinschafts-Admin-Rechte entfernen"""
+    benutzer_id = int(request.form.get('benutzer_id'))
+    gemeinschaft_id = int(request.form.get('gemeinschaft_id'))
+    
+    with MaschinenDBContext(DB_PATH) as db:
+        db.remove_gemeinschafts_admin(benutzer_id, gemeinschaft_id)
+        flash('Gemeinschafts-Admin-Rechte entfernt!', 'success')
+    
+    return redirect(url_for('admin_rollen'))
+
+
 if __name__ == '__main__':
-    # Für Entwicklung
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Port aus Umgebungsvariable (für Launcher) oder Standard
+    port = int(os.environ.get('FLASK_PORT', 5000))
+    
+    # Host: Bei Launcher nur lokal, sonst für alle Geräte
+    host = '127.0.0.1' if os.environ.get('DB_PATH') else '0.0.0.0'
+    
+    print(f"\n{'='*60}")
+    print(f"Maschinengemeinschaft Server")
+    print(f"{'='*60}")
+    print(f"Datenbank: {DB_PATH}")
+    print(f"URL: http://{host}:{port}")
+    print(f"{'='*60}\n")
+    
+    app.run(host=host, port=port, debug=False)
+
+
+
+

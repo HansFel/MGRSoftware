@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Mitglieder von {{ gemeinschaft.name }} - Admin{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-people"></i> Mitglieder von "{{ gemeinschaft.name }}"
+                </h4>
+                <p class="text-muted mb-0">{{ gemeinschaft.beschreibung }}</p>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Verfügbare Benutzer</h5>
+                            <div class="list-group" style="max-height: 500px; overflow-y: auto;">
+                                {% for benutzer in verfuegbare_benutzer %}
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox" 
+                                           name="mitglieder" value="{{ benutzer.id }}">
+                                    {{ benutzer.name }} {{ benutzer.vorname or '' }}
+                                    <small class="text-muted">({{ benutzer.username }})</small>
+                                </label>
+                                {% endfor %}
+                                {% if not verfuegbare_benutzer %}
+                                <div class="alert alert-info">
+                                    Alle aktiven Benutzer sind bereits Mitglied
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% if verfuegbare_benutzer %}
+                            <button type="submit" name="action" value="hinzufuegen" 
+                                    class="btn btn-success mt-3 w-100">
+                                <i class="bi bi-arrow-right"></i> Hinzufügen →
+                            </button>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <h5>Aktuelle Mitglieder</h5>
+                            <div class="list-group" style="max-height: 500px; overflow-y: auto;">
+                                {% for mitglied in aktuelle_mitglieder %}
+                                <label class="list-group-item">
+                                    <input class="form-check-input me-2" type="checkbox" 
+                                           name="entfernen" value="{{ mitglied.id }}">
+                                    {{ mitglied.name }} {{ mitglied.vorname or '' }}
+                                    <small class="text-muted">({{ mitglied.username }})</small>
+                                    {% if mitglied.is_admin %}
+                                    <span class="badge bg-warning">Admin</span>
+                                    {% endif %}
+                                </label>
+                                {% endfor %}
+                                {% if not aktuelle_mitglieder %}
+                                <div class="alert alert-warning">
+                                    Diese Gemeinschaft hat noch keine Mitglieder
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% if aktuelle_mitglieder %}
+                            <button type="submit" name="action" value="entfernen" 
+                                    class="btn btn-danger mt-3 w-100">
+                                <i class="bi bi-arrow-left"></i> ← Entfernen
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('admin_gemeinschaften') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Zurück
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

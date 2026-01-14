@@ -79,6 +79,40 @@
             </div>
         </div>
 
+        {% if session.get('is_admin') %}
+        <!-- Backup-Einstellungen (nur für Admins) -->
+        <div class="card mt-3">
+            <div class="card-header bg-warning text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-database"></i> Backup-Einstellungen (Administrator)
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST" action="{{ url_for('passwort_aendern') }}">
+                    <input type="hidden" name="form_type" value="backup_schwellwert">
+                    <div class="mb-3">
+                        <label for="backup_schwellwert" class="form-label">
+                            Warnung nach wie vielen neuen Einsätzen?
+                        </label>
+                        <input type="number" step="1" min="1" max="500" class="form-control" 
+                               id="backup_schwellwert" name="backup_schwellwert" 
+                               value="{{ benutzer.backup_schwellwert or 50 }}" required>
+                        <small class="text-muted">
+                            Sie erhalten eine Warnung im Admin-Dashboard, wenn diese Anzahl neuer Einsätze 
+                            seit der letzten Datensicherung erfasst wurde. Standard: 50
+                        </small>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-save"></i> Backup-Schwellwert speichern
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="card mt-3">
             <div class="card-body">
                 <h6 class="text-muted mb-2">

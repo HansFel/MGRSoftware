@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS benutzer (
     username TEXT UNIQUE,
     password_hash TEXT,
     is_admin BOOLEAN DEFAULT 0,
+    admin_level INTEGER DEFAULT 0,
     adresse TEXT,
     telefon TEXT,
     email TEXT,
@@ -164,3 +165,41 @@ FROM gemeinschaften g
 LEFT JOIN maschinen m ON g.id = m.gemeinschaft_id AND m.aktiv = 1
 LEFT JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
 GROUP BY g.id, g.name, g.beschreibung, g.aktiv;
+
+-- Tabelle für Gemeinschafts-Administratoren
+CREATE TABLE IF NOT EXISTS gemeinschafts_admin (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    benutzer_id INTEGER NOT NULL,
+    gemeinschaft_id INTEGER NOT NULL,
+    erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(benutzer_id, gemeinschaft_id),
+    FOREIGN KEY (benutzer_id) REFERENCES benutzer(id) ON DELETE CASCADE,
+    FOREIGN KEY (gemeinschaft_id) REFERENCES gemeinschaften(id) ON DELETE CASCADE
+);
+
+-- Tabelle für Backup-Bestätigungen
+CREATE TABLE IF NOT EXISTS backup_bestaetigung (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_id INTEGER NOT NULL,
+    zeitpunkt TIMESTAMP NOT NULL,
+    bemerkung TEXT,
+    status TEXT DEFAULT 'wartend',
+    FOREIGN KEY (admin_id) REFERENCES benutzer(id) ON DELETE CASCADE
+);
+
+-- Indizes für Performance
+CREATE INDEX IF NOT EXISTS idx_gemeinschafts_admin_benutzer 
+    ON gemeinschafts_admin(benutzer_id);
+
+CREATE INDEX IF NOT EXISTS idx_gemeinschafts_admin_gemeinschaft 
+    ON gemeinschafts_admin(gemeinschaft_id);
+
+CREATE INDEX IF NOT EXISTS idx_backup_bestaetigung_status 
+    ON backup_bestaetigung(status);
+
+-- Standard-Admin-Benutzer für neue Datenbanken
+-- Wird nur angelegt, wenn noch kein Admin-Benutzer existiert
+-- Login: Benutzername = admin, Passwort = admin123
+-- Der password_hash ist der SHA-256 Hash von "admin123"
+INSERT OR IGNORE INTO benutzer (id, name, vorname, username, password_hash, is_admin, admin_level, aktiv)
+VALUES (1, 'Admin', 'System', 'admin', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 1, 2, 1);

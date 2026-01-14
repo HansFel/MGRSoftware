@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Stornierte Einsätze{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>
+        <i class="bi bi-archive"></i> Alle stornierten Einsätze
+    </h2>
+    
+    <div class="mb-3">
+        <a href="{{ url_for('admin_alle_einsaetze') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück zu aktiven Einsätzen
+        </a>
+    </div>
+
+    {% if stornierte_einsaetze %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i>
+        Hier sehen Sie alle stornierten Einsätze aller Benutzer. Diese Einsätze werden nicht mehr in den Abrechnungen berücksichtigt.
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover table-sm">
+            <thead class="table-dark">
+                <tr>
+                    <th>ID</th>
+                    <th>Datum</th>
+                    <th>Benutzer</th>
+                    <th>Maschine</th>
+                    <th>Einsatzzweck</th>
+                    <th>Std.</th>
+                    <th>Treibstoff</th>
+                    <th>Maschine</th>
+                    <th>Gesamt</th>
+                    <th>Storniert am</th>
+                    <th>Storniert von</th>
+                    <th>Grund</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for einsatz in stornierte_einsaetze %}
+                <tr>
+                    <td><small>{{ einsatz.original_einsatz_id }}</small></td>
+                    <td>{{ einsatz.datum }}</td>
+                    <td>{{ einsatz.benutzer_name }} {{ einsatz.benutzer_vorname or '' }}</td>
+                    <td>{{ einsatz.maschine_name }}</td>
+                    <td>{{ einsatz.einsatzzweck_name or '-' }}</td>
+                    <td>{{ "%.1f"|format(einsatz.betriebsstunden or 0) }} h</td>
+                    <td>{{ "%.2f"|format(einsatz.treibstoffkosten or 0) }} €</td>
+                    <td>{{ "%.2f"|format(einsatz.maschinenkosten or 0) }} €</td>
+                    <td><strong>{{ "%.2f"|format(einsatz.gesamtkosten or 0) }} €</strong></td>
+                    <td>
+                        <small>{{ einsatz.storniert_am }}</small>
+                    </td>
+                    <td>
+                        <small>
+                            {{ einsatz.storniert_von_name }} {{ einsatz.storniert_von_vorname or '' }}
+                        </small>
+                    </td>
+                    <td>
+                        {% if einsatz.stornierungsgrund %}
+                            <small class="text-muted" title="{{ einsatz.stornierungsgrund }}">
+                                {{ einsatz.stornierungsgrund[:30] }}{% if einsatz.stornierungsgrund|length > 30 %}...{% endif %}
+                            </small>
+                        {% else %}
+                            <small class="text-muted">-</small>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="alert alert-secondary mt-3">
+        <strong>Anzahl stornierter Einsätze:</strong> {{ stornierte_einsaetze|length }}
+    </div>
+    {% else %}
+    <div class="alert alert-success">
+        <i class="bi bi-check-circle"></i>
+        Es wurden noch keine Einsätze storniert.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

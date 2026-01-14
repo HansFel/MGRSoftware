@@ -6,10 +6,13 @@
 <div class="row mt-4">
     <div class="col-12">
         <div class="card">
-            <div class="card-header bg-white">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h4 class="mb-0">
                     <i class="bi bi-list-check"></i> Alle Maschineneinsätze
                 </h4>
+                <a href="{{ url_for('admin_stornierte_einsaetze') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-archive"></i> Stornierte Einsätze
+                </a>
             </div>
             <div class="card-body">
                 {% if einsaetze %}
@@ -27,6 +30,7 @@
                                 <th>Treibstoff</th>
                                 <th>T-Kosten</th>
                                 <th>Berechnet</th>
+                                <th>Aktion</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -69,6 +73,13 @@
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
+                                <td>
+                                    <a href="{{ url_for('einsatz_stornieren', einsatz_id=einsatz.id) }}" 
+                                       class="btn btn-sm btn-outline-danger"
+                                       onclick="return confirm('Soll dieser Einsatz wirklich storniert werden?')">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </td>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -93,8 +104,7 @@
                                         -
                                     {% endif %}
                                 </td>
-                                <td>
-                                    {% set berechnet_gesamt = einsaetze|selectattr('kosten_berechnet')|sum(attribute='kosten_berechnet') %}
+                                <td>                                <td></td>                                    {% set berechnet_gesamt = einsaetze|selectattr('kosten_berechnet')|sum(attribute='kosten_berechnet') %}
                                     {% if berechnet_gesamt > 0 %}
                                         <strong class="text-success">{{ "%.2f"|format(berechnet_gesamt) }} €</strong>
                                     {% else %}

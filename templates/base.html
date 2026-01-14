@@ -69,6 +69,11 @@
                             <i class="bi bi-calendar-check"></i> Reservierungen
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('nachrichten') }}">
+                            <i class="bi bi-chat-dots"></i> Nachrichten
+                        </a>
+                    </li>
                     {% if session.get('is_admin') %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown">
@@ -78,15 +83,34 @@
                             <li><a class="dropdown-item" href="{{ url_for('admin_dashboard') }}">
                                 <i class="bi bi-speedometer"></i> Admin-Dashboard
                             </a></li>
+                            {% if session.admin_level >= 2 %}
+                            <li><a class="dropdown-item" href="{{ url_for('admin_rollen') }}">
+                                <i class="bi bi-shield-lock"></i> Administrator-Rollen
+                            </a></li>
+                            {% endif %}
+                            <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{{ url_for('admin_alle_einsaetze') }}">
                                 <i class="bi bi-list-check"></i> Alle Einsätze
                             </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_stornierte_einsaetze') }}">
+                                <i class="bi bi-archive"></i> Stornierte Einsätze
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{{ url_for('admin_benutzer') }}">
                                 <i class="bi bi-people"></i> Benutzer
                             </a></li>
                             <li><a class="dropdown-item" href="{{ url_for('admin_maschinen') }}">
                                 <i class="bi bi-tools"></i> Maschinen
                             </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_database_backup') }}">
+                                <i class="bi bi-download"></i> Datenbank sichern
+                            </a></li>
+                            {% if session.admin_level >= 2 %}
+                            <li><a class="dropdown-item text-danger" href="{{ url_for('admin_database_restore') }}">
+                                <i class="bi bi-arrow-counterclockwise"></i> Datenbank rücksichern
+                            </a></li>
+                            {% endif %}
                         </ul>
                     </li>
                     {% endif %}

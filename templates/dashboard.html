@@ -11,6 +11,27 @@
     </div>
 </div>
 
+<!-- Ungelesene Nachrichten -->
+{% if ungelesene_nachrichten > 0 %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <h5 class="alert-heading">
+                <i class="bi bi-envelope-fill"></i> Neue Nachrichten!
+            </h5>
+            <p class="mb-2">
+                Sie haben <strong>{{ ungelesene_nachrichten }} ungelesene Nachricht{% if ungelesene_nachrichten > 1 %}en{% endif %}</strong> in Ihren Gemeinschaften.
+            </p>
+            <hr>
+            <a href="{{ url_for('nachrichten') }}" class="btn btn-info btn-sm">
+                <i class="bi bi-chat-dots"></i> Nachrichten anzeigen
+            </a>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Statistik-Karten -->
 <div class="row g-3 mb-4">
     <div class="col-md-3">

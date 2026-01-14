@@ -11,6 +11,92 @@
     </div>
 </div>
 
+<!-- Backup-Warnung -->
+{% if offene_bestaetigung %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <h5 class="alert-heading">
+                <i class="bi bi-hourglass-split"></i> Backup-Bestätigung ausstehend
+            </h5>
+            {% if offene_bestaetigung.ist_eigene %}
+            <p class="mb-2">
+                Sie haben eine Backup-Durchführung bestätigt.<br>
+                <strong>Warten auf Bestätigung eines zweiten Administrators.</strong>
+            </p>
+            <p class="mb-0">
+                <small class="text-muted">
+                    Ihre Bestätigung: {{ offene_bestaetigung.zeitpunkt }}<br>
+                    {% if offene_bestaetigung.bemerkung %}
+                    Bemerkung: {{ offene_bestaetigung.bemerkung }}
+                    {% endif %}
+                </small>
+            </p>
+            {% else %}
+            <p class="mb-2">
+                <strong>{{ offene_bestaetigung.admin_name }}</strong> hat eine Backup-Durchführung bestätigt.<br>
+                Bitte bestätigen Sie ebenfalls die Durchführung, um das Backup abzuschließen.
+            </p>
+            <p class="mb-0">
+                <small class="text-muted">
+                    Bestätigung von: {{ offene_bestaetigung.admin_name }} um {{ offene_bestaetigung.zeitpunkt }}<br>
+                    {% if offene_bestaetigung.bemerkung %}
+                    Bemerkung: {{ offene_bestaetigung.bemerkung }}
+                    {% endif %}
+                </small>
+            </p>
+            <hr>
+            <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#backupModal">
+                <i class="bi bi-check-circle"></i> Zweite Bestätigung abgeben
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if backup_warnung %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <h5 class="alert-heading">
+                <i class="bi bi-exclamation-triangle-fill"></i> Datensicherung empfohlen!
+            </h5>
+            <p class="mb-2">
+                Es wurden <strong>{{ einsaetze_seit_backup }} neue Einsätze</strong> seit der letzten Datensicherung erfasst.
+                {% if letztes_backup %}
+                Letztes Backup: <strong>{{ letztes_backup }}</strong>
+                {% endif %}
+            </p>
+            <p class="mb-2">
+                <small class="text-muted">
+                    Ihr Backup-Schwellwert: <strong>{{ backup_schwellwert }} Einsätze</strong>
+                    <a href="{{ url_for('passwort_aendern') }}" class="text-decoration-none">
+                        <i class="bi bi-gear"></i> ändern
+                    </a>
+                </small>
+            </p>
+            <hr>
+            <p class="mb-3">
+                <small>
+                    <i class="bi bi-info-circle"></i> 
+                    Bitte erstellen Sie ein Backup der Datenbank <code>maschinengemeinschaft.db</code> und bestätigen Sie die Durchführung.
+                </small>
+            </p>
+            <p class="mb-2">
+                <small class="text-warning">
+                    <i class="bi bi-people-fill"></i> 
+                    <strong>Zwei-Personen-Regel:</strong> Ein zweiter Administrator muss die Sicherung ebenfalls bestätigen.
+                </small>
+            </p>
+            <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#backupModal">
+                <i class="bi bi-check-circle"></i> Backup durchgeführt - bestätigen
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Statistik-Karten -->
 <div class="row g-3 mb-4">
     <div class="col-md-3">
@@ -251,4 +337,44 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Backup-Bestätigungs-Modal -->
+<div class="modal fade" id="backupModal" tabindex="-1" aria-labelledby="backupModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="backupModalLabel">
+                    <i class="bi bi-database"></i> Backup-Durchführung bestätigen
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin_backup_bestaetigen') }}">
+                <div class="modal-body">
+                    <p>Bitte bestätigen Sie, dass Sie ein Backup der Datenbank erstellt haben:</p>
+                    <div class="mb-3">
+                        <label for="bemerkung" class="form-label">Bemerkung (optional)</label>
+                        <input type="text" class="form-control" id="bemerkung" name="bemerkung" 
+                               placeholder="z.B. Backup auf USB-Stick gespeichert">
+                    </div>
+                    <div class="alert alert-info mb-0">
+                        <small>
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Backup-Pfad:</strong><br>
+                            Windows: <code>C:\...\MGRSoftware\data\maschinengemeinschaft.db</code><br>
+                            Docker: <code>docker cp container:/app/data/maschinengemeinschaft.db backup.db</code><br>
+                            Linux: <code>/opt/maschinengemeinschaft/data/maschinengemeinschaft.db</code>
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-check-circle"></i> Backup bestätigen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Gemeinschaft bearbeiten' if gemeinschaft else 'Neue Gemeinschaft' }} - Admin{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-people-fill"></i> 
+                    {{ 'Gemeinschaft bearbeiten' if gemeinschaft else 'Neue Gemeinschaft anlegen' }}
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="name" name="name" 
+                               value="{{ gemeinschaft.name if gemeinschaft else '' }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="beschreibung" class="form-label">Beschreibung</label>
+                        <textarea class="form-control" id="beschreibung" name="beschreibung" 
+                                  rows="3">{{ gemeinschaft.beschreibung if gemeinschaft else '' }}</textarea>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="aktiv" name="aktiv" 
+                               {{ 'checked' if not gemeinschaft or gemeinschaft.aktiv else '' }}>
+                        <label class="form-check-label" for="aktiv">Aktiv</label>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('admin_gemeinschaften') }}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Abbrechen
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Speichern
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

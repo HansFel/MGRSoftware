@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Maschine reservieren - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-calendar-check"></i> Maschine reservieren: {{ maschine.bezeichnung }}
+                </h4>
+            </div>
+            <div class="card-body p-4">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> 
+                    <strong>Hinweis:</strong> Reservierungen sind für andere Mitglieder sichtbar. 
+                    Bitte stornieren Sie rechtzeitig, wenn Sie die Maschine doch nicht benötigen.
+                </div>
+
+                <form method="POST" action="{{ url_for('maschine_reservieren', maschine_id=maschine.id) }}" id="reservierungsForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="datum" class="form-label">Datum *</label>
+                            <input type="date" class="form-control" id="datum" name="datum" 
+                                   min="{{ heute }}" required>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="nutzungsdauer" class="form-label">Nutzungsdauer (Stunden) *</label>
+                            <input type="number" step="0.5" min="0.5" max="24" class="form-control" 
+                                   id="nutzungsdauer" name="nutzungsdauer" value="2" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="uhrzeit_von" class="form-label">Von Uhrzeit *</label>
+                            <input type="time" class="form-control" id="uhrzeit_von" name="uhrzeit_von" 
+                                   value="08:00" required>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="uhrzeit_bis" class="form-label">Bis Uhrzeit *</label>
+                            <input type="time" class="form-control" id="uhrzeit_bis" name="uhrzeit_bis" 
+                                   value="10:00" required readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="zweck" class="form-label">Verwendungszweck</label>
+                        <select class="form-select" id="zweck" name="zweck">
+                            <option value="">-- Bitte wählen --</option>
+                            {% for einsatzzweck in einsatzzwecke %}
+                            <option value="{{ einsatzzweck.bezeichnung }}">{{ einsatzzweck.bezeichnung }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="bemerkung" class="form-label">Bemerkung</label>
+                        <textarea class="form-control" id="bemerkung" name="bemerkung" rows="2" 
+                                  placeholder="Optionale Notizen zur Reservierung"></textarea>
+                    </div>
+                    
+                    <!-- Existierende Reservierungen anzeigen -->
+                    {% if reservierungen %}
+                    <div class="alert alert-warning mt-3">
+                        <h6><i class="bi bi-exclamation-triangle"></i> Bestehende Reservierungen:</h6>
+                        <ul class="mb-0 small">
+                            {% for res in reservierungen %}
+                            <li>
+                                <strong>{{ res.datum }}</strong> 
+                                {{ res.uhrzeit_von }} - {{ res.uhrzeit_bis }} Uhr
+                                ({{ res.benutzer_name }})
+                                {% if res.zweck %}- {{ res.zweck }}{% endif %}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-calendar-check"></i> Reservieren
+                        </button>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Abbrechen
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Meine Reservierungen -->
+        {% if meine_reservierungen %}
+        <div class="card mt-3">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-calendar-week"></i> Meine Reservierungen für diese Maschine
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Datum</th>
+                                <th>Zeit</th>
+                                <th>Dauer</th>
+                                <th>Zweck</th>
+                                <th>Bemerkung</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for res in meine_reservierungen %}
+                            <tr>
+                                <td>{{ res.datum }}</td>
+                                <td>{{ res.uhrzeit_von }} - {{ res.uhrzeit_bis }}</td>
+                                <td>{{ res.nutzungsdauer_stunden }} h</td>
+                                <td>{{ res.zweck or '-' }}</td>
+                                <td>{{ res.bemerkung or '-' }}</td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('reservierung_stornieren', reservierung_id=res.id) }}" 
+                                          style="display: inline;" onsubmit="return confirm('Reservierung wirklich stornieren?');">
+                                        <button type="submit" class="btn btn-sm btn-danger" title="Stornieren">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Automatische Berechnung der End-Uhrzeit
+function berechneEndzeit() {
+    const von = document.getElementById('uhrzeit_von').value;
+    const dauer = parseFloat(document.getElementById('nutzungsdauer').value) || 0;
+    
+    if (von && dauer > 0) {
+        const [stunden, minuten] = von.split(':').map(Number);
+        const startMinuten = stunden * 60 + minuten;
+        const endeMinuten = startMinuten + (dauer * 60);
+        
+        const endeStunden = Math.floor(endeMinuten / 60) % 24;
+        const endeMin = endeMinuten % 60;
+        
+        const ende = `${String(endeStunden).padStart(2, '0')}:${String(endeMin).padStart(2, '0')}`;
+        document.getElementById('uhrzeit_bis').value = ende;
+    }
+}
+
+document.getElementById('uhrzeit_von').addEventListener('change', berechneEndzeit);
+document.getElementById('nutzungsdauer').addEventListener('input', berechneEndzeit);
+
+// Initiale Berechnung
+berechneEndzeit();
+</script>
+{% endblock %}
