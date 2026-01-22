@@ -1,9 +1,12 @@
-﻿"""
+﻿# -*- coding: utf-8 -*-
+"""
 Flask-Webanwendung für Maschinengemeinschaft
 Ermöglicht Benutzern den Zugriff von extern (z.B. Mobiltelefon)
 """
 
+
 import os
+import csv
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify, make_response
 from database import MaschinenDBContext
 from datetime import datetime
@@ -458,7 +461,7 @@ def meine_einsaetze():
         # Summen berechnen
         summe_treibstoff = sum(e.get('treibstoffkosten', 0) for e in einsaetze)
         summe_maschine = sum(e.get('maschinenkosten_berechnet', 0) for e in einsaetze)
-        summe_gesamt = summe_treibstoff + summe_maschine
+        summe_gesamt = summe_maschine  # Treibstoffkosten werden nicht mehr addiert
     return render_template('meine_einsaetze.html', 
                          einsaetze=einsaetze,
                          summe_treibstoff=summe_treibstoff,
@@ -919,26 +922,46 @@ def meine_einsaetze_csv():
         'Datum', 'Benutzer', 'Maschine', 'Einsatzzweck',
         'Abrechnungsart', 'Preis pro Einheit',
         'Anfangstand', 'Endstand', 'Betriebsstunden',
-        'Treibstoffverbrauch (l)', 'Treibstoffkosten (â‚¬)',
-        'FlÃ¤che/Menge', 'Maschinenkosten (â‚¬)', 'Anmerkungen'
+        'Treibstoffverbrauch (l)', 'Treibstoffkosten (€)',
+        'Fläche/Menge', 'Maschinenkosten (€)', 'Anmerkungen'
     ])
     
     # Daten
+    def de_format(val, decimals=2):
+        if val is None or val == '':
+            return ''
+        try:
+            return f"{float(val):.{decimals}f}".replace('.', ',')
+        except Exception:
+            return str(val)
+
+    def de_date(val):
+        # Erwartet ISO-Format (YYYY-MM-DD) oder datetime-Objekt
+        import datetime
+        if not val:
+            return ''
+        if isinstance(val, datetime.date):
+            return val.strftime('%d.%m.%Y')
+        try:
+            return datetime.datetime.strptime(str(val), '%Y-%m-%d').strftime('%d.%m.%Y')
+        except Exception:
+            return str(val)
+
     for e in einsaetze:
         writer.writerow([
-            e['datum'],
-            e['benutzer'],
-            e['maschine'],
-            e['einsatzzweck'],
+            de_date(e.get('datum', '')),
+            e.get('benutzer', ''),
+            e.get('maschine', ''),
+            e.get('einsatzzweck', ''),
             e.get('abrechnungsart', 'stunden'),
-            f"{e.get('preis_pro_einheit', 0):.2f}",
-            f"{e['anfangstand']:.1f}",
-            f"{e['endstand']:.1f}",
-            f"{e['betriebsstunden']:.1f}",
-            f"{e['treibstoffverbrauch']:.1f}" if e['treibstoffverbrauch'] else '',
-            f"{e.get('treibstoffkosten', 0):.2f}" if e.get('treibstoffkosten') else '',
-            f"{e.get('flaeche_menge', 0):.1f}" if e.get('flaeche_menge') else '',
-            f"{e.get('kosten_berechnet', 0):.2f}" if e.get('kosten_berechnet') else '',
+            de_format(e.get('preis_pro_einheit'), 2),
+            de_format(e.get('anfangstand'), 1),
+            de_format(e.get('endstand'), 1),
+            de_format(e.get('betriebsstunden'), 1),
+            de_format(e.get('treibstoffverbrauch'), 1),
+            de_format(e.get('treibstoffkosten'), 2),
+            de_format(e.get('flaeche_menge'), 1),
+            de_format(e.get('kosten_berechnet'), 2),
             e.get('anmerkungen', '')
         ])
     
@@ -949,7 +972,7 @@ def meine_einsaetze_csv():
     filename = f'meine_einsaetze_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
     return send_file(
         csv_bytes,
-        mimetype='text/csv',
+        mimetype='text/csv; charset=utf-8',
         as_attachment=True,
         download_name=filename
     )

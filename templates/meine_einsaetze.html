@@ -11,7 +11,8 @@
                     <i class="bi bi-list-ul"></i> Meine Einsätze
                 </h4>
                 <div>
-                    <a href="{{ url_for('meine_stornierten_einsaetze') }}" class="btn btn-outline-secondary btn-sm me-2">
+                    <a href="{{ url_for('meine_stornierten_einsaetze') }}"
+                        class="btn btn-outline-secondary btn-sm me-2">
                         <i class="bi bi-archive"></i> Stornierte Einsätze
                     </a>
                     <a href="{{ url_for('meine_einsaetze_csv') }}" class="btn btn-success btn-sm me-2">
@@ -39,149 +40,105 @@
                                 <th>T-Kosten</th>
                                 <th>M-Kosten</th>
                                 <th>Anmerkungen</th>
-                                <th>Aktion</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for einsatz in einsaetze %}
                             <tr>
-                                <td>{{ einsatz.datum }}</td>
                                 <td>
-                                    <strong>{{ einsatz.maschine }}</strong>
-                                </td>
-                                <td>
-                                    <span class="badge bg-info">{{ einsatz.einsatzzweck }}</span>
-                                </td>
-                                <td>
-                                    {% if einsatz.preis_pro_einheit %}
-                                        <small>{{ "%.2f"|format(einsatz.preis_pro_einheit) }}€
-                                        {% if einsatz.abrechnungsart == 'hektar' %}/ha
-                                        {% elif einsatz.abrechnungsart == 'kilometer' %}/km
-                                        {% elif einsatz.abrechnungsart == 'stueck' %}/St
-                                        {% else %}/h
-                                        {% endif %}
-                                        </small>
+                                    {% if einsatz.datum %}
+                                    {% if einsatz.datum is string %}
+                                    {{ einsatz.datum }}
                                     {% else %}
-                                        <span class="text-muted">-</span>
+                                    {{ einsatz.datum.strftime('%d.%m.%Y') }}
+                                    {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td>{{ einsatz.maschine }}</td>
+                                <td>{{ einsatz.einsatzzweck }}</td>
+                                <td>{{ "%.2f"|format(einsatz.preis_pro_einheit)|replace('.', ',') }} €</td>
+                                <td>
+                                    {% if einsatz.abrechnungsart == 'hektar' %}
+                                    {{ "%.2f"|format(einsatz.anfangstand)|replace('.', ',') }} ha
+                                    {% elif einsatz.abrechnungsart == 'kilometer' %}
+                                    {{ "%.1f"|format(einsatz.anfangstand)|replace('.', ',') }} km
+                                    {% elif einsatz.abrechnungsart == 'stueck' %}
+                                    {{ "%.0f"|format(einsatz.anfangstand) }} St
+                                    {% else %}
+                                    {{ "%.1f"|format(einsatz.anfangstand)|replace('.', ',') }} h
                                     {% endif %}
                                 </td>
                                 <td>
                                     {% if einsatz.abrechnungsart == 'hektar' %}
-                                        {{ "%.2f"|format(einsatz.anfangstand) }} ha
+                                    {{ "%.2f"|format(einsatz.endstand)|replace('.', ',') }} ha
                                     {% elif einsatz.abrechnungsart == 'kilometer' %}
-                                        {{ "%.1f"|format(einsatz.anfangstand) }} km
+                                    {{ "%.1f"|format(einsatz.endstand)|replace('.', ',') }} km
                                     {% elif einsatz.abrechnungsart == 'stueck' %}
-                                        {{ "%.0f"|format(einsatz.anfangstand) }} St
+                                    {{ "%.0f"|format(einsatz.endstand) }} St
                                     {% else %}
-                                        {{ "%.1f"|format(einsatz.anfangstand) }} h
+                                    {{ "%.1f"|format(einsatz.endstand)|replace('.', ',') }} h
                                     {% endif %}
                                 </td>
-                                <td>
-                                    {% if einsatz.abrechnungsart == 'hektar' %}
-                                        {{ "%.2f"|format(einsatz.endstand) }} ha
-                                    {% elif einsatz.abrechnungsart == 'kilometer' %}
-                                        {{ "%.1f"|format(einsatz.endstand) }} km
-                                    {% elif einsatz.abrechnungsart == 'stueck' %}
-                                        {{ "%.0f"|format(einsatz.endstand) }} St
-                                    {% else %}
-                                        {{ "%.1f"|format(einsatz.endstand) }} h
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <strong>{{ einsatz.menge_berechnet }}</strong>
-                                </td>
+                                <td><strong>{% if einsatz.menge_berechnet is not none and einsatz.menge_berechnet != ''
+                                        %}{{ einsatz.menge_berechnet|replace('.', ',') }}{% endif %}</strong></td>
                                 <td>
                                     {% if einsatz.treibstoffverbrauch %}
-                                        {{ "%.1f"|format(einsatz.treibstoffverbrauch) }} l
+                                    {{ "%.1f"|format(einsatz.treibstoffverbrauch)|replace('.', ',') }} l
                                     {% else %}
-                                        <span class="text-muted">-</span>
+                                    <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
                                 <td>
                                     {% if einsatz.treibstoffkosten %}
-                                        {{ "%.2f"|format(einsatz.treibstoffkosten) }} €
+                                    {{ "%.2f"|format(einsatz.treibstoffkosten)|replace('.', ',') }} €
                                     {% else %}
-                                        <span class="text-muted">-</span>
+                                    <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
-                                <td>
-                                    <strong class="text-success">{{ "%.2f"|format(einsatz.maschinenkosten_berechnet) }} €</strong>
+                                <td><strong class="text-success">{{
+                                        "%.2f"|format(einsatz.maschinenkosten_berechnet)|replace('.', ',') }} €</strong>
                                 </td>
                                 <td>
                                     {% if einsatz.anmerkungen %}
-                                        <small class="text-muted">{{ einsatz.anmerkungen[:50] }}{% if einsatz.anmerkungen|length > 50 %}...{% endif %}</small>
+                                    <small class="text-muted">{{ einsatz.anmerkungen[:50] }}{% if
+                                        einsatz.anmerkungen|length > 50 %}...{% endif %}</small>
                                     {% else %}
-                                        <span class="text-muted">-</span>
+                                    <span class="text-muted">-</span>
                                     {% endif %}
+                                </td>
                                 <td>
-                                    <a href="{{ url_for('einsatz_stornieren', einsatz_id=einsatz.id) }}" 
-                                       class="btn btn-sm btn-outline-danger"
-                                       onclick="return confirm('Soll dieser Einsatz wirklich storniert werden?')">
+                                    <a href="{{ url_for('einsatz_stornieren', einsatz_id=einsatz.id) }}"
+                                        class="btn btn-sm btn-outline-danger"
+                                        onclick="return confirm('Soll dieser Einsatz wirklich storniert werden?')">
                                         <i class="bi bi-trash"></i>
                                     </a>
-                                </td>
                                 </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                         <tfoot class="table-light">
-                            <tr>
-                                <td colspan="6" class="text-end"><strong>Gesamt:</strong></td>
+                            <tr class="table-info">
+                                <td colspan="7" class="text-end"><strong>Gesamt:</strong></td>
                                 <td>
-                                    {# Summen-Menge dynamisch nach Abrechnungsart und Erfassungsmodus #}
-                                    {% set summe = 0 %}
-                                    {% if einsaetze|length > 0 %}
-                                        {% set abrechnungsart = einsaetze[0].abrechnungsart %}
-                                        {% set erfassungsmodus = einsaetze[0].erfassungsmodus %}
-                                        {% if erfassungsmodus == 'fortlaufend' %}
-                                                {% set end_sum = einsaetze|map(attribute='endstand')|map('default', 0)|sum %}
-                                                {% set anfang_sum = einsaetze|map(attribute='anfangstand')|map('default', 0)|sum %}
-                                                {% set summe = end_sum - anfang_sum %}
-                                                {% if abrechnungsart == 'hektar' %}
-                                                    <strong>{{ "%.2f"|format(summe) }} ha</strong>
-                                                {% elif abrechnungsart == 'kilometer' %}
-                                                    <strong>{{ "%.1f"|format(summe) }} km</strong>
-                                                {% elif abrechnungsart == 'stueck' %}
-                                                    <strong>{{ "%.0f"|format(summe) }} St</strong>
-                                                {% else %}
-                                                    <strong>{{ "%.1f"|format(summe) }} h</strong>
-                                                {% endif %}
-                                        {% else %}
-                                                {% set summe = einsaetze|map(attribute='flaeche_menge')|map('default', 0)|sum %}
-                                                {% if abrechnungsart == 'hektar' %}
-                                                    <strong>{{ "%.2f"|format(summe) }} ha</strong>
-                                                {% elif abrechnungsart == 'kilometer' %}
-                                                    <strong>{{ "%.1f"|format(summe) }} km</strong>
-                                                {% elif abrechnungsart == 'stueck' %}
-                                                    <strong>{{ "%.0f"|format(summe) }} St</strong>
-                                                {% else %}
-                                                    <strong>{{ "%.1f"|format(summe) }} h</strong>
-                                                {% endif %}
-                                        {% endif %}
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% set treibstoff_gesamt = einsaetze|selectattr('treibstoffverbrauch')|sum(attribute='treibstoffverbrauch') %}
+                                    {% set treibstoff_gesamt =
+                                    einsaetze|selectattr('treibstoffverbrauch')|sum(attribute='treibstoffverbrauch') %}
                                     {% if treibstoff_gesamt > 0 %}
-                                        <strong>{{ "%.1f"|format(treibstoff_gesamt) }} l</strong>
+                                    <strong>{{ "%.1f"|format(treibstoff_gesamt) }} l</strong>
                                     {% else %}
-                                        -
+                                    -
                                     {% endif %}
                                 </td>
                                 <td></td>
-                            </tr>
-                            <tr class="table-info">
-                                <td colspan="9
                                 <td>
-                                    <strong class="text-success">{{ "%.2f"|format(summe_maschine) }} €</strong>
+                                    {% if summe_maschine > 0 %}
+                                    <strong class="text-success">{{ "%.2f"|format(summe_maschine)|replace('.', ',') }}
+                                        €</strong>
+                                    {% else %}
+                                    -
+                                    {% endif %}
                                 </td>
-                                <td></td>
-                            </tr>
-                            <tr class="table-info">
-                                <td colspan="8" class="text-end"><strong>GESAMTKOSTEN:</strong></td>
-                                <td colspan="3">
-                                    <strong class="text-primary" style="font-size: 1.1em;">{{ "%.2f"|format(summe_gesamt) }} €</strong>
-                                </td>
+                                <td colspan="2"></td>
                             </tr>
                         </tfoot>
                     </table>

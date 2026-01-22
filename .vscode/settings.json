@@ -1,0 +1,29 @@
+{
+  "editor.copyWithSyntaxHighlighting": false,  // Schnelleres Kopieren
+  "editor.formatOnPaste": true,  // Wenn du meinen Code einfügst
+  "files.autoSave": "afterDelay",  // Nichts verlieren
+  "files.autoSaveDelay": 1000
+}
+```
+
+### **4. Keyboard Shortcuts anpassen**
+`Ctrl+K Ctrl+S` → Shortcuts:
+- **Copy Relative Path** → z.B. `Ctrl+Shift+C` (um mir schnell zu sagen welche Datei)
+- **Compare with Clipboard** → praktisch um meinen Code zu vergleichen
+
+### **5. Terminal-Setup**
+```
+Ctrl+` → Terminal öffnen
+```
+Dann kannst du schnell:
+- Error-Messages kopieren → mir zeigen
+- `pip install` Befehle die ich dir gebe direkt ausführen
+
+## 🚀 Optimaler Workflow:
+```
+1. Problem in VS Code entdecken
+2. Alt+Tab zu diesem Chat
+3. Code einfügen oder Datei hochladen
+4. Meine Lösung bekommen
+5. Alt+Tab zurück zu VS Code
+6. Code einfügen (wird auto-formatiert!)

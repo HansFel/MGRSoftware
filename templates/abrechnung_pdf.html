@@ -111,9 +111,22 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Abrechnung #{{ abrechnung.id }}</h1>
-        <p>{{ abrechnung.gemeinschaft_name }}</p>
+
+    <div class="header" style="display: flex; align-items: flex-start; justify-content: space-between;">
+        <div style="flex: 1;">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" style="height: 70px; margin-bottom: 10px;">
+            <h1 style="margin-top: 0; color: #0066cc;">{{ abrechnung.gemeinschaft_name }}</h1>
+            <div style="font-size: 15px; color: #444; margin-bottom: 5px;">
+                Musterstraße 1, 12345 Musterstadt<br>
+                Tel: 01234 / 567890<br>
+                E-Mail: info@gemeinschaft.de
+            </div>
+        </div>
+        <div style="text-align: right; min-width: 180px;">
+            <div style="font-size: 18px; color: #0066cc; font-weight: bold;">Abrechnung</div>
+            <div style="font-size: 14px; color: #333;">Nr.: <b>{{ abrechnung.id }}</b></div>
+            <div style="font-size: 14px; color: #333;">Datum: {{ abrechnung.datum }}</div>
+        </div>
     </div>
 
     <div class="info-box">
