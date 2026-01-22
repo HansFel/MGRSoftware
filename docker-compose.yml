@@ -8,6 +8,7 @@ services:
       - ./data:/data
     environment:
       - DB_PATH=/data/maschinengemeinschaft.db
+      - SECRET_KEY=supergeheimerkey2026
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/login')"]

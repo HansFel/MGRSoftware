@@ -3,35 +3,42 @@
 {% block title %}Abrechnung {{ gemeinschaft.name }} - Maschinengemeinschaft{% endblock %}
 
 {% block content %}
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="text-white">
-                <i class="bi bi-calculator"></i> Abrechnung: {{ gemeinschaft.name }}
-            </h2>
-            <div>
-                <a href="{{ url_for('admin_gemeinschaften_abrechnung_csv', gemeinschaft_id=gemeinschaft.id) }}" 
-                   class="btn btn-success">
-                    <i class="bi bi-file-earmark-spreadsheet"></i> CSV Export
-                </a>
-                <a href="{{ url_for('admin_gemeinschaften') }}" class="btn btn-secondary">
-                    <i class="bi bi-arrow-left"></i> Zurück
-                </a>
+{% include "abrechnung_header.html" %}
+
+
+<!-- Gemeinschaftsdaten und Administratoren -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        {% if gemeinschaft.beschreibung %}
+        <div class="alert alert-info mb-2">
+            <i class="bi bi-info-circle"></i> {{ gemeinschaft.beschreibung }}
+        </div>
+        {% endif %}
+        <div class="card mb-2">
+            <div class="card-body">
+                <strong>Adresse:</strong> {{ gemeinschaft.adresse or '-' }}<br>
+                <strong>Telefon:</strong> {{ gemeinschaft.telefon or '-' }}<br>
+                <strong>E-Mail:</strong> {{ gemeinschaft.email or '-' }}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <strong>Administratoren:</strong><br>
+                {% if admins and admins|length > 0 %}
+                    <ul class="mb-0">
+                    {% for admin in admins %}
+                        <li>{{ admin.vorname }} {{ admin.name }}{% if admin.email %} &lt;{{ admin.email }}&gt;{% endif %}</li>
+                    {% endfor %}
+                    </ul>
+                {% else %}
+                    <span class="text-muted">Keine Administratoren hinterlegt</span>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
-
-<!-- Beschreibung der Gemeinschaft -->
-{% if gemeinschaft.beschreibung %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="alert alert-info">
-            <i class="bi bi-info-circle"></i> {{ gemeinschaft.beschreibung }}
-        </div>
-    </div>
-</div>
-{% endif %}
 
 <!-- Zusammenfassung -->
 <div class="row g-3 mb-4">

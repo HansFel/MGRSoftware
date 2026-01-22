@@ -157,24 +157,16 @@
             <div class="card-body">
                 <table class="table table-sm">
                     <tr>
-                        <td><strong>Anzahl Einsätze:</strong></td>
-                        <td class="text-end">{{ rentabilitaet.anzahl_einsaetze }}</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Betriebsstunden:</strong></td>
-                        <td class="text-end">{{ "%.1f"|format(rentabilitaet.betriebsstunden) }} h</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Einnahmen:</strong></td>
+                        <td><strong>Einnahmen gesamt:</strong></td>
                         <td class="text-end">{{ "%.2f"|format(rentabilitaet.einnahmen_gesamt) }}€</td>
                     </tr>
                     <tr>
-                        <td><strong>- Abschreibung:</strong></td>
-                        <td class="text-end">-{{ "%.2f"|format(rentabilitaet.abschreibung_bisher) }}€</td>
+                        <td><strong>- Aufwendungen gesamt:</strong></td>
+                        <td class="text-end">-{{ "%.2f"|format(rentabilitaet.aufwendungen_gesamt) }}€</td>
                     </tr>
                     <tr>
-                        <td><strong>- Aufwendungen:</strong></td>
-                        <td class="text-end">-{{ "%.2f"|format(rentabilitaet.aufwendungen_gesamt) }}€</td>
+                        <td><strong>- Abschreibung (Jahr):</strong></td>
+                        <td class="text-end">-{{ "%.2f"|format(rentabilitaet.abschreibung_pro_jahr) }}€</td>
                     </tr>
                     <tr>
                         <td><strong>- Bankgebuchte Kosten:</strong></td>

@@ -14,24 +14,37 @@
             </div>
             <div class="card-body">
                 <form method="POST">
+                    <h5 class="mb-3"><i class="bi bi-info-circle"></i> Gemeinschaftsdaten</h5>
                     <div class="mb-3">
                         <label for="name" class="form-label">Name *</label>
                         <input type="text" class="form-control" id="name" name="name" 
                                value="{{ gemeinschaft.name if gemeinschaft else '' }}" required>
                     </div>
-
                     <div class="mb-3">
                         <label for="beschreibung" class="form-label">Beschreibung</label>
                         <textarea class="form-control" id="beschreibung" name="beschreibung" 
                                   rows="3">{{ gemeinschaft.beschreibung if gemeinschaft else '' }}</textarea>
                     </div>
-
+                    <div class="mb-3">
+                        <label for="adresse" class="form-label">Adresse</label>
+                        <input type="text" class="form-control" id="adresse" name="adresse" 
+                               value="{{ gemeinschaft.adresse if gemeinschaft and gemeinschaft.adresse else '' }}" placeholder="Straße, PLZ Ort">
+                    </div>
+                    <div class="mb-3">
+                        <label for="telefon" class="form-label">Telefon</label>
+                        <input type="text" class="form-control" id="telefon" name="telefon" 
+                               value="{{ gemeinschaft.telefon if gemeinschaft and gemeinschaft.telefon else '' }}" placeholder="Telefonnummer">
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">E-Mail</label>
+                        <input type="email" class="form-control" id="email" name="email" 
+                               value="{{ gemeinschaft.email if gemeinschaft and gemeinschaft.email else '' }}" placeholder="E-Mail-Adresse">
+                    </div>
                     <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" id="aktiv" name="aktiv" 
                                {{ 'checked' if not gemeinschaft or gemeinschaft.aktiv else '' }}>
                         <label class="form-check-label" for="aktiv">Aktiv</label>
                     </div>
-
                     <hr class="my-4">
                     <h5 class="mb-3"><i class="bi bi-bank"></i> Bankverbindung</h5>
                     <p class="text-muted small">Diese Informationen werden auf den Abrechnungen für Mitglieder angezeigt.</p>

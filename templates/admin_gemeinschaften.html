@@ -68,6 +68,11 @@
                                            title="Abrechnung">
                                             <i class="bi bi-calculator"></i>
                                         </a>
+                                        <a href="{{ url_for('admin_gemeinschaften_maschinenuebersicht_pdf', gemeinschaft_id=gem.id) }}" 
+                                           class="btn btn-sm btn-outline-secondary" target="_blank"
+                                           title="Maschinenübersicht PDF">
+                                            <i class="bi bi-file-earmark-pdf"></i>
+                                        </a>
                                     </div>
                                 </td>
                             </tr>

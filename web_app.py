@@ -1753,8 +1753,8 @@ def admin_maschinen_rentabilitaet(maschine_id):
 
         # Gesamtkosten: Aufwendungen + Bankbuchungen
         gesamtkosten = aufwendungen_gesamt + bankkosten_gesamt
-        # Rentabilität neu berechnen (Einnahmen - Abschreibung - Gesamtkosten)
-        deckungsbeitrag = einnahmen - abschreibung_bisher - gesamtkosten
+        # Rentabilität NEU: nur jährliche Abschreibung berücksichtigen
+        deckungsbeitrag = einnahmen - abschreibung_pro_jahr - gesamtkosten
         rentabilitaet_prozent = (deckungsbeitrag / anschaffungspreis * 100) if anschaffungspreis > 0 else 0
 
         rentabilitaet = {
@@ -1895,7 +1895,8 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
                 einsatz['aufwendungen'] = 0
             einsatz['gewinn'] = einsatz['einnahmen'] - einsatz['aufwendungen']
         
-        deckungsbeitrag = einnahmen - abschreibung_bisher - aufwendungen_gesamt
+        # Nur jährliche Abschreibung berücksichtigen
+        deckungsbeitrag = einnahmen - abschreibung_pro_jahr - aufwendungen_gesamt
         rentabilitaet_prozent = (deckungsbeitrag / anschaffungspreis * 100) if anschaffungspreis > 0 else 0
     
     # PDF erstellen
@@ -1940,27 +1941,25 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
     elements.append(maschinen_table)
     elements.append(Spacer(1, 0.5*cm))
     
-    # Kennzahlen
-    elements.append(Paragraph("Kennzahlen", styles['Heading2']))
-    kennzahlen_data = [
-        ['Anschaffungspreis:', f"{anschaffungspreis:.2f} €"],
-        ['Restwert (aktuell):', f"{restwert:.2f} €"],
-        ['Einnahmen gesamt:', f"{einnahmen:.2f} €"],
-        ['Aufwendungen gesamt:', f"{aufwendungen_gesamt:.2f} €"],
-        ['Deckungsbeitrag:', f"{deckungsbeitrag:.2f} €"],
-        ['Rentabilität:', f"{rentabilitaet_prozent:.1f} %"],
+    # Rentabilitätsblock
+    elements.append(Paragraph("Rentabilitätsberechnung", styles['Heading2']))
+    rentab_data = [
+        ["Einnahmen gesamt", f"{einnahmen:.2f} €"],
+        ["- Aufwendungen gesamt", f"- {aufwendungen_gesamt:.2f} €"],
+        ["- Abschreibung (Jahr)", f"- {abschreibung_pro_jahr:.2f} €"],
+        ["= Deckungsbeitrag", f"{deckungsbeitrag:.2f} €"],
+        ["Rentabilität", f"{rentabilitaet_prozent:.1f} %"],
     ]
-
-    kennzahlen_table = Table(kennzahlen_data, colWidths=[10*cm, 7*cm])
-    kennzahlen_table.setStyle(TableStyle([
+    rentab_table = Table(rentab_data, colWidths=[10*cm, 7*cm])
+    rentab_table.setStyle(TableStyle([
         ('FONTNAME', (0, 0), (0, -1), default_font),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('FONTSIZE', (0, 0), (-1, -1), 11),
         ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('LINEABOVE', (0, -2), (-1, -2), 1, colors.black),
-        ('BACKGROUND', (0, -2), (-1, -1), colors.lightgrey),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+        ('LINEABOVE', (0, 3), (-1, 3), 1, colors.black),
+        ('BACKGROUND', (0, 3), (-1, 4), colors.lightgrey),
     ]))
-    elements.append(kennzahlen_table)
+    elements.append(rentab_table)
     elements.append(Spacer(1, 0.5*cm))
     
     # Abschreibung
@@ -2273,7 +2272,115 @@ def admin_einsatzzwecke_delete(einsatzzweck_id):
     return redirect(url_for('admin_einsatzzwecke'))
 
 
+
 # ==================== GEMEINSCHAFTEN-VERWALTUNG ====================
+
+# PDF-Übersicht aller Maschinen einer Gemeinschaft
+@app.route('/admin/gemeinschaften/<int:gemeinschaft_id>/maschinenuebersicht/pdf')
+@admin_required
+def admin_gemeinschaften_maschinenuebersicht_pdf(gemeinschaft_id):
+    """PDF-Übersicht aller Maschinen einer Gemeinschaft"""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import cm
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from io import BytesIO
+    import os
+    from datetime import datetime
+
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        # Gemeinschaft laden
+        cursor.execute("SELECT * FROM gemeinschaften WHERE id = ?", (gemeinschaft_id,))
+        columns = [desc[0] for desc in cursor.description]
+        gemeinschaft = dict(zip(columns, cursor.fetchone()))
+
+
+        # Maschinen der Gemeinschaft laden (Tabellenname angepasst: maschineneinsaetze statt einsaetze)
+        cursor.execute("""
+            SELECT m.*, 
+                (SELECT SUM(e.endstand - e.anfangstand) FROM maschineneinsaetze e WHERE e.maschine_id = m.id) as betriebsstunden,
+                (SELECT SUM(CASE WHEN m.abrechnungsart = 'stunden' THEN (e.endstand - e.anfangstand) * COALESCE(m.preis_pro_einheit, 0)
+                                 ELSE COALESCE(e.flaeche_menge, 0) * COALESCE(m.preis_pro_einheit, 0) END) FROM maschineneinsaetze e WHERE e.maschine_id = m.id) as einnahmen,
+                (SELECT SUM(auf.wartungskosten + auf.reparaturkosten + auf.versicherung + auf.steuern + auf.sonstige_kosten) FROM maschinen_aufwendungen auf WHERE auf.maschine_id = m.id) as aufwendungen
+            FROM maschinen m
+            WHERE m.gemeinschaft_id = ?
+            ORDER BY m.bezeichnung
+        """, (gemeinschaft_id,))
+        maschinen = cursor.fetchall()
+        maschinen_columns = [desc[0] for desc in cursor.description]
+
+    # PDF-Setup
+    font_path = os.path.join(os.path.dirname(__file__), 'static', 'fonts', 'DejaVuSans.ttf')
+    if os.path.exists(font_path):
+        pdfmetrics.registerFont(TTFont('DejaVuSans', font_path))
+        default_font = 'DejaVuSans'
+    else:
+        default_font = 'Helvetica'
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=1.5*cm, rightMargin=1.5*cm, topMargin=2*cm, bottomMargin=2*cm)
+    elements = []
+    styles = getSampleStyleSheet()
+    for style in styles.byName.values():
+        style.fontName = default_font
+
+    # Titel
+    title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=20, fontName=default_font)
+    elements.append(Paragraph(f"Maschinenübersicht: {gemeinschaft['name']}", title_style))
+    elements.append(Paragraph(f"Erstellt am: {datetime.now().strftime('%d.%m.%Y %H:%M')}", styles['Normal']))
+    elements.append(Spacer(1, 0.5*cm))
+
+    # Tabellendaten
+    table_data = [[
+        'Bezeichnung', 'Hersteller', 'Modell', 'Baujahr', 'Betriebsstunden',
+        'Einnahmen', 'Aufwendungen', 'Abschreibung (Jahr)', 'Deckungsbeitrag'
+    ]]
+    for row in maschinen:
+        maschine = dict(zip(maschinen_columns, row))
+        einnahmen = maschine.get('einnahmen') or 0
+        aufwendungen = maschine.get('aufwendungen') or 0
+        anschaffungspreis = maschine.get('anschaffungspreis') or 0
+        abschreibungsdauer = maschine.get('abschreibungsdauer_jahre') or 10
+        try:
+            abschreibung_jahr = float(anschaffungspreis) / float(abschreibungsdauer) if abschreibungsdauer else 0
+        except Exception:
+            abschreibung_jahr = 0
+        deckungsbeitrag = einnahmen - aufwendungen - abschreibung_jahr
+        table_data.append([
+            maschine.get('bezeichnung', '-'),
+            maschine.get('hersteller', '-'),
+            maschine.get('modell', '-'),
+            maschine.get('baujahr', '-'),
+            f"{maschine.get('betriebsstunden') or 0:.1f}",
+            f"{einnahmen:.2f} €",
+            f"{aufwendungen:.2f} €",
+            f"{abschreibung_jahr:.2f} €",
+            f"{deckungsbeitrag:.2f} €"
+        ])
+
+    table = Table(table_data, colWidths=[3.2*cm, 2.2*cm, 2.2*cm, 1.5*cm, 2*cm, 2.2*cm, 2.2*cm, 2.2*cm, 2.2*cm])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('FONTNAME', (0, 0), (-1, -1), default_font),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('ALIGN', (4, 1), (-1, -1), 'RIGHT'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(table)
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.getvalue(), 200, {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': f'inline; filename="Maschinenuebersicht_{gemeinschaft["name"]}_{datetime.now().strftime("%Y%m%d")}.pdf"'
+    }
 
 @app.route('/admin/gemeinschaften')
 @admin_required
@@ -2325,6 +2432,9 @@ def admin_gemeinschaften_edit(gemeinschaft_id):
                 UPDATE gemeinschaften 
                 SET name = ?, 
                     beschreibung = ?, 
+                    adresse = ?,
+                    telefon = ?,
+                    email = ?,
                     aktiv = ?,
                     bank_name = ?,
                     bank_iban = ?,
@@ -2334,6 +2444,9 @@ def admin_gemeinschaften_edit(gemeinschaft_id):
             """, (
                 request.form['name'],
                 request.form.get('beschreibung'),
+                request.form.get('adresse'),
+                request.form.get('telefon'),
+                request.form.get('email'),
                 1 if request.form.get('aktiv') else 0,
                 request.form.get('bank_name'),
                 request.form.get('bank_iban'),
@@ -2803,7 +2916,7 @@ def admin_gemeinschaften_abrechnung(gemeinschaft_id):
         columns = [desc[0] for desc in cursor.description]
         gemeinschaft = dict(zip(columns, cursor.fetchone()))
         
-        # Abrechnung pro Mitglied (nur Maschinenkosten)
+        # Abrechnung pro Mitglied (nur Maschinenkosten, Tabellennamen angepasst)
         cursor.execute("""
             SELECT 
                 b.id,
@@ -2819,7 +2932,7 @@ def admin_gemeinschaften_abrechnung(gemeinschaft_id):
                 ) as einnahmen_gesamt
             FROM benutzer b
             JOIN mitglied_gemeinschaft mg ON b.id = mg.mitglied_id
-            LEFT JOIN einsaetze e ON b.id = e.benutzer_id
+            LEFT JOIN maschineneinsaetze e ON b.id = e.benutzer_id
             LEFT JOIN maschinen m ON e.maschine_id = m.id AND m.gemeinschaft_id = ?
             WHERE mg.gemeinschaft_id = ?
             GROUP BY b.id, b.name, b.vorname
@@ -2830,21 +2943,31 @@ def admin_gemeinschaften_abrechnung(gemeinschaft_id):
         mitglieder_abrechnung = []
         for row in cursor.fetchall():
             d = dict(zip(columns, row))
-            d['gesamtkosten'] = d['maschinenkosten'] or 0
+            d['gesamtkosten'] = d['einnahmen_gesamt'] or 0
             mitglieder_abrechnung.append(d)
-        
+
         # Gesamtsummen
         gesamtsummen = {
             'anzahl_einsaetze': sum(m['anzahl_einsaetze'] or 0 for m in mitglieder_abrechnung),
             'betriebsstunden': sum(m['betriebsstunden'] or 0 for m in mitglieder_abrechnung),
-            'maschinenkosten': sum(m['maschinenkosten'] or 0 for m in mitglieder_abrechnung),
+            'maschinenkosten': sum(m['einnahmen_gesamt'] or 0 for m in mitglieder_abrechnung),
             'gesamtkosten': sum(m['gesamtkosten'] or 0 for m in mitglieder_abrechnung)
         }
-    
+
+        # Gemeinschafts-Administratoren laden
+        cursor.execute("""
+            SELECT b.name, b.vorname, b.email
+            FROM gemeinschafts_admin ga
+            JOIN benutzer b ON ga.benutzer_id = b.id
+            WHERE ga.gemeinschaft_id = ?
+        """, (gemeinschaft_id,))
+        admins = [dict(zip([desc[0] for desc in cursor.description], row)) for row in cursor.fetchall()]
+
     return render_template('admin_gemeinschaften_abrechnung.html', 
                          gemeinschaft=gemeinschaft,
                          mitglieder_abrechnung=mitglieder_abrechnung,
-                         gesamtsummen=gesamtsummen)
+                         gesamtsummen=gesamtsummen,
+                         admins=admins)
 
 
 @app.route('/admin/gemeinschaften/<int:gemeinschaft_id>/abrechnung/csv')

@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS benutzer (
     mitglied_seit DATE,
     aktiv BOOLEAN DEFAULT 1,
     bemerkungen TEXT,
-    treibstoffkosten_preis REAL DEFAULT 1.50
+    treibstoffkosten_preis REAL DEFAULT 1.50,
+    backup_schwellwert REAL DEFAULT 10.0
 );
 
 -- Tabelle für Maschinen
@@ -128,6 +129,9 @@ CREATE TABLE IF NOT EXISTS gemeinschaften (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
     beschreibung TEXT,
+    adresse TEXT,
+    telefon TEXT,
+    email TEXT,
     erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     aktiv BOOLEAN DEFAULT 1
 );
@@ -196,6 +200,13 @@ CREATE INDEX IF NOT EXISTS idx_gemeinschafts_admin_gemeinschaft
 
 CREATE INDEX IF NOT EXISTS idx_backup_bestaetigung_status 
     ON backup_bestaetigung(status);
+
+CREATE TABLE IF NOT EXISTS backup_tracking (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    letztes_backup TIMESTAMP,
+    einsaetze_bei_backup INTEGER,
+    bemerkung TEXT
+);    
 
 -- Standard-Admin-Benutzer für neue Datenbanken
 -- Wird nur angelegt, wenn noch kein Admin-Benutzer existiert
