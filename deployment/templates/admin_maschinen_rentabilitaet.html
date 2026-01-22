@@ -88,6 +88,14 @@
             </div>
         </div>
     </div>
+    <div class="col-md-2">
+        <div class="card stat-card">
+            <div class="card-body">
+                <p class="text-muted mb-1">Bankgebuchte Kosten</p>
+                <h4 class="mb-0 text-danger">{{ "%.2f"|format(rentabilitaet.bankkosten_gesamt) }}€</h4>
+            </div>
+        </div>
+    </div>
     <div class="col-md-3">
         <div class="card stat-card {% if rentabilitaet.deckungsbeitrag >= 0 %}bg-success{% else %}bg-danger{% endif %} text-white">
             <div class="card-body">
@@ -117,11 +125,24 @@
                     </tr>
                     <tr>
                         <td><strong>Alter der Maschine:</strong></td>
-                        <td class="text-end">{{ "%.1f"|format(rentabilitaet.alter_jahre) }} Jahre</td>
+                        <td class="text-end">
+                            {% if rentabilitaet.alter_error %}
+                                <span class="text-danger">{{ rentabilitaet.alter_error }}</span>
+                            {% else %}
+                                {{ rentabilitaet.alter_jahre|default(0) }} Jahre
+                                {% if rentabilitaet.alter_jahre_float is defined %}
+                                    ({{ '%.1f'|format(rentabilitaet.alter_jahre_float|default(0)) }} Jahre exakt)
+                                {% endif %}
+                            {% endif %}
+                        </td>
                     </tr>
                     <tr class="table-light">
-                        <td><strong>Abschreibung bisher:</strong></td>
-                        <td class="text-end"><strong>{{ "%.2f"|format(rentabilitaet.abschreibung_bisher) }}€</strong></td>
+                        <td><strong>Abschreibung (Jahr):</strong></td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(rentabilitaet.abschreibung_pro_jahr) }}€</strong> <span class="text-muted">pro Jahr</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Abschreibung bisher (Info):</strong></td>
+                        <td class="text-end">{{ "%.2f"|format(rentabilitaet.abschreibung_bisher) }}€</td>
                     </tr>
                 </table>
             </div>
@@ -155,6 +176,10 @@
                         <td><strong>- Aufwendungen:</strong></td>
                         <td class="text-end">-{{ "%.2f"|format(rentabilitaet.aufwendungen_gesamt) }}€</td>
                     </tr>
+                    <tr>
+                        <td><strong>- Bankgebuchte Kosten:</strong></td>
+                        <td class="text-end">-{{ "%.2f"|format(rentabilitaet.bankkosten_gesamt) }}€</td>
+                    </tr>
                     <tr class="table-light">
                         <td><strong>= Deckungsbeitrag:</strong></td>
                         <td class="text-end">
@@ -171,6 +196,42 @@
                             </strong>
                         </td>
                     </tr>
+                <!-- Bankgebuchte Kosten Detailtabelle -->
+                {% if bankbuchungen and bankbuchungen|length > 0 %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-white">
+                                <h5 class="mb-0"><i class="bi bi-bank"></i> Bankgebuchte Kosten für diese Maschine</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Datum</th>
+                                                <th>Betrag</th>
+                                                <th>Typ</th>
+                                                <th>Beschreibung</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for b in bankbuchungen %}
+                                            <tr>
+                                                <td>{{ b.datum }}</td>
+                                                <td class="text-end">{{ "%.2f"|format(b.betrag) }}€</td>
+                                                <td>{{ b.typ }}</td>
+                                                <td>{{ b.beschreibung }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
                 </table>
             </div>
         </div>

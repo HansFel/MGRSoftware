@@ -171,22 +171,30 @@ class MaschinenDB:
                      anmerkungen: str = None,
                      bemerkungen: str = None,
                      abrechnungsart: str = 'stunden',
-                     preis_pro_einheit: float = 0.0) -> int:
+                     preis_pro_einheit: float = 0.0,
+                     erfassungsmodus: str = 'fortlaufend',
+                     gemeinschaft_id: int = None,
+                     anschaffungspreis: float = 0.0,
+                     abschreibungsdauer_jahre: int = 10) -> int:
         """Neue Maschine hinzufügen"""
         # naechste_wartung hat Vorrang vor naechste_wartung_bei (Kompatibilität)
         wartung = naechste_wartung if naechste_wartung is not None else naechste_wartung_bei
         
         sql = """INSERT INTO maschinen (bezeichnung, hersteller, modell, baujahr,
-                                        kennzeichen, anschaffungsdatum, 
-                                        stundenzaehler_aktuell, wartungsintervall,
-                                        naechste_wartung_bei, bemerkungen,
-                                        abrechnungsart, preis_pro_einheit)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                        kennzeichen, anschaffungsdatum, 
+                        stundenzaehler_aktuell, wartungsintervall,
+                        naechste_wartung_bei, bemerkungen,
+                        abrechnungsart, preis_pro_einheit,
+                        erfassungsmodus, gemeinschaft_id,
+                        anschaffungspreis, abschreibungsdauer_jahre)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
         self.cursor.execute(sql, (bezeichnung, hersteller, modell, baujahr,
-                                  kennzeichen, anschaffungsdatum,
-                                  stundenzaehler_aktuell, wartungsintervall,
-                                  wartung, anmerkungen or bemerkungen,
-                                  abrechnungsart, preis_pro_einheit))
+                      kennzeichen, anschaffungsdatum,
+                      stundenzaehler_aktuell, wartungsintervall,
+                      wartung, anmerkungen or bemerkungen,
+                      abrechnungsart, preis_pro_einheit,
+                      erfassungsmodus, gemeinschaft_id,
+                      anschaffungspreis, abschreibungsdauer_jahre))
         self.connection.commit()
         return self.cursor.lastrowid
     

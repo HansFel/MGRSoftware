@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Zahlung verbuchen - {{ mitglied.vorname }} {{ mitglied.name }} - Admin{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-cash"></i> Zahlung verbuchen
+                </h4>
+                <p class="text-muted mb-0">
+                    {{ gemeinschaft.name }} - {{ mitglied.vorname }} {{ mitglied.name }}
+                </p>
+            </div>
+            <div class="card-body">
+                <!-- Kontostand -->
+                <div class="alert alert-{{ 'danger' if saldo < 0 else 'success' if saldo > 0 else 'secondary' }}">
+                    <h5>Aktueller Kontostand</h5>
+                    <h3>{{ "%.2f"|format(saldo) }} €</h3>
+                    {% if saldo < 0 %}
+                    <small>Mitglied hat Schulden</small>
+                    {% elif saldo > 0 %}
+                    <small>Mitglied hat Guthaben</small>
+                    {% else %}
+                    <small>Konto ausgeglichen</small>
+                    {% endif %}
+                </div>
+
+                <!-- Offene Abrechnungen -->
+                {% if offene_abrechnungen %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Offene Abrechnungen</h6>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Zeitraum</th>
+                                    <th class="text-end">Betrag</th>
+                                    <th>Erstellt am</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for abr in offene_abrechnungen %}
+                                <tr>
+                                    <td>{{ abr.zeitraum_von }} bis {{ abr.zeitraum_bis }}</td>
+                                    <td class="text-end"><strong>{{ "%.2f"|format(abr.betrag_gesamt) }} €</strong></td>
+                                    <td>{{ abr.erstellt_am[:10] }}</td>
+                                </tr>
+                                {% endfor %}
+                                <tr class="table-warning">
+                                    <td><strong>Summe offen:</strong></td>
+                                    <td class="text-end">
+                                        <strong>
+                                            {{ "%.2f"|format(offene_abrechnungen|sum(attribute='betrag_gesamt')) }} €
+                                        </strong>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle"></i> Keine offenen Abrechnungen
+                </div>
+                {% endif %}
+
+                <!-- Zahlungsformular -->
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="betrag" class="form-label">Eingezahlter Betrag *</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="betrag" name="betrag" 
+                                   step="0.01" min="0" 
+                                   {% if offene_abrechnungen %}
+                                   value="{{ "%.2f"|format(offene_abrechnungen|sum(attribute='betrag_gesamt')) }}"
+                                   {% endif %}
+                                   required>
+                            <span class="input-group-text">€</span>
+                        </div>
+                        <div class="form-text">
+                            Tipp: Vorausgefüllt mit Summe der offenen Abrechnungen
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="datum" class="form-label">Zahlungsdatum *</label>
+                        <input type="date" class="form-control" id="datum" name="datum" 
+                               value="{{ heute }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="beschreibung" class="form-label">Beschreibung</label>
+                        <input type="text" class="form-control" id="beschreibung" name="beschreibung" 
+                               value="Zahlung von {{ mitglied.vorname }} {{ mitglied.name }}"
+                               placeholder="Optionale Notiz zur Zahlung">
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Hinweis:</strong> Die Zahlung wird als Einzahlung verbucht und reduziert die Schulden bzw. erhöht das Guthaben. 
+                        Offene Abrechnungen werden automatisch als "bezahlt" markiert, wenn genug Guthaben vorhanden ist.
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('admin_konten', gemeinschaft_id=gemeinschaft.id) }}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Abbrechen
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle"></i> Zahlung verbuchen
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

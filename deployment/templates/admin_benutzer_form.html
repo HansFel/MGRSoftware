@@ -73,6 +73,20 @@
                             </div>
                         </div>
 
+                        {% if not (benutzer and benutzer.is_admin) and not (request.form.get('is_admin')) %}
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="gemeinschaft_id" class="form-label">Gemeinschaft</label>
+                                <select class="form-select" id="gemeinschaft_id" name="gemeinschaft_id">
+                                    {% for g in gemeinschaften %}
+                                    <option value="{{ g.id }}" {% if benutzer and benutzer.gemeinschaft_id == g.id %}selected{% endif %}>{{ g.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">Nur normale Mitglieder können einer Gemeinschaft zugeordnet werden.</small>
+                            </div>
+                        </div>
+                        {% endif %}
+
                         <hr>
 
                         <div class="d-flex justify-content-between">

@@ -1,19 +1,17 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('c:\\Users\\HTFel\\OneDrive\\Gemeinschaften\\Traktor\\MGRSoftware\\templates', 'templates'), ('c:\\Users\\HTFel\\OneDrive\\Gemeinschaften\\Traktor\\MGRSoftware\\static', 'static'), ('c:\\Users\\HTFel\\OneDrive\\Gemeinschaften\\Traktor\\MGRSoftware\\schema.sql', '.')]
+datas = [('templates', 'templates'), ('static', 'static'), ('schema.sql', '.'), ('web_app.py', '.'), ('database.py', '.')]
 binaries = []
-hiddenimports = ['flask', 'sqlite3', 'werkzeug', 'jinja2', 'email_validator']
+hiddenimports = ['flask', 'werkzeug', 'jinja2', 'sqlite3']
 tmp_ret = collect_all('flask')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('werkzeug')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('jinja2')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
-    ['c:\\Users\\HTFel\\OneDrive\\Gemeinschaften\\Traktor\\MGRSoftware\\launcher.py'],
+    ['launcher.py'],
     pathex=[],
     binaries=binaries,
     datas=datas,

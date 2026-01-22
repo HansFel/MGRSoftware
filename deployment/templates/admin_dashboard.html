@@ -12,7 +12,7 @@
 </div>
 
 <!-- Backup-Warnung -->
-{% if session.admin_level >= 2 and offene_bestaetigung %}
+{% if offene_bestaetigung %}
 <div class="row mb-4">
     <div class="col-12">
         <div class="alert alert-info alert-dismissible fade show" role="alert">
@@ -22,7 +22,7 @@
             {% if offene_bestaetigung.ist_eigene %}
             <p class="mb-2">
                 Sie haben eine Backup-Durchführung bestätigt.<br>
-                <strong>Warten auf Bestätigung eines zweiten Haupt-Administrators.</strong>
+                <strong>Warten auf Bestätigung eines zweiten Administrators.</strong>
             </p>
             <p class="mb-0">
                 <small class="text-muted">
@@ -83,24 +83,15 @@
                     Bitte erstellen Sie ein Backup der Datenbank <code>maschinengemeinschaft.db</code> und bestätigen Sie die Durchführung.
                 </small>
             </p>
-            {% if session.admin_level >= 2 %}
             <p class="mb-2">
                 <small class="text-warning">
-                    <i class="bi bi-shield-lock"></i> 
-                    <strong>Zwei-Personen-Regel:</strong> Ein zweiter Haupt-Administrator muss die Sicherung ebenfalls bestätigen.
+                    <i class="bi bi-people-fill"></i> 
+                    <strong>Zwei-Personen-Regel:</strong> Ein zweiter Administrator muss die Sicherung ebenfalls bestätigen.
                 </small>
             </p>
             <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#backupModal">
                 <i class="bi bi-check-circle"></i> Backup durchgeführt - bestätigen
             </button>
-            {% else %}
-            <p class="mb-2">
-                <small class="text-muted">
-                    <i class="bi bi-info-circle"></i> 
-                    Nur Haupt-Administratoren können Backups bestätigen.
-                </small>
-            </p>
-            {% endif %}
         </div>
     </div>
 </div>

@@ -1,48 +1,24 @@
 ﻿"""
-Flask-Webanwendung fÃ¼r Maschinengemeinschaft
-ErmÃ¶glicht Benutzern den Zugriff von extern (z.B. Mobiltelefon)
+Flask-Webanwendung für Maschinengemeinschaft
+Ermöglicht Benutzern den Zugriff von extern (z.B. Mobiltelefon)
 """
 
+import os
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify, make_response
 from database import MaschinenDBContext
 from datetime import datetime
-import os
-import json
-import csv
 from io import StringIO, BytesIO
 from functools import wraps
-import zipfile
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))  # FÃ¼r Session-Management
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))  # Für Session-Management
 
-# Übungsmodus: Datenbank-Pfad aus Umgebungsvariable oder Standard-Pfad
-DB_PATH = os.environ.get('DB_PATH')
-if DB_PATH:
-    # Launcher-Modus: Verwende gewählte Datenbank
-    DATABASE = DB_PATH
-else:
-    # Server-Modus: Prüfe mehrere mögliche Pfade
-    possible_paths = [
-        os.path.join(os.path.dirname(__file__), 'maschinengemeinschaft.db'),  # Hauptverzeichnis
-        os.path.join(os.path.dirname(__file__), 'data', 'maschinengemeinschaft.db'),  # data-Ordner
-    ]
-    DATABASE = None
-    for path in possible_paths:
-        if os.path.exists(path):
-            DATABASE = path
-            break
-    
-    # Falls keine existiert, verwende Hauptverzeichnis als Standard
-    if DATABASE is None:
-        DATABASE = possible_paths[0]
-    
-# Für Kompatibilität mit bestehendem Code
-DB_PATH = DATABASE
+# Datenbank-Pfad aus Umgebungsvariable oder Standard-Pfad
+DB_PATH = os.environ.get('DB_PATH', './data/maschinengemeinschaft.db')
 
 
 def login_required(f):
-    """Decorator fÃ¼r geschÃ¼tzte Routen"""
+    """Decorator für geschützte Routen"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'benutzer_id' not in session:
@@ -173,10 +149,22 @@ def login():
                 else:
                     session['gemeinschafts_admin_ids'] = []
                 
+                # Lade Gemeinschaften des Benutzers für das Menü
+                cursor = db.connection.cursor()
+                cursor.execute("""
+                    SELECT g.id, g.name
+                    FROM gemeinschaften g
+                    JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
+                    WHERE mg.mitglied_id = ? AND g.aktiv = 1
+                    ORDER BY g.name
+                """, (benutzer['id'],))
+                gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
+                session['gemeinschaften'] = gemeinschaften
+                
                 flash(f"Willkommen, {benutzer['vorname']}!", 'success')
                 return redirect(url_for('dashboard'))
             else:
-                flash('UngÃ¼ltiger Benutzername oder Passwort.', 'danger')
+                flash('Ungültiger Benutzername oder Passwort.', 'danger')
     
     return render_template('login.html')
 
@@ -192,7 +180,7 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    """Dashboard - Ãœbersicht fÃ¼r den Benutzer"""
+    """Dashboard - Übersicht für den Benutzer"""
     # Archiviere abgelaufene Reservierungen
     archiviere_abgelaufene_reservierungen()
     
@@ -207,7 +195,7 @@ def dashboard():
         maschinenkosten = statistik.get('gesamt_maschinenkosten', 0) or 0
         statistik['gesamtkosten'] = treibstoffkosten + maschinenkosten
         
-        # Letzte EinsÃ¤tze
+        # Letzte Einsätze
         einsaetze = db.get_einsaetze_by_benutzer(benutzer_id)
         letzte_einsaetze = einsaetze[:10] if einsaetze else []
         
@@ -236,7 +224,7 @@ def dashboard():
         schulden_nach_gemeinschaft = []
         for row in cursor.fetchall():
             d = dict(zip(columns, row))
-            d['bezeichnung'] = d['name']  # Mapping fÃ¼r Template
+            d['bezeichnung'] = d['name']  # Mapping für Template
             d['gesamtkosten'] = d['maschinenkosten'] or 0
             schulden_nach_gemeinschaft.append(d)
         
@@ -254,7 +242,7 @@ def dashboard():
         columns = [desc[0] for desc in cursor.description]
         reservierungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
         
-        # Ungelesene Nachrichten zÃ¤hlen
+        # Ungelesene Nachrichten zählen
         cursor.execute("""
             SELECT COUNT(*) FROM gemeinschafts_nachrichten n
             JOIN mitglied_gemeinschaft mg ON n.gemeinschaft_id = mg.gemeinschaft_id
@@ -299,7 +287,7 @@ def neuer_einsatz():
             kosten = request.form.get('treibstoffkosten')
             flaeche_menge = request.form.get('flaeche_menge')
             
-            # Hole Maschine fÃ¼r Erfassungsmodus
+            # Hole Maschine für Erfassungsmodus
             with MaschinenDBContext(DB_PATH) as db:
                 maschine = db.get_maschine_by_id(maschine_id)
                 erfassungsmodus = maschine.get('erfassungsmodus', 'fortlaufend')
@@ -311,7 +299,7 @@ def neuer_einsatz():
                         flash('Bitte geben Sie einen Wert ein!', 'danger')
                         return redirect(url_for('neuer_einsatz'))
                     
-                    # Verwende aktuellen StundenzÃ¤hler als Anfang, berechne Ende
+                    # Verwende aktuellen Stundenzähler als Anfang, berechne Ende
                     aktueller_stand = maschine.get('stundenzaehler_aktuell', 0) or 0
                     anfangstand = aktueller_stand
                     
@@ -320,7 +308,7 @@ def neuer_einsatz():
                     if maschine.get('abrechnungsart') == 'stunden':
                         endstand = anfangstand + direkt_wert
                     else:
-                        # Bei Hektar/km/StÃ¼ck: Stunden â‰ˆ Wert (vereinfacht)
+                        # Bei Hektar/km/Stück: Stunden ≈ Wert (vereinfacht)
                         endstand = anfangstand + direkt_wert
                         if not flaeche_menge:
                             flaeche_menge = str(direkt_wert)
@@ -330,7 +318,7 @@ def neuer_einsatz():
                     endstand = float(request.form.get('endstand'))
                     
                     if endstand < anfangstand:
-                        flash('Endstand muss grÃ¶ÃŸer oder gleich Anfangstand sein!', 'danger')
+                        flash('Endstand muss größer oder gleich Anfangstand sein!', 'danger')
                         return redirect(url_for('neuer_einsatz'))
                 
                 db.add_einsatz(
@@ -346,7 +334,7 @@ def neuer_einsatz():
                     flaeche_menge=float(flaeche_menge) if flaeche_menge else None
                 )
                 
-                # Speichere letzten Treibstoffpreis fÃ¼r Vorschlag
+                # Speichere letzten Treibstoffpreis für Vorschlag
                 if kosten:
                     cursor = db.connection.cursor()
                     cursor.execute("""
@@ -382,7 +370,7 @@ def neuer_einsatz():
         columns = [desc[0] for desc in cursor.description]
         maschinen = [dict(zip(columns, row)) for row in cursor.fetchall()]
         
-        # PrÃ¼fe aktuelle Reservierungen fÃ¼r heute
+        # Prüfe aktuelle Reservierungen für heute
         heute_datum = datetime.now().strftime('%Y-%m-%d')
         
         for maschine in maschinen:
@@ -411,7 +399,7 @@ def neuer_einsatz():
         benutzer = db.get_benutzer(session['benutzer_id'])
         treibstoffkosten_preis = benutzer.get('treibstoffkosten_preis', 1.50)
         
-        # Hole letzten Treibstoffpreis des Benutzers fÃ¼r Vorschlag
+        # Hole letzten Treibstoffpreis des Benutzers für Vorschlag
         cursor.execute("""
             SELECT letzter_treibstoffpreis FROM benutzer WHERE id = ?
         """, (session['benutzer_id'],))
@@ -429,15 +417,48 @@ def neuer_einsatz():
 @app.route('/meine-einsaetze')
 @login_required
 def meine_einsaetze():
-    """Liste aller eigenen EinsÃ¤tze"""
+    """Liste aller eigenen Einsätze"""
     with MaschinenDBContext(DB_PATH) as db:
         einsaetze = db.get_einsaetze_by_benutzer(session['benutzer_id'])
-        
+        # None-Werte für Summenfelder durch 0 ersetzen
+        for e in einsaetze:
+            for key in ['anfangstand', 'endstand', 'flaeche_menge', 'betriebsstunden', 'treibstoffverbrauch', 'treibstoffkosten', 'kosten_berechnet']:
+                if e.get(key) is None:
+                    e[key] = 0
+            # Einheit bestimmen
+            abrechnungsart = e.get('abrechnungsart', 'stunden')
+            preis = e.get('preis_pro_einheit', 0)
+            if abrechnungsart == 'hektar':
+                einheit = 'ha'
+            elif abrechnungsart == 'kilometer':
+                einheit = 'km'
+            elif abrechnungsart == 'stueck':
+                einheit = 'St'
+            else:
+                einheit = 'h'
+            # Menge berechnen
+            if e.get('erfassungsmodus', 'fortlaufend') == 'fortlaufend':
+                menge = e['endstand'] - e['anfangstand']
+            else:
+                menge = e.get('flaeche_menge', 0)
+            # Maschinenkosten berechnen
+            maschinenkosten = menge * preis
+            # Formatierung
+            if einheit == 'ha':
+                menge_str = f"{menge:.2f} ha"
+            elif einheit == 'km':
+                menge_str = f"{menge:.1f} km"
+            elif einheit == 'St':
+                menge_str = f"{menge:.0f} St"
+            else:
+                menge_str = f"{menge:.1f} h"
+            e['menge_berechnet'] = menge_str
+            e['einheit'] = einheit
+            e['maschinenkosten_berechnet'] = maschinenkosten
         # Summen berechnen
-        summe_treibstoff = sum(e.get('treibstoffkosten', 0) or 0 for e in einsaetze)
-        summe_maschine = sum(e.get('kosten_berechnet', 0) or 0 for e in einsaetze)
+        summe_treibstoff = sum(e.get('treibstoffkosten', 0) for e in einsaetze)
+        summe_maschine = sum(e.get('maschinenkosten_berechnet', 0) for e in einsaetze)
         summe_gesamt = summe_treibstoff + summe_maschine
-    
     return render_template('meine_einsaetze.html', 
                          einsaetze=einsaetze,
                          summe_treibstoff=summe_treibstoff,
@@ -469,7 +490,7 @@ def einsatz_stornieren(einsatz_id):
             flash('Einsatz nicht gefunden.', 'danger')
             return redirect(url_for('meine_einsaetze'))
         
-        # BerechtigungsprÃ¼fung: Nur eigener Einsatz oder Admin
+        # Berechtigungsprüfung: Nur eigener Einsatz oder Admin
         if einsatz['benutzer_id'] != session['benutzer_id'] and not session.get('is_admin'):
             flash('Keine Berechtigung zum Stornieren dieses Einsatzes.', 'danger')
             return redirect(url_for('meine_einsaetze'))
@@ -495,7 +516,7 @@ def einsatz_stornieren(einsatz_id):
                   stornierungsgrund, 
                   einsatz_id))
             
-            # Original lÃ¶schen
+            # Original löschen
             cursor.execute("DELETE FROM maschineneinsaetze WHERE id = ?", (einsatz_id,))
             db.connection.commit()
             
@@ -506,14 +527,14 @@ def einsatz_stornieren(einsatz_id):
             else:
                 return redirect(url_for('meine_einsaetze'))
         
-        # GET - BestÃ¤tigungsformular anzeigen
+        # GET - Bestätigungsformular anzeigen
         return render_template('einsatz_stornieren.html', einsatz=einsatz)
 
 
 @app.route('/meine-stornierten-einsaetze')
 @login_required
 def meine_stornierten_einsaetze():
-    """Liste aller eigenen stornierten EinsÃ¤tze"""
+    """Liste aller eigenen stornierten Einsätze"""
     with MaschinenDBContext(DB_PATH) as db:
         cursor = db.connection.cursor()
         
@@ -559,7 +580,7 @@ def maschine_reservieren(maschine_id):
             zweck = request.form.get('zweck')
             bemerkung = request.form.get('bemerkung')
             
-            # PrÃ¼fen ob Zeitraum verfÃ¼gbar ist
+            # Prüfen ob Zeitraum verfügbar ist
             cursor.execute("""
                 SELECT COUNT(*) FROM maschinen_reservierungen
                 WHERE maschine_id = ? 
@@ -573,7 +594,7 @@ def maschine_reservieren(maschine_id):
             """, (maschine_id, datum, uhrzeit_von, uhrzeit_von, uhrzeit_bis, uhrzeit_bis, uhrzeit_von, uhrzeit_bis))
             
             if cursor.fetchone()[0] > 0:
-                flash('Der gewÃ¤hlte Zeitraum Ã¼berschneidet sich mit einer bestehenden Reservierung!', 'danger')
+                flash('Der gewählte Zeitraum überschneidet sich mit einer bestehenden Reservierung!', 'danger')
                 return redirect(url_for('maschine_reservieren', maschine_id=maschine_id))
             
             # Reservierung erstellen
@@ -584,13 +605,13 @@ def maschine_reservieren(maschine_id):
             """, (maschine_id, session['benutzer_id'], datum, uhrzeit_von, uhrzeit_bis, nutzungsdauer, zweck, bemerkung))
             
             db.connection.commit()
-            flash(f'Maschine "{maschine["bezeichnung"]}" wurde erfolgreich fÃ¼r {datum} reserviert!', 'success')
+            flash(f'Maschine "{maschine["bezeichnung"]}" wurde erfolgreich für {datum} reserviert!', 'success')
             return redirect(url_for('dashboard'))
         
         # GET: Zeige Formular
         einsatzzwecke = db.get_all_einsatzzwecke()
         
-        # Hole aktuelle und zukÃ¼nftige Reservierungen
+        # Hole aktuelle und zukünftige Reservierungen
         cursor.execute("""
             SELECT r.*, b.name || ' ' || COALESCE(b.vorname, '') as benutzer_name
             FROM maschinen_reservierungen r
@@ -604,7 +625,7 @@ def maschine_reservieren(maschine_id):
         columns = [desc[0] for desc in cursor.description]
         reservierungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
         
-        # Meine Reservierungen fÃ¼r diese Maschine
+        # Meine Reservierungen für diese Maschine
         cursor.execute("""
             SELECT * FROM maschinen_reservierungen
             WHERE maschine_id = ? 
@@ -742,7 +763,7 @@ def reservierungen_balken():
 @app.route('/meine-reservierungen')
 @login_required
 def meine_reservierungen():
-    """Ãœbersicht aller eigenen Reservierungen"""
+    """Übersicht aller eigenen Reservierungen"""
     from datetime import datetime
     
     with MaschinenDBContext(DB_PATH) as db:
@@ -874,7 +895,7 @@ def abgelaufene_reservierungen():
 @app.route('/api/maschine/<int:maschine_id>/stundenzaehler')
 @login_required
 def get_stundenzaehler(maschine_id):
-    """API: Aktuellen StundenzÃ¤hlerstand abrufen"""
+    """API: Aktuellen Stundenzählerstand abrufen"""
     with MaschinenDBContext(DB_PATH) as db:
         maschine = db.get_maschine_by_id(maschine_id)
         if maschine:
@@ -885,7 +906,7 @@ def get_stundenzaehler(maschine_id):
 @app.route('/meine-einsaetze/csv')
 @login_required
 def meine_einsaetze_csv():
-    """Exportiere eigene EinsÃ¤tze als CSV"""
+    """Exportiere eigene Einsätze als CSV"""
     with MaschinenDBContext(DB_PATH) as db:
         einsaetze = db.get_einsaetze_by_benutzer(session['benutzer_id'])
     
@@ -921,7 +942,7 @@ def meine_einsaetze_csv():
             e.get('anmerkungen', '')
         ])
     
-    # BytesIO fÃ¼r send_file
+    # BytesIO für send_file
     csv_bytes = BytesIO(csv_buffer.getvalue().encode('utf-8-sig'))
     csv_bytes.seek(0)
     
@@ -937,7 +958,7 @@ def meine_einsaetze_csv():
 @app.route('/api/maschine/<int:maschine_id>')
 @login_required
 def api_maschine_details(maschine_id):
-    """API-Endpunkt fÃ¼r Maschinen-Details (fÃ¼r AJAX)"""
+    """API-Endpunkt für Maschinen-Details (fÃ¼r AJAX)"""
     with MaschinenDBContext(DB_PATH) as db:
         maschine = db.get_maschine(maschine_id)
     
@@ -974,7 +995,7 @@ def nachrichten():
         columns = [desc[0] for desc in cursor.description]
         nachrichten_list = [dict(zip(columns, row)) for row in cursor.fetchall()]
         
-        # ZÃ¤hle ungelesene Nachrichten
+        # Zähle ungelesene Nachrichten
         ungelesen = sum(1 for n in nachrichten_list if not n['gelesen'])
     
     return render_template('nachrichten.html', 
@@ -1114,9 +1135,171 @@ def admin_backup_bestaetigen():
             
             db.connection.commit()
             
-            flash('Ihre BestÃ¤tigung wurde gespeichert. Ein zweiter Haupt-Administrator muss die Sicherung innerhalb von 24 Stunden bestÃ¤tigen.', 'info')
+            flash('Ihre Bestätigung wurde gespeichert. Ein zweiter Haupt-Administrator muss die Sicherung innerhalb von 24 Stunden bestätigen.', 'info')
     
     return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/meine-abrechnungen')
+@login_required
+def meine_abrechnungen():
+    """Zeigt alle Abrechnungen des angemeldeten Mitglieds"""
+    benutzer_id = session.get('benutzer_id')
+    
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Hole alle Abrechnungen für diesen Benutzer
+        cursor.execute("""
+            SELECT 
+                ma.id,
+                ma.zeitraum_von,
+                ma.zeitraum_bis,
+                ma.betrag_maschinen,
+                ma.betrag_treibstoff,
+                ma.status,
+                ma.erstellt_am,
+                ma.bezahlt_am,
+                g.name as gemeinschaft_name,
+                g.id as gemeinschaft_id
+            FROM mitglieder_abrechnungen ma
+            JOIN gemeinschaften g ON ma.gemeinschaft_id = g.id
+            WHERE ma.benutzer_id = ?
+            ORDER BY ma.erstellt_am DESC
+        """, (benutzer_id,))
+        
+        abrechnungen = []
+        for row in cursor.fetchall():
+            abrechnungen.append({
+                'id': row[0],
+                'zeitraum_von': row[1],
+                'zeitraum_bis': row[2],
+                'betrag_maschinen': row[3],
+                'betrag_treibstoff': row[4],
+                'betrag_gesamt': row[3] + row[4],
+                'status': row[5],
+                'erstellt_am': row[6],
+                'bezahlt_am': row[7],
+                'gemeinschaft_name': row[8],
+                'gemeinschaft_id': row[9]
+            })
+        
+        # Berechne Statistiken
+        summe_offen = sum(a['betrag_gesamt'] for a in abrechnungen if a['status'] == 'offen')
+        summe_bezahlt = sum(a['betrag_gesamt'] for a in abrechnungen if a['status'] == 'bezahlt')
+        anzahl_offen = sum(1 for a in abrechnungen if a['status'] == 'offen')
+        
+        return render_template('meine_abrechnungen.html',
+                             abrechnungen=abrechnungen,
+                             summe_offen=summe_offen,
+                             summe_bezahlt=summe_bezahlt,
+                             anzahl_offen=anzahl_offen)
+
+
+@app.route('/abrechnung/<int:abrechnung_id>/pdf')
+@login_required
+def abrechnung_pdf(abrechnung_id):
+    """Generiert PDF für eine Abrechnung"""
+    benutzer_id = session.get('benutzer_id')
+    
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Prüfe ob Abrechnung dem Benutzer gehört
+        cursor.execute("""
+            SELECT 
+                ma.id,
+                ma.zeitraum_von,
+                ma.zeitraum_bis,
+                ma.betrag_maschinen,
+                ma.betrag_treibstoff,
+                ma.status,
+                ma.erstellt_am,
+                g.name as gemeinschaft_name,
+                g.bank_name,
+                g.bank_iban,
+                g.bank_bic,
+                g.bank_kontoinhaber,
+                b.name,
+                b.vorname,
+                b.email
+            FROM mitglieder_abrechnungen ma
+            JOIN gemeinschaften g ON ma.gemeinschaft_id = g.id
+            JOIN benutzer b ON ma.benutzer_id = b.id
+            WHERE ma.id = ? AND ma.benutzer_id = ?
+        """, (abrechnung_id, benutzer_id))
+        
+        row = cursor.fetchone()
+        if not row:
+            flash('Abrechnung nicht gefunden!', 'danger')
+            return redirect(url_for('meine_abrechnungen'))
+        
+        abrechnung = {
+            'id': row[0],
+            'zeitraum_von': row[1],
+            'zeitraum_bis': row[2],
+            'betrag_maschinen': row[3],
+            'betrag_treibstoff': row[4],
+            'betrag_gesamt': row[3] + row[4],
+            'status': row[5],
+            'erstellt_am': row[6],
+            'gemeinschaft_name': row[7],
+            'bank_name': row[8],
+            'bank_iban': row[9],
+            'bank_bic': row[10],
+            'bank_kontoinhaber': row[11],
+            'mitglied_name': f"{row[13]} {row[12]}",
+            'mitglied_email': row[14]
+        }
+        
+        # Hole Maschineneinsätze für diese Abrechnung (NUR Maschinen der Gemeinschaft!)
+        # Hole zuerst die gemeinschaft_id aus der Abrechnung
+        cursor.execute("SELECT gemeinschaft_id FROM mitglieder_abrechnungen WHERE id = ?", (abrechnung_id,))
+        abrechnung_gemeinschaft_id = cursor.fetchone()[0]
+        
+        cursor.execute("""
+            SELECT 
+                m.bezeichnung,
+                me.datum,
+                me.endstand - me.anfangstand as betriebsstunden,
+                m.preis_pro_einheit,
+                me.kosten_berechnet,
+                me.treibstoffverbrauch,
+                me.treibstoffkosten,
+                m.treibstoff_berechnen
+            FROM maschineneinsaetze me
+            JOIN maschinen m ON me.maschine_id = m.id
+            WHERE me.benutzer_id = ? 
+            AND me.datum >= ? 
+            AND me.datum <= ?
+            AND m.gemeinschaft_id = ?
+            ORDER BY me.datum
+        """, (benutzer_id, abrechnung['zeitraum_von'], abrechnung['zeitraum_bis'], abrechnung_gemeinschaft_id))
+        
+        einsaetze = []
+        for row in cursor.fetchall():
+            treibstoff_berechnen = row[7]
+            einsaetze.append({
+                'maschine': row[0],
+                'datum': row[1],
+                'betriebsstunden': row[2] if row[2] else 0,
+                'preis_pro_stunde': row[3] if row[3] else 0,
+                'betrag_maschine': row[4] if row[4] else 0,
+                'treibstoff_liter': row[5] if treibstoff_berechnen and row[5] else 0,
+                'treibstoffkosten': row[6] if treibstoff_berechnen and row[6] else 0,
+                'treibstoff_berechnen': treibstoff_berechnen
+            })
+        
+        # Einfaches HTML-PDF (ohne externe Library)
+        html = render_template('abrechnung_pdf.html',
+                             abrechnung=abrechnung,
+                             einsaetze=einsaetze)
+        
+        response = make_response(html)
+        response.headers['Content-Type'] = 'text/html'
+        response.headers['Content-Disposition'] = f'inline; filename=Abrechnung_{abrechnung_id}.html'
+        
+        return response
 
 
 @app.route('/passwort-aendern', methods=['GET', 'POST'])
@@ -1199,7 +1382,7 @@ def passwort_aendern():
 def admin_dashboard():
     """Admin-Dashboard"""
     with MaschinenDBContext(DB_PATH) as db:
-        # Alle EinsÃ¤tze
+        # Alle Einsätze
         alle_einsaetze = db.get_all_einsaetze(limit=50)
         
         # Statistiken
@@ -1217,7 +1400,7 @@ def admin_dashboard():
         """)
         gesamt_stats = dict(cursor.fetchone())
         
-        # Backup-Status prÃ¼fen
+        # Backup-Status prüfen
         backup_warnung = False
         einsaetze_seit_backup = 0
         letztes_backup = None
@@ -1284,7 +1467,7 @@ def admin_dashboard():
 @app.route('/admin/alle-einsaetze')
 @admin_required
 def admin_alle_einsaetze():
-    """Alle EinsÃ¤tze aller Benutzer"""
+    """Alle Einsätze aller Benutzer"""
     with MaschinenDBContext(DB_PATH) as db:
         einsaetze = db.get_all_einsaetze()
     
@@ -1294,7 +1477,7 @@ def admin_alle_einsaetze():
 @app.route('/admin/stornierte-einsaetze')
 @admin_required
 def admin_stornierte_einsaetze():
-    """Alle stornierten EinsÃ¤tze"""
+    """Alle stornierten Einsätze"""
     with MaschinenDBContext(DB_PATH) as db:
         cursor = db.connection.cursor()
         
@@ -1414,11 +1597,10 @@ def admin_maschinen_rentabilitaet(maschine_id):
     
     with MaschinenDBContext(DB_PATH) as db:
         cursor = db.cursor
-        
         # Maschine laden
         maschine = db.get_maschine_by_id(maschine_id)
-        
-        # GesamteinsÃ¤tze und Einnahmen
+
+        # Gesamteinsätze und Einnahmen
         cursor.execute("""
             SELECT 
                 COUNT(e.id) as anzahl_einsaetze,
@@ -1433,36 +1615,84 @@ def admin_maschinen_rentabilitaet(maschine_id):
             JOIN maschinen m ON e.maschine_id = m.id
             WHERE m.id = ?
         """, (maschine_id,))
-        
         row = cursor.fetchone()
         anzahl_einsaetze = row[0] or 0
         betriebsstunden = row[1] or 0
         einnahmen = row[2] or 0
-        
+
         # Abschreibung berechnen
         anschaffungspreis = maschine.get('anschaffungspreis', 0) or 0
         abschreibungsdauer = maschine.get('abschreibungsdauer_jahre', 10) or 10
         anschaffungsdatum = maschine.get('anschaffungsdatum')
-        
         abschreibung_pro_jahr = anschaffungspreis / abschreibungsdauer if abschreibungsdauer > 0 else 0
-        
-        # Alter berechnen
+        alter_jahre_float = 0
         alter_jahre = 0
+        alter_error = None
         if anschaffungsdatum:
             try:
                 datum = datetime.strptime(anschaffungsdatum, '%Y-%m-%d')
-                alter_jahre = (datetime.now() - datum).days / 365.25
-            except:
+                tage = (datetime.now() - datum).days
+                alter_jahre_float = tage / 365.25
+                alter_jahre = max(0, int(tage // 365))
+            except Exception as e:
+                alter_error = f"Ungültiges Anschaffungsdatum: {anschaffungsdatum} ({str(e)})"
+                alter_jahre_float = 0
                 alter_jahre = 0
-        
-        abschreibung_bisher = min(abschreibung_pro_jahr * alter_jahre, anschaffungspreis)
+        elif anschaffungsdatum is None or anschaffungsdatum == '':
+            alter_error = "Kein Anschaffungsdatum hinterlegt"
+        abschreibung_bisher = min(abschreibung_pro_jahr * alter_jahre_float, anschaffungspreis)
         restwert = max(anschaffungspreis - abschreibung_bisher, 0)
-        
-        # RentabilitÃ¤t
-        deckungsbeitrag = einnahmen - abschreibung_bisher
-        rentabilitaet_prozent = (deckungsbeitrag / anschaffungspreis * 100) if anschaffungspreis > 0 else 0
-        
-        # EinsÃ¤tze pro Jahr
+
+        # Für Template: Fehlertext und beide Alterswerte bereitstellen
+        aufwendungen_gesamt = 0  # Vorinitialisierung, damit Variable immer existiert
+        rentabilitaet = {
+            'anschaffungspreis': anschaffungspreis,
+            'abschreibungsdauer': abschreibungsdauer,
+            'abschreibung_pro_jahr': abschreibung_pro_jahr,
+            'alter_jahre': alter_jahre,
+            'alter_jahre_float': alter_jahre_float,
+            'alter_error': alter_error,
+            'abschreibung_bisher': abschreibung_bisher,
+            'restwert': restwert,
+            'anzahl_einsaetze': anzahl_einsaetze,
+            'betriebsstunden': betriebsstunden,
+            'einnahmen_gesamt': einnahmen,
+            'aufwendungen_gesamt': aufwendungen_gesamt,
+            'bankkosten_gesamt': 0,  # wird später gesetzt
+            'deckungsbeitrag': 0,   # wird später gesetzt,
+        }
+
+        # Aufwendungen laden (alle Jahre)
+        cursor.execute("""
+            SELECT 
+                jahr,
+                wartungskosten,
+                reparaturkosten,
+                versicherung,
+                steuern,
+                sonstige_kosten
+            FROM maschinen_aufwendungen
+            WHERE maschine_id = ?
+            ORDER BY jahr
+        """, (maschine_id,))
+        columns = [desc[0] for desc in cursor.description]
+        alle_aufwendungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        aufwendungen_gesamt = sum(
+            a['wartungskosten'] + a['reparaturkosten'] + a['versicherung'] + 
+            a['steuern'] + a['sonstige_kosten']
+            for a in alle_aufwendungen
+        )
+
+        # Bankgebuchte Kosten (Buchungen mit referenz_typ='maschine')
+        cursor.execute("""
+            SELECT datum, betrag, beschreibung, typ FROM buchungen
+            WHERE referenz_typ = 'maschine' AND referenz_id = ?
+            ORDER BY datum
+        """, (maschine_id,))
+        bankbuchungen = [dict(zip([desc[0] for desc in cursor.description], row)) for row in cursor.fetchall()]
+        bankkosten_gesamt = sum(b['betrag'] for b in bankbuchungen)
+
+        # Einsätze pro Jahr
         cursor.execute("""
             SELECT 
                 strftime('%Y', e.datum) as jahr,
@@ -1480,35 +1710,9 @@ def admin_maschinen_rentabilitaet(maschine_id):
             GROUP BY jahr
             ORDER BY jahr DESC
         """, (maschine_id,))
-        
         columns = [desc[0] for desc in cursor.description]
         einsaetze_pro_jahr = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        
-        # Aufwendungen laden (alle Jahre)
-        cursor.execute("""
-            SELECT 
-                jahr,
-                wartungskosten,
-                reparaturkosten,
-                versicherung,
-                steuern,
-                sonstige_kosten
-            FROM maschinen_aufwendungen
-            WHERE maschine_id = ?
-            ORDER BY jahr
-        """, (maschine_id,))
-        
-        columns = [desc[0] for desc in cursor.description]
-        alle_aufwendungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        
-        # Gesamtaufwendungen berechnen
-        aufwendungen_gesamt = sum(
-            a['wartungskosten'] + a['reparaturkosten'] + a['versicherung'] + 
-            a['steuern'] + a['sonstige_kosten']
-            for a in alle_aufwendungen
-        )
-        
-        # Aufwendungen zu einsaetze_pro_jahr hinzufÃ¼gen
+        # Aufwendungen zu einsaetze_pro_jahr hinzufuegen
         aufwendungen_dict = {str(a['jahr']): a for a in alle_aufwendungen}
         for einsatz in einsaetze_pro_jahr:
             jahr = einsatz['jahr']
@@ -1521,16 +1725,20 @@ def admin_maschinen_rentabilitaet(maschine_id):
             else:
                 einsatz['aufwendungen'] = 0
             einsatz['gewinn'] = einsatz['einnahmen'] - einsatz['aufwendungen']
-        
-        # RentabilitÃ¤t neu berechnen (Einnahmen - Abschreibung - Aufwendungen)
-        deckungsbeitrag = einnahmen - abschreibung_bisher - aufwendungen_gesamt
+
+        # Gesamtkosten: Aufwendungen + Bankbuchungen
+        gesamtkosten = aufwendungen_gesamt + bankkosten_gesamt
+        # Rentabilität neu berechnen (Einnahmen - Abschreibung - Gesamtkosten)
+        deckungsbeitrag = einnahmen - abschreibung_bisher - gesamtkosten
         rentabilitaet_prozent = (deckungsbeitrag / anschaffungspreis * 100) if anschaffungspreis > 0 else 0
-        
+
         rentabilitaet = {
             'anzahl_einsaetze': anzahl_einsaetze,
             'betriebsstunden': betriebsstunden,
             'einnahmen_gesamt': einnahmen,
             'aufwendungen_gesamt': aufwendungen_gesamt,
+            'bankkosten_gesamt': bankkosten_gesamt,
+            'gesamtkosten': gesamtkosten,
             'anschaffungspreis': anschaffungspreis,
             'abschreibungsdauer': abschreibungsdauer,
             'abschreibung_pro_jahr': abschreibung_pro_jahr,
@@ -1540,11 +1748,12 @@ def admin_maschinen_rentabilitaet(maschine_id):
             'deckungsbeitrag': deckungsbeitrag,
             'rentabilitaet_prozent': rentabilitaet_prozent
         }
-    
+
     return render_template('admin_maschinen_rentabilitaet.html', 
                          maschine=maschine,
                          rentabilitaet=rentabilitaet,
-                         einsaetze_pro_jahr=einsaetze_pro_jahr)
+                         einsaetze_pro_jahr=einsaetze_pro_jahr,
+                         bankbuchungen=bankbuchungen)
 
 
 @app.route('/admin/maschinen/<int:maschine_id>/rentabilitaet/pdf')
@@ -1560,6 +1769,7 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
+    import os
     
     with MaschinenDBContext(DB_PATH) as db:
         cursor = db.cursor
@@ -1592,13 +1802,21 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
         anschaffungsdatum = maschine.get('anschaffungsdatum')
         abschreibung_pro_jahr = anschaffungspreis / abschreibungsdauer if abschreibungsdauer > 0 else 0
         
+        alter_jahre_float = 0
         alter_jahre = 0
+        alter_error = None
         if anschaffungsdatum:
             try:
                 datum = datetime.strptime(anschaffungsdatum, '%Y-%m-%d')
-                alter_jahre = (datetime.now() - datum).days / 365.25
-            except:
+                tage = (datetime.now() - datum).days
+                alter_jahre_float = tage / 365.25
+                alter_jahre = max(0, int(tage // 365))
+            except Exception as e:
+                alter_error = f"Ungültiges Anschaffungsdatum: {anschaffungsdatum} ({str(e)})"
+                alter_jahre_float = 0
                 alter_jahre = 0
+        elif anschaffungsdatum is None or anschaffungsdatum == '':
+            alter_error = "Kein Anschaffungsdatum hinterlegt"
         
         abschreibung_bisher = min(abschreibung_pro_jahr * alter_jahre, anschaffungspreis)
         restwert = max(anschaffungspreis - abschreibung_bisher, 0)
@@ -1618,7 +1836,7 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
             a['steuern'] + a['sonstige_kosten'] for a in alle_aufwendungen
         )
         
-        # EinsÃ¤tze pro Jahr
+        # Einsätze pro Jahr
         cursor.execute("""
             SELECT 
                 strftime('%Y', e.datum) as jahr,
@@ -1640,7 +1858,7 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
         columns = [desc[0] for desc in cursor.description]
         einsaetze_pro_jahr = [dict(zip(columns, row)) for row in cursor.fetchall()]
         
-        # Aufwendungen zu JahresÃ¼bersicht hinzufÃ¼gen
+        # Aufwendungen zu Jahresübersicht hinzufügen
         aufwendungen_dict = {str(a['jahr']): a for a in alle_aufwendungen}
         for einsatz in einsaetze_pro_jahr:
             jahr = einsatz['jahr']
@@ -1656,16 +1874,27 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
         rentabilitaet_prozent = (deckungsbeitrag / anschaffungspreis * 100) if anschaffungspreis > 0 else 0
     
     # PDF erstellen
+    # DejaVu Sans einbinden (für Umlaute)
+    font_path = os.path.join(os.path.dirname(__file__), 'static', 'fonts', 'DejaVuSans.ttf')
+    if os.path.exists(font_path):
+        pdfmetrics.registerFont(TTFont('DejaVuSans', font_path))
+        default_font = 'DejaVuSans'
+    else:
+        default_font = 'Helvetica'
+
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=2*cm, rightMargin=2*cm,
                            topMargin=2*cm, bottomMargin=2*cm)
     
     elements = []
     styles = getSampleStyleSheet()
-    
+    # Standard-Schriftart auf DejaVu Sans setzen
+    for style in styles.byName.values():
+        style.fontName = default_font
+
     # Titel
-    title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=30)
-    elements.append(Paragraph(f"RentabilitÃ¤tsbericht: {maschine['bezeichnung']}", title_style))
+    title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=30, fontName=default_font)
+    elements.append(Paragraph(f"Rentabilitätsbericht: {maschine['bezeichnung']}", title_style))
     elements.append(Paragraph(f"Erstellt am: {datetime.now().strftime('%d.%m.%Y %H:%M')}", styles['Normal']))
     elements.append(Spacer(1, 0.5*cm))
     
@@ -1676,10 +1905,10 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
         ['Baujahr:', str(maschine.get('baujahr', '-'))],
         ['Kennzeichen:', maschine.get('kennzeichen', '-')],
     ]
-    
+
     maschinen_table = Table(maschinen_data, colWidths=[5*cm, 12*cm])
     maschinen_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (0, 0), (0, -1), default_font),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
     ]))
@@ -1689,17 +1918,17 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
     # Kennzahlen
     elements.append(Paragraph("Kennzahlen", styles['Heading2']))
     kennzahlen_data = [
-        ['Anschaffungspreis:', f"{anschaffungspreis:.2f} â‚¬"],
-        ['Restwert (aktuell):', f"{restwert:.2f} â‚¬"],
-        ['Einnahmen gesamt:', f"{einnahmen:.2f} â‚¬"],
-        ['Aufwendungen gesamt:', f"{aufwendungen_gesamt:.2f} â‚¬"],
-        ['Deckungsbeitrag:', f"{deckungsbeitrag:.2f} â‚¬"],
-        ['RentabilitÃ¤t:', f"{rentabilitaet_prozent:.1f} %"],
+        ['Anschaffungspreis:', f"{anschaffungspreis:.2f} €"],
+        ['Restwert (aktuell):', f"{restwert:.2f} €"],
+        ['Einnahmen gesamt:', f"{einnahmen:.2f} €"],
+        ['Aufwendungen gesamt:', f"{aufwendungen_gesamt:.2f} €"],
+        ['Deckungsbeitrag:', f"{deckungsbeitrag:.2f} €"],
+        ['Rentabilität:', f"{rentabilitaet_prozent:.1f} %"],
     ]
-    
+
     kennzahlen_table = Table(kennzahlen_data, colWidths=[10*cm, 7*cm])
     kennzahlen_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (0, 0), (0, -1), default_font),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
         ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
@@ -1713,14 +1942,14 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
     elements.append(Paragraph("Abschreibung", styles['Heading2']))
     abschreibung_data = [
         ['Abschreibungsdauer:', f"{abschreibungsdauer} Jahre"],
-        ['Abschreibung pro Jahr:', f"{abschreibung_pro_jahr:.2f} â‚¬"],
-        ['Alter der Maschine:', f"{alter_jahre:.1f} Jahre"],
-        ['Abschreibung bisher:', f"{abschreibung_bisher:.2f} â‚¬"],
+        ['Abschreibung (Jahr):', f"{abschreibung_pro_jahr:.2f} € pro Jahr"],
+        ['Alter der Maschine:', f"{alter_jahre} Jahre (%.1f Jahre exakt)" % alter_jahre_float if not alter_error else alter_error],
+        ['Abschreibung bisher (Info):', f"{abschreibung_bisher:.2f} €"],
     ]
-    
+
     abschreibung_table = Table(abschreibung_data, colWidths=[10*cm, 7*cm])
     abschreibung_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (0, 0), (0, -1), default_font),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
         ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
@@ -1728,25 +1957,25 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
     elements.append(abschreibung_table)
     elements.append(Spacer(1, 0.5*cm))
     
-    # JahresÃ¼bersicht
+    # Jahresübersicht
     if einsaetze_pro_jahr:
-        elements.append(Paragraph("EinsÃ¤tze pro Jahr", styles['Heading2']))
-        jahr_data = [['Jahr', 'EinsÃ¤tze', 'Stunden', 'Einnahmen', 'Aufwend.', 'Gewinn']]
+        elements.append(Paragraph("Einsätze pro Jahr", styles['Heading2']))
+        jahr_data = [['Jahr', 'Einsätze', 'Stunden', 'Einnahmen', 'Aufwend.', 'Gewinn']]
         for e in einsaetze_pro_jahr:
             jahr_data.append([
                 e['jahr'],
                 str(e['anzahl']),
                 f"{e['stunden']:.1f}",
-                f"{e['einnahmen']:.2f} â‚¬",
-                f"{e['aufwendungen']:.2f} â‚¬",
-                f"{e['gewinn']:.2f} â‚¬",
+                f"{e['einnahmen']:.2f} €",
+                f"{e['aufwendungen']:.2f} €",
+                f"{e['gewinn']:.2f} €",
             ])
-        
+
         jahr_table = Table(jahr_data, colWidths=[2*cm, 2*cm, 2.5*cm, 3.5*cm, 3.5*cm, 3.5*cm])
         jahr_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, 0), default_font),
             ('FONTSIZE', (0, 0), (-1, -1), 9),
             ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
@@ -1859,7 +2088,7 @@ def admin_maschinen_neu():
     """Neue Maschine anlegen"""
     with MaschinenDBContext(DB_PATH) as db:
         if request.method == 'POST':
-            db.add_maschine(
+            maschine_id = db.add_maschine(
                 bezeichnung=request.form['bezeichnung'],
                 hersteller=request.form.get('hersteller'),
                 modell=request.form.get('modell'),
@@ -1877,6 +2106,16 @@ def admin_maschinen_neu():
                 abschreibungsdauer_jahre=int(request.form.get('abschreibungsdauer_jahre', 10)),
                 anschaffungsdatum=request.form.get('anschaffungsdatum') if request.form.get('anschaffungsdatum') else None
             )
+            
+            # Treibstoff-Berechnungseinstellung setzen
+            cursor = db.connection.cursor()
+            treibstoff_berechnen = 1 if request.form.get('treibstoff_berechnen') else 0
+            cursor.execute("""
+                UPDATE maschinen 
+                SET treibstoff_berechnen = ?
+                WHERE id = ?
+            """, (treibstoff_berechnen, maschine_id))
+            
             flash('Maschine erfolgreich angelegt!', 'success')
             return redirect(url_for('admin_maschinen'))
         
@@ -1913,13 +2152,28 @@ def admin_maschinen_edit(maschine_id):
                 'anschaffungsdatum': request.form.get('anschaffungsdatum') if request.form.get('anschaffungsdatum') else None
             }
             db.update_maschine(maschine_id, **update_data)
+            
+            # Treibstoff-Berechnungseinstellung separat aktualisieren
+            cursor = db.connection.cursor()
+            treibstoff_berechnen = 1 if request.form.get('treibstoff_berechnen') else 0
+            cursor.execute("""
+                UPDATE maschinen 
+                SET treibstoff_berechnen = ?
+                WHERE id = ?
+            """, (treibstoff_berechnen, maschine_id))
+            
             flash('Maschine erfolgreich aktualisiert!', 'success')
             return redirect(url_for('admin_maschinen'))
         
         maschine = db.get_maschine_by_id(maschine_id)
         
+        # Hole treibstoff_berechnen Wert
+        cursor = db.connection.cursor()
+        cursor.execute("SELECT treibstoff_berechnen FROM maschinen WHERE id = ?", (maschine_id,))
+        result = cursor.fetchone()
+        maschine['treibstoff_berechnen'] = result[0] if result else 0
+        
         # Hole Gemeinschaften fÃ¼r Dropdown
-        cursor = db.cursor
         cursor.execute("SELECT id, name FROM gemeinschaften WHERE aktiv = 1 ORDER BY name")
         gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
         
@@ -2044,12 +2298,22 @@ def admin_gemeinschaften_edit(gemeinschaft_id):
         if request.method == 'POST':
             cursor.execute("""
                 UPDATE gemeinschaften 
-                SET name = ?, beschreibung = ?, aktiv = ?
+                SET name = ?, 
+                    beschreibung = ?, 
+                    aktiv = ?,
+                    bank_name = ?,
+                    bank_iban = ?,
+                    bank_bic = ?,
+                    bank_kontoinhaber = ?
                 WHERE id = ?
             """, (
                 request.form['name'],
                 request.form.get('beschreibung'),
                 1 if request.form.get('aktiv') else 0,
+                request.form.get('bank_name'),
+                request.form.get('bank_iban'),
+                request.form.get('bank_bic'),
+                request.form.get('bank_kontoinhaber'),
                 gemeinschaft_id
             ))
             db.connection.commit()
@@ -2061,6 +2325,434 @@ def admin_gemeinschaften_edit(gemeinschaft_id):
         gemeinschaft = dict(zip(columns, cursor.fetchone()))
     
     return render_template('admin_gemeinschaften_form.html', gemeinschaft=gemeinschaft)
+
+
+@app.route('/admin/gemeinschaften/<int:gemeinschaft_id>/konten')
+@admin_required
+def admin_konten(gemeinschaft_id):
+    """Mitgliederkonten-Übersicht"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Gemeinschaft laden
+        cursor.execute("SELECT * FROM gemeinschaften WHERE id = ?", (gemeinschaft_id,))
+        columns = [desc[0] for desc in cursor.description]
+        gemeinschaft = dict(zip(columns, cursor.fetchone()))
+        
+        # Konten mit Details
+        cursor.execute("""
+            SELECT 
+                mk.benutzer_id,
+                b.vorname || ' ' || b.name as mitglied_name,
+                b.email,
+                mk.saldo,
+                (SELECT COUNT(*) FROM mitglieder_abrechnungen 
+                 WHERE benutzer_id = mk.benutzer_id 
+                 AND gemeinschaft_id = mk.gemeinschaft_id 
+                 AND status = 'offen') as offene_abrechnungen,
+                (SELECT COUNT(*) FROM buchungen 
+                 WHERE benutzer_id = mk.benutzer_id 
+                 AND gemeinschaft_id = mk.gemeinschaft_id) as anzahl_buchungen,
+                (SELECT MAX(datum) FROM buchungen 
+                 WHERE benutzer_id = mk.benutzer_id 
+                 AND gemeinschaft_id = mk.gemeinschaft_id) as letzte_buchung
+            FROM mitglieder_konten mk
+            JOIN benutzer b ON mk.benutzer_id = b.id
+            WHERE mk.gemeinschaft_id = ?
+            ORDER BY mk.saldo ASC
+        """, (gemeinschaft_id,))
+        
+        columns = [desc[0] for desc in cursor.description]
+        konten = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        
+        # Statistiken
+        cursor.execute("""
+            SELECT 
+                SUM(CASE WHEN saldo > 0 THEN saldo ELSE 0 END) as guthaben,
+                SUM(CASE WHEN saldo < 0 THEN saldo ELSE 0 END) as schulden,
+                SUM(saldo) as saldo_gesamt,
+                COUNT(CASE WHEN saldo > 0.01 THEN 1 END) as anzahl_guthaben,
+                COUNT(CASE WHEN saldo < -0.01 THEN 1 END) as anzahl_schulden,
+                COUNT(CASE WHEN saldo >= -0.01 AND saldo <= 0.01 THEN 1 END) as anzahl_ausgeglichen
+            FROM mitglieder_konten
+            WHERE gemeinschaft_id = ?
+        """, (gemeinschaft_id,))
+        
+        stat_row = cursor.fetchone()
+        statistik = {
+            'guthaben': stat_row[0] or 0,
+            'schulden': stat_row[1] or 0,
+            'saldo_gesamt': stat_row[2] or 0,
+            'anzahl_guthaben': stat_row[3] or 0,
+            'anzahl_schulden': stat_row[4] or 0,
+            'anzahl_ausgeglichen': stat_row[5] or 0
+        }
+        
+        # Letzte 20 Buchungen
+        cursor.execute("""
+            SELECT 
+                bu.datum,
+                b.vorname || ' ' || b.name as mitglied_name,
+                bu.typ,
+                bu.beschreibung,
+                bu.betrag,
+                erstellt.vorname || ' ' || erstellt.name as erstellt_von
+            FROM buchungen bu
+            JOIN benutzer b ON bu.benutzer_id = b.id
+            JOIN benutzer erstellt ON bu.erstellt_von = erstellt.id
+            WHERE bu.gemeinschaft_id = ?
+            ORDER BY bu.erstellt_am DESC
+            LIMIT 20
+        """, (gemeinschaft_id,))
+        
+        columns = [desc[0] for desc in cursor.description]
+        letzte_buchungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    
+    return render_template('admin_konten.html', 
+                         gemeinschaft=gemeinschaft,
+                         konten=konten,
+                         statistik=statistik,
+                         letzte_buchungen=letzte_buchungen)
+
+
+@app.route('/admin/gemeinschaften/<int:gemeinschaft_id>/konten/buchung-neu', methods=['GET', 'POST'])
+@admin_required
+def admin_konten_buchung_neu(gemeinschaft_id):
+    """Neue manuelle Buchung erstellen"""
+    benutzer_id = session.get('benutzer_id')
+    
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Gemeinschaft laden
+        cursor.execute("SELECT * FROM gemeinschaften WHERE id = ?", (gemeinschaft_id,))
+        columns = [desc[0] for desc in cursor.description]
+        gemeinschaft = dict(zip(columns, cursor.fetchone()))
+        
+        if request.method == 'POST':
+            mitglied_id = request.form['benutzer_id']
+            typ = request.form['typ']
+            betrag_input = float(request.form['betrag'])
+            datum = request.form['datum']
+            beschreibung = request.form['beschreibung']
+            
+            # Betrag je nach Typ anpassen
+            if typ == 'einzahlung':
+                betrag = betrag_input  # Positiv = Guthaben für Mitglied
+            elif typ == 'auszahlung':
+                betrag = -betrag_input  # Negativ = Schulden für Mitglied
+            elif typ == 'korrektur':
+                # Bei Korrektur kann Admin entscheiden (hier positiv wie eingegeben)
+                betrag = betrag_input
+            else:
+                flash('Ungültiger Buchungstyp!', 'danger')
+                return redirect(url_for('admin_konten_buchung_neu', gemeinschaft_id=gemeinschaft_id))
+            
+            # Buchung erstellen
+            cursor.execute("""
+                INSERT INTO buchungen (
+                    benutzer_id,
+                    gemeinschaft_id,
+                    datum,
+                    betrag,
+                    typ,
+                    beschreibung,
+                    referenz_typ,
+                    erstellt_von
+                ) VALUES (?, ?, ?, ?, ?, ?, 'manually', ?)
+            """, (mitglied_id, gemeinschaft_id, datum, betrag, typ, beschreibung, benutzer_id))
+            
+            # Konto aktualisieren
+            cursor.execute("""
+                INSERT INTO mitglieder_konten (benutzer_id, gemeinschaft_id, saldo, saldo_vorjahr)
+                VALUES (?, ?, ?, 0)
+                ON CONFLICT(benutzer_id, gemeinschaft_id) 
+                DO UPDATE SET 
+                    saldo = saldo + ?,
+                    letzte_aktualisierung = CURRENT_TIMESTAMP
+            """, (mitglied_id, gemeinschaft_id, betrag, betrag))
+            
+            db.connection.commit()
+            
+            flash(f'Buchung erfolgreich erstellt: {betrag:,.2f} €', 'success')
+            return redirect(url_for('admin_konten', gemeinschaft_id=gemeinschaft_id))
+        
+        # GET: Mitglieder mit aktuellen Salden laden
+        cursor.execute("""
+            SELECT 
+                b.id,
+                b.vorname || ' ' || b.name as name,
+                COALESCE(mk.saldo, 0) as saldo
+            FROM benutzer b
+            JOIN mitglied_gemeinschaft mg ON b.id = mg.mitglied_id
+            LEFT JOIN mitglieder_konten mk ON b.id = mk.benutzer_id 
+                AND mk.gemeinschaft_id = mg.gemeinschaft_id
+            WHERE mg.gemeinschaft_id = ?
+            ORDER BY b.name
+        """, (gemeinschaft_id,))
+        
+        columns = [desc[0] for desc in cursor.description]
+        mitglieder = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        
+        from datetime import datetime
+        heute = datetime.now().strftime('%Y-%m-%d')
+    
+    return render_template('admin_konten_buchung_neu.html',
+                         gemeinschaft=gemeinschaft,
+                         mitglieder=mitglieder,
+                         heute=heute)
+
+
+@app.route('/admin/gemeinschaften/<int:gemeinschaft_id>/konten/zahlung/<int:benutzer_id>', methods=['GET', 'POST'])
+@admin_required
+def admin_konten_zahlung(gemeinschaft_id, benutzer_id):
+    """Zahlung für offene Abrechnungen verbuchen"""
+    admin_id = session.get('benutzer_id')
+    
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Gemeinschaft laden
+        cursor.execute("SELECT * FROM gemeinschaften WHERE id = ?", (gemeinschaft_id,))
+        columns = [desc[0] for desc in cursor.description]
+        gemeinschaft = dict(zip(columns, cursor.fetchone()))
+        
+        cursor.execute("SELECT * FROM benutzer WHERE id = ?", (benutzer_id,))
+        columns = [desc[0] for desc in cursor.description]
+        mitglied = dict(zip(columns, cursor.fetchone()))
+        
+        if request.method == 'POST':
+            betrag = float(request.form['betrag'])
+            datum = request.form['datum']
+            beschreibung = request.form.get('beschreibung', f'Zahlung von {mitglied["vorname"]} {mitglied["name"]}')
+            
+            # Einzahlungsbuchung
+            cursor.execute("""
+                INSERT INTO buchungen (
+                    benutzer_id,
+                    gemeinschaft_id,
+                    datum,
+                    betrag,
+                    typ,
+                    beschreibung,
+                    referenz_typ,
+                    erstellt_von
+                ) VALUES (?, ?, ?, ?, 'einzahlung', ?, 'zahlung', ?)
+            """, (benutzer_id, gemeinschaft_id, datum, betrag, beschreibung, admin_id))
+            
+            # Konto aktualisieren
+            cursor.execute("""
+                INSERT INTO mitglieder_konten (benutzer_id, gemeinschaft_id, saldo)
+                VALUES (?, ?, ?)
+                ON CONFLICT(benutzer_id, gemeinschaft_id) 
+                DO UPDATE SET 
+                    saldo = saldo + ?,
+                    letzte_aktualisierung = CURRENT_TIMESTAMP
+            """, (benutzer_id, gemeinschaft_id, betrag, betrag))
+            
+            # Prüfe ob damit Abrechnungen beglichen werden können
+            cursor.execute("""
+                SELECT id, betrag_gesamt 
+                FROM mitglieder_abrechnungen
+                WHERE benutzer_id = ? 
+                AND gemeinschaft_id = ?
+                AND status = 'offen'
+                ORDER BY zeitraum_bis
+            """, (benutzer_id, gemeinschaft_id))
+            
+            offene_abrechnungen = cursor.fetchall()
+            verbleibend = betrag
+            
+            for abr_id, abr_betrag in offene_abrechnungen:
+                if verbleibend >= abr_betrag:
+                    # Abrechnung vollständig bezahlt
+                    cursor.execute("""
+                        UPDATE mitglieder_abrechnungen
+                        SET status = 'bezahlt'
+                        WHERE id = ?
+                    """, (abr_id,))
+                    verbleibend -= abr_betrag
+                else:
+                    break  # Nicht genug für diese Abrechnung
+            
+            db.connection.commit()
+            
+            flash(f'Zahlung von {betrag:,.2f} € erfolgreich verbucht!', 'success')
+            return redirect(url_for('admin_konten', gemeinschaft_id=gemeinschaft_id))
+        
+        # GET: Offene Abrechnungen laden
+        cursor.execute("""
+            SELECT 
+                id,
+                zeitraum_von,
+                zeitraum_bis,
+                betrag_gesamt,
+                erstellt_am
+            FROM mitglieder_abrechnungen
+            WHERE benutzer_id = ?
+            AND gemeinschaft_id = ?
+            AND status = 'offen'
+            ORDER BY zeitraum_bis DESC
+        """, (benutzer_id, gemeinschaft_id))
+        
+        columns = [desc[0] for desc in cursor.description]
+        offene_abrechnungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        
+        # Aktueller Saldo
+        cursor.execute("""
+            SELECT COALESCE(saldo, 0)
+            FROM mitglieder_konten
+            WHERE benutzer_id = ? AND gemeinschaft_id = ?
+        """, (benutzer_id, gemeinschaft_id))
+        saldo = cursor.fetchone()[0]
+        
+        from datetime import datetime
+        heute = datetime.now().strftime('%Y-%m-%d')
+    
+    return render_template('admin_konten_zahlung.html',
+                         gemeinschaft=gemeinschaft,
+                         mitglied=mitglied,
+                         offene_abrechnungen=offene_abrechnungen,
+                         saldo=saldo,
+                         heute=heute)
+
+
+@app.route('/admin/gemeinschaften/<int:gemeinschaft_id>/konten/detail/<int:benutzer_id>')
+@admin_required
+def admin_konten_detail(gemeinschaft_id, benutzer_id):
+    """Detaillierter Kontoverlauf eines Mitglieds"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Gemeinschaft und Mitglied laden
+        cursor.execute("SELECT * FROM gemeinschaften WHERE id = ?", (gemeinschaft_id,))
+        columns = [desc[0] for desc in cursor.description]
+        gemeinschaft = dict(zip(columns, cursor.fetchone()))
+        
+        cursor.execute("SELECT * FROM benutzer WHERE id = ?", (benutzer_id,))
+        columns = [desc[0] for desc in cursor.description]
+        mitglied = dict(zip(columns, cursor.fetchone()))
+        
+        # Konto und Saldo
+        cursor.execute("""
+            SELECT saldo, saldo_vorjahr
+            FROM mitglieder_konten
+            WHERE benutzer_id = ? AND gemeinschaft_id = ?
+        """, (benutzer_id, gemeinschaft_id))
+        konto_row = cursor.fetchone()
+        saldo = konto_row[0] if konto_row else 0
+        saldo_vorjahr = konto_row[1] if konto_row else 0
+        
+        # Buchungen
+        cursor.execute("""
+            SELECT 
+                datum,
+                typ,
+                beschreibung,
+                betrag,
+                referenz_typ,
+                referenz_id
+            FROM buchungen
+            WHERE benutzer_id = ? AND gemeinschaft_id = ?
+            ORDER BY datum DESC, erstellt_am DESC
+        """, (benutzer_id, gemeinschaft_id))
+        
+        columns = [desc[0] for desc in cursor.description]
+        alle_bewegungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        
+        # Statistiken
+        cursor.execute("""
+            SELECT COUNT(*) FROM mitglieder_abrechnungen
+            WHERE benutzer_id = ? AND gemeinschaft_id = ? AND status = 'offen'
+        """, (benutzer_id, gemeinschaft_id))
+        offene_abrechnungen_count = cursor.fetchone()[0]
+    
+    return render_template('admin_konten_detail.html',
+                         gemeinschaft=gemeinschaft,
+                         mitglied=mitglied,
+                         saldo=saldo,
+                         saldo_vorjahr=saldo_vorjahr,
+                         buchungen=alle_bewegungen,
+                         offene_abrechnungen_count=offene_abrechnungen_count)
+
+
+@app.route('/mein-konto/<int:gemeinschaft_id>')
+@login_required
+def mein_konto(gemeinschaft_id):
+    """Mein Konto für eine Gemeinschaft"""
+    benutzer_id = session.get('benutzer_id')
+    
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Gemeinschaft laden
+        cursor.execute("SELECT * FROM gemeinschaften WHERE id = ?", (gemeinschaft_id,))
+        columns = [desc[0] for desc in cursor.description]
+        gemeinschaft_row = cursor.fetchone()
+        if not gemeinschaft_row:
+            flash('Gemeinschaft nicht gefunden!', 'danger')
+            return redirect(url_for('dashboard'))
+        gemeinschaft = dict(zip(columns, gemeinschaft_row))
+        
+        # Prüfe ob Mitglied in dieser Gemeinschaft ist
+        cursor.execute("""
+            SELECT 1 FROM mitglied_gemeinschaft
+            WHERE mitglied_id = ? AND gemeinschaft_id = ?
+        """, (benutzer_id, gemeinschaft_id))
+        if not cursor.fetchone():
+            flash('Sie sind kein Mitglied dieser Gemeinschaft!', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        # Konto und Saldo
+        cursor.execute("""
+            SELECT saldo, saldo_vorjahr
+            FROM mitglieder_konten
+            WHERE benutzer_id = ? AND gemeinschaft_id = ?
+        """, (benutzer_id, gemeinschaft_id))
+        konto_row = cursor.fetchone()
+        saldo = konto_row[0] if konto_row else 0
+        saldo_vorjahr = konto_row[1] if konto_row else 0
+        
+        # Buchungen
+        cursor.execute("""
+            SELECT 
+                datum,
+                typ,
+                beschreibung,
+                betrag,
+                referenz_typ,
+                referenz_id
+            FROM buchungen
+            WHERE benutzer_id = ? AND gemeinschaft_id = ?
+            ORDER BY datum DESC, erstellt_am DESC
+        """, (benutzer_id, gemeinschaft_id))
+        
+        columns = [desc[0] for desc in cursor.description]
+        buchungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        
+        # Offene Abrechnungen
+        cursor.execute("""
+            SELECT 
+                id,
+                zeitraum_von,
+                zeitraum_bis,
+                betrag_gesamt,
+                erstellt_am
+            FROM mitglieder_abrechnungen
+            WHERE benutzer_id = ?
+            AND gemeinschaft_id = ?
+            AND status = 'offen'
+            ORDER BY zeitraum_bis DESC
+        """, (benutzer_id, gemeinschaft_id))
+        columns = [desc[0] for desc in cursor.description]
+        offene_abrechnungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    
+    return render_template('mein_konto.html',
+                         gemeinschaft=gemeinschaft,
+                         saldo=saldo,
+                         saldo_vorjahr=saldo_vorjahr,
+                         buchungen=buchungen,
+                         offene_abrechnungen=offene_abrechnungen)
 
 
 @app.route('/admin/gemeinschaften/<int:gemeinschaft_id>/abrechnung')
@@ -2088,7 +2780,7 @@ def admin_gemeinschaften_abrechnung(gemeinschaft_id):
                         WHEN m.abrechnungsart = 'stunden' THEN (e.endstand - e.anfangstand) * COALESCE(m.preis_pro_einheit, 0)
                         ELSE COALESCE(e.flaeche_menge, 0) * COALESCE(m.preis_pro_einheit, 0)
                     END
-                ) as maschinenkosten
+                ) as einnahmen_gesamt
             FROM benutzer b
             JOIN mitglied_gemeinschaft mg ON b.id = mg.mitglied_id
             LEFT JOIN einsaetze e ON b.id = e.benutzer_id
@@ -2158,6 +2850,7 @@ def admin_gemeinschaften_abrechnung_csv(gemeinschaft_id):
         """, (gemeinschaft_id, gemeinschaft_id))
         
         rows = cursor.fetchall()
+        columns = [desc[0] for desc in cursor.description]
     
     # CSV erstellen
     output = io.StringIO()
@@ -2196,9 +2889,9 @@ def admin_gemeinschaften_abrechnung_csv(gemeinschaft_id):
                     f"{gesamt_maschinenkosten:.2f}"])
     
     # Response erstellen
-    response = make_response(output.getvalue())
-    response.headers["Content-Disposition"] = f"attachment; filename=abrechnung_{gemeinschaft['name'].replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.csv"
-    response.headers["Content-type"] = "text/csv; charset=utf-8"
+    response = make_response(output.getvalue().encode('utf-8-sig'))
+    response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+    response.headers['Content-Disposition'] = f'attachment; filename=abrechnung_{gemeinschaft["name"].replace(" ", "_")}_{datetime.now().strftime("%Y%m%d")}.csv'
     
     return response
 
@@ -2344,7 +3037,7 @@ def admin_export_csv():
             writer.writerows(einsatzzwecke)
             zip_file.writestr('einsatzzwecke.csv', csv_buffer.getvalue())
         
-        # EinsÃ¤tze CSV
+        # Einsätze CSV
         if einsaetze:
             csv_buffer = StringIO()
             writer = csv.DictWriter(csv_buffer, fieldnames=einsaetze[0].keys())
@@ -2383,19 +3076,19 @@ def admin_backup_database():
 @app.route('/admin/einsaetze/loeschen', methods=['GET', 'POST'])
 @admin_required
 def admin_einsaetze_loeschen():
-    """EinsÃ¤tze nach Zeitraum lÃ¶schen"""
+    """Einsätze nach Zeitraum löschen"""
     if request.method == 'POST':
         von_datum = request.form.get('von_datum')
         bis_datum = request.form.get('bis_datum')
         bestaetigung = request.form.get('bestaetigung')
         
         if bestaetigung != 'LOESCHEN':
-            flash('BestÃ¤tigung nicht korrekt. Bitte "LOESCHEN" eingeben.', 'danger')
+            flash('Bestätigung nicht korrekt. Bitte "LOESCHEN" eingeben.', 'danger')
             return redirect(url_for('admin_einsaetze_loeschen'))
         
         try:
             with MaschinenDBContext(DB_PATH) as db:
-                # ZÃ¤hle EinsÃ¤tze im Zeitraum
+                # Zähle Einsätze im Zeitraum
                 cursor = db.cursor
                 cursor.execute("""
                     SELECT COUNT(*) FROM maschineneinsaetze 
@@ -2404,27 +3097,27 @@ def admin_einsaetze_loeschen():
                 anzahl = cursor.fetchone()[0]
                 
                 if anzahl == 0:
-                    flash('Keine EinsÃ¤tze im angegebenen Zeitraum gefunden.', 'warning')
+                    flash('Keine Einsätze im angegebenen Zeitraum gefunden.', 'warning')
                     return redirect(url_for('admin_einsaetze_loeschen'))
                 
-                # LÃ¶sche EinsÃ¤tze
+                # Lösche Einsätze
                 cursor.execute("""
                     DELETE FROM maschineneinsaetze 
                     WHERE datum BETWEEN ? AND ?
                 """, (von_datum, bis_datum))
                 db.connection.commit()
                 
-                flash(f'{anzahl} EinsÃ¤tze erfolgreich gelÃ¶scht!', 'success')
+                flash(f'{anzahl} Einsätze erfolgreich gelöscht!', 'success')
                 return redirect(url_for('admin_dashboard'))
                 
         except Exception as e:
-            flash(f'Fehler beim LÃ¶schen: {str(e)}', 'danger')
+            flash(f'Fehler beim Löschen: {str(e)}', 'danger')
             return redirect(url_for('admin_einsaetze_loeschen'))
     
     # GET - Zeige Formular
     with MaschinenDBContext(DB_PATH) as db:
         cursor = db.cursor
-        # Hole Ã¤ltesten und neuesten Einsatz
+        # Hole ältesten und neuesten Einsatz
         cursor.execute("""
             SELECT MIN(datum) as min_datum, MAX(datum) as max_datum, COUNT(*) as anzahl
             FROM maschineneinsaetze
@@ -2533,7 +3226,7 @@ def admin_database_restore():
 @app.route('/admin/export/alle-einsaetze-csv')
 @admin_required
 def admin_export_alle_einsaetze_csv():
-    """Exportiert alle EinsÃ¤tze als CSV fÃ¼r Jahresabschluss"""
+    """Exportiert alle Einsätze als CSV für Jahresabschluss"""
     import io
     from datetime import datetime
     
@@ -2580,7 +3273,7 @@ def admin_export_alle_einsaetze_csv():
         
         # Summenzeile
         writer.writerow([])
-        writer.writerow(['SUMMEN', '', '', '', '', '', '', '', '',
+        writer.writerow(['GESAMT', '', '', '', '', '', '', '', '',
                         sum(r[9] for r in rows),  # Treibstoffkosten
                         sum(r[10] for r in rows),  # Maschinenkosten
                         sum(r[11] for r in rows),  # Gesamtkosten
@@ -2650,7 +3343,7 @@ def admin_rollen_set_level():
         
         # PrÃ¼fe, dass nicht der letzte Haupt-Admin entfernt wird
         if level < 2:
-            cursor.execute("SELECT COUNT(*) FROM benutzer WHERE admin_level = 2 AND aktiv = 1")
+            cursor.execute('SELECT COUNT(*) FROM benutzer WHERE admin_level = 2 AND aktiv = 1')
             anzahl_haupt_admins = cursor.fetchone()[0]
             
             cursor.execute("SELECT admin_level FROM benutzer WHERE id = ?", (benutzer_id,))
@@ -2719,7 +3412,7 @@ def admin_abrechnungen():
             cursor.execute("SELECT id, name FROM gemeinschaften WHERE aktiv = 1")
         else:
             # Gemeinschafts-Admin sieht nur seine Gemeinschaften
-            cursor.execute("""
+            cursor.execute(""" 
                 SELECT g.id, g.name 
                 FROM gemeinschaften g
                 JOIN gemeinschafts_admin ga ON g.id = ga.gemeinschaft_id
@@ -2731,7 +3424,7 @@ def admin_abrechnungen():
         # Statistiken
         statistiken = {}
         for gem in gemeinschaften:
-            cursor.execute("""
+            cursor.execute(""" 
                 SELECT 
                     COUNT(*) as anzahl_offen,
                     COALESCE(SUM(betrag_gesamt), 0) as summe_offen
@@ -2748,6 +3441,305 @@ def admin_abrechnungen():
     return render_template('admin_abrechnungen.html',
                          gemeinschaften=gemeinschaften,
                          statistiken=statistiken)
+
+
+@app.route('/admin/abrechnungen/<int:gemeinschaft_id>/erstellen', methods=['GET', 'POST'])
+@admin_required
+def abrechnungen_erstellen(gemeinschaft_id):
+    """Erstellt Abrechnungen für alle Mitglieder einer Gemeinschaft"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Prüfe Berechtigung
+        if session.get('admin_level', 0) < 2:
+            cursor.execute(""" 
+                SELECT COUNT(*) FROM gemeinschafts_admin
+                WHERE benutzer_id = ? AND gemeinschaft_id = ?
+            """, (session['benutzer_id'], gemeinschaft_id))
+            if cursor.fetchone()[0] == 0:
+                flash('Keine Berechtigung!', 'danger')
+                return redirect(url_for('admin_abrechnungen'))
+        
+        if request.method == 'POST':
+            zeitraum_von = request.form.get('zeitraum_von')
+            zeitraum_bis = request.form.get('zeitraum_bis')
+            
+            if not zeitraum_von or not zeitraum_bis:
+                flash('Bitte beide Datumsfelder ausfüllen!', 'warning')
+                return redirect(request.url)
+            
+            # Erstelle Abrechnungszeitraum-String
+            von_obj = datetime.strptime(zeitraum_von, '%Y-%m-%d')
+            bis_obj = datetime.strptime(zeitraum_bis, '%Y-%m-%d')
+            abrechnungszeitraum = f"{von_obj.strftime('%m/%Y')} - {bis_obj.strftime('%m/%Y')}"
+            
+            # Hole alle Mitglieder der Gemeinschaft
+            cursor.execute(""" 
+                SELECT DISTINCT b.id, b.name, b.vorname
+                FROM benutzer b
+                JOIN mitglied_gemeinschaft mg ON b.id = mg.mitglied_id
+                WHERE mg.gemeinschaft_id = ?
+                ORDER BY b.name
+            """, (gemeinschaft_id,))
+            mitglieder = cursor.fetchall()
+            
+            erstellt = 0
+            uebersprungen = 0
+            
+            for mitglied in mitglieder:
+                benutzer_id = mitglied[0]
+                
+                # Prüfe ob bereits Abrechnung für diesen Zeitraum existiert
+                cursor.execute(""" 
+                    SELECT COUNT(*) FROM mitglieder_abrechnungen
+                    WHERE gemeinschaft_id = ? AND benutzer_id = ?
+                    AND zeitraum_von = ? AND zeitraum_bis = ?
+                """, (gemeinschaft_id, benutzer_id, zeitraum_von, zeitraum_bis))
+                
+                if cursor.fetchone()[0] > 0:
+                    uebersprungen += 1
+                    continue
+                
+                # Berechne Kosten für den Zeitraum (NUR Maschinen dieser Gemeinschaft!)
+                # 1. Maschineneinsätze
+                cursor.execute(""" 
+                    SELECT COALESCE(SUM(me.kosten_berechnet), 0)
+                    FROM maschineneinsaetze me
+                    JOIN maschinen m ON me.maschine_id = m.id
+                    WHERE me.benutzer_id = ? 
+                    AND me.datum BETWEEN ? AND ?
+                    AND m.gemeinschaft_id = ?
+                """, (benutzer_id, zeitraum_von, zeitraum_bis, gemeinschaft_id))
+                betrag_maschinen = cursor.fetchone()[0]
+                
+                # 2. Treibstoffkosten (nur für Maschinen mit treibstoff_berechnen = 1 UND dieser Gemeinschaft)
+                cursor.execute(""" 
+                    SELECT COALESCE(SUM(me.treibstoffkosten), 0)
+                    FROM maschineneinsaetze me
+                    JOIN maschinen m ON me.maschine_id = m.id
+                    WHERE me.benutzer_id = ? 
+                    AND me.datum BETWEEN ? AND ?
+                    AND m.treibstoff_berechnen = 1
+                    AND m.gemeinschaft_id = ?
+                """, (benutzer_id, zeitraum_von, zeitraum_bis, gemeinschaft_id))
+                betrag_treibstoff = cursor.fetchone()[0]
+                
+                betrag_gesamt = betrag_maschinen + betrag_treibstoff
+                
+                # Nur erstellen wenn Betrag > 0
+                if betrag_gesamt > 0:
+                    cursor.execute(""" 
+                        INSERT INTO mitglieder_abrechnungen
+                        (gemeinschaft_id, benutzer_id, abrechnungszeitraum,
+                         zeitraum_von, zeitraum_bis, betrag_gesamt,
+                         betrag_treibstoff, betrag_maschinen, betrag_sonstiges,
+                         status, erstellt_von)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'offen', ?)
+                    """, (gemeinschaft_id, benutzer_id, abrechnungszeitraum,
+                          zeitraum_von, zeitraum_bis, betrag_gesamt,
+                          betrag_treibstoff, betrag_maschinen, session['benutzer_id']))
+                    
+                    abrechnung_id = cursor.lastrowid
+                    
+                    # Erstelle Buchung für diese Abrechnung
+                    cursor.execute(""" 
+                        INSERT INTO buchungen (
+                            benutzer_id,
+                            gemeinschaft_id,
+                            datum,
+                            betrag,
+                            typ,
+                            beschreibung,
+                            referenz_typ,
+                            referenz_id,
+                            erstellt_von
+                        ) VALUES (?, ?, ?, ?, 'abrechnung', ?, 'abrechnung', ?, ?)
+                    """, (
+                        benutzer_id,
+                        gemeinschaft_id,
+                        zeitraum_bis,  # Buchungsdatum = Ende des Abrechnungszeitraums
+                        -betrag_gesamt,  # Negativ = Mitglied schuldet der Gemeinschaft
+                        f'Abrechnung #{abrechnung_id} für {abrechnungszeitraum}',
+                        abrechnung_id,
+                        session['benutzer_id']
+                    ))
+                    
+                    # Aktualisiere Mitgliederkonto
+                    cursor.execute(""" 
+                        INSERT INTO mitglieder_konten (benutzer_id, gemeinschaft_id, saldo, saldo_vorjahr)
+                        VALUES (?, ?, ?, 0)
+                        ON CONFLICT(benutzer_id, gemeinschaft_id) 
+                        DO UPDATE SET 
+                            saldo = saldo + ?,
+                            letzte_aktualisierung = CURRENT_TIMESTAMP
+                    """, (benutzer_id, gemeinschaft_id, -betrag_gesamt, -betrag_gesamt))
+                    
+                    erstellt += 1
+            
+            db.connection.commit()
+            
+            # Detaillierte Rückmeldung
+            if erstellt > 0:
+                flash(f'✅ {erstellt} Abrechnung(en) erfolgreich erstellt', 'success')
+            if uebersprungen > 0:
+                flash(f'ℹ️ {uebersprungen} Abrechnung(en) bereits vorhanden (übersprungen)', 'info')
+            if erstellt == 0 and uebersprungen == 0:
+                flash(f'⚠️ Keine Maschineneinsätze im Zeitraum {zeitraum_von} bis {zeitraum_bis} gefunden. '
+                      f'Bitte wählen Sie einen anderen Zeitraum.', 'warning')
+            
+            # Leite weiter zur Liste, auch wenn nichts erstellt wurde (damit User sieht was existiert)
+            return redirect(url_for('abrechnungen_liste', gemeinschaft_id=gemeinschaft_id))
+        
+        # GET - Formular anzeigen
+        cursor.execute("SELECT name FROM gemeinschaften WHERE id = ?", (gemeinschaft_id,))
+        gemeinschaft_name = cursor.fetchone()[0]
+        
+        # Vorschlag für Zeitraum: Aktueller Monat (nicht letzter Monat!)
+        # Da wir mitten im Monat sind, ist es wahrscheinlicher dass User aktuelle Einsätze abrechnen will
+        heute = datetime.now()
+        jahr = heute.year
+        aktueller_monat = heute.month
+        
+        vorschlag_von = f"{jahr}-{aktueller_monat:02d}-01"
+        
+        # Letzter Tag des aktuellen Monats
+        if aktueller_monat in [1, 3, 5, 7, 8, 10, 12]:
+            letzter_tag = 31
+        elif aktueller_monat in [4, 6, 9, 11]:
+            letzter_tag = 30
+        else:  # Februar
+            if jahr % 4 == 0 and (jahr % 100 != 0 or jahr % 400 == 0):
+                letzter_tag = 29
+            else:
+                letzter_tag = 28
+        
+        vorschlag_bis = f"{jahr}-{aktueller_monat:02d}-{letzter_tag}"
+        
+        # Hole Statistik über vorhandene Einsätze
+        cursor.execute("""
+            SELECT 
+                MIN(datum) as erster_einsatz,
+                MAX(datum) as letzter_einsatz,
+                COUNT(*) as anzahl_einsaetze
+            FROM maschineneinsaetze me
+            JOIN mitglied_gemeinschaft mg ON me.benutzer_id = mg.mitglied_id
+            WHERE mg.gemeinschaft_id = ?
+        """, (gemeinschaft_id,))
+        stats = cursor.fetchone()
+        einsatz_info = {
+            'erster': stats[0],
+            'letzter': stats[1],
+            'anzahl': stats[2]
+        }
+    
+    return render_template('abrechnungen_erstellen.html',
+                         gemeinschaft_id=gemeinschaft_id,
+                         gemeinschaft_name=gemeinschaft_name,
+                         vorschlag_von=vorschlag_von,
+                         vorschlag_bis=vorschlag_bis,
+                         einsatz_info=einsatz_info)
+
+
+@app.route('/admin/abrechnungen/<int:gemeinschaft_id>/liste')
+@admin_required
+def abrechnungen_liste(gemeinschaft_id):
+    """Liste aller Abrechnungen einer Gemeinschaft"""
+    with MaschinenDBContext(DB_PATH) as db:
+        cursor = db.connection.cursor()
+        
+        # Prüfe Berechtigung
+        if session.get('admin_level', 0) < 2:
+            cursor.execute("""
+                SELECT COUNT(*) FROM gemeinschafts_admin
+                WHERE benutzer_id = ? AND gemeinschaft_id = ?
+            """, (session['benutzer_id'], gemeinschaft_id))
+            if cursor.fetchone()[0] == 0:
+                flash('Keine Berechtigung!', 'danger')
+                return redirect(url_for('admin_abrechnungen'))
+        
+        # Abrechnungen laden mit Zahlungsinformationen
+        cursor.execute("""
+            SELECT 
+                ma.id, 
+                ma.zeitraum_von,
+                ma.zeitraum_bis,
+                ma.betrag_maschinen,
+                ma.betrag_treibstoff,
+                ma.betrag_gesamt,
+                ma.status,
+                ma.erstellt_am,
+                ma.bezahlt_am,
+                ma.benutzer_id,
+                b.name,
+                b.vorname,
+                b.email
+            FROM mitglieder_abrechnungen ma
+            JOIN benutzer b ON ma.benutzer_id = b.id
+            WHERE ma.gemeinschaft_id = ?
+            ORDER BY ma.erstellt_am DESC
+        """, (gemeinschaft_id,))
+        
+        abrechnungen = []
+        summe_maschinen = 0
+        summe_treibstoff = 0
+        
+        for row in cursor.fetchall():
+            betrag_maschinen = row[3] or 0
+            betrag_treibstoff = row[4] or 0
+            benutzer_id = row[9]
+            
+            # Hole Zahlungen für diese Abrechnung
+            cursor.execute("""
+                SELECT 
+                    datum,
+                    betrag,
+                    beschreibung,
+                    typ
+                FROM buchungen
+                WHERE benutzer_id = ?
+                AND gemeinschaft_id = ?
+                AND typ = 'einzahlung'
+                AND datum >= ?
+                ORDER BY datum DESC
+                LIMIT 5
+            """, (benutzer_id, gemeinschaft_id, row[1]))  # ab zeitraum_von
+            
+            zahlungen = []
+            for z in cursor.fetchall():
+                zahlungen.append({
+                    'datum': z[0],
+                    'betrag': z[1],
+                    'beschreibung': z[2],
+                    'typ': z[3]
+                })
+            
+            abrechnungen.append({
+                'id': row[0],
+                'zeitraum_von': row[1],
+                'zeitraum_bis': row[2],
+                'betrag_maschinen': betrag_maschinen,
+                'betrag_treibstoff': betrag_treibstoff,
+                'betrag_gesamt': row[5],
+                'status': row[6],
+                'erstellt_am': row[7],
+                'bezahlt_am': row[8],
+                'mitglied_name': f"{row[11] or ''} {row[10]}".strip(),
+                'mitglied_email': row[12],
+                'zahlungen': zahlungen
+            })
+            
+            summe_maschinen += betrag_maschinen
+            summe_treibstoff += betrag_treibstoff
+        
+        cursor.execute("SELECT name FROM gemeinschaften WHERE id = ?", (gemeinschaft_id,))
+        gemeinschaft_name = cursor.fetchone()[0]
+    
+    return render_template('abrechnungen_liste.html',
+                         gemeinschaft_id=gemeinschaft_id,
+                         gemeinschaft_name=gemeinschaft_name,
+                         abrechnungen=abrechnungen,
+                         summe_maschinen=summe_maschinen,
+                         summe_treibstoff=summe_treibstoff)
 
 
 @app.route('/admin/abrechnungen/<int:gemeinschaft_id>/csv-import', methods=['GET', 'POST'])
@@ -2791,165 +3783,64 @@ def admin_csv_import(gemeinschaft_id):
             return redirect(request.url)
         
         if request.method == 'POST':
-            if 'csv_file' not in request.files:
-                flash('Keine Datei ausgewählt!', 'danger')
-                return redirect(request.url)
+            # Konfiguration speichern
+            cursor.execute("""
+                UPDATE csv_import_konfiguration
+                SET trennzeichen = ?,
+                    kodierung = ?,
+                    spalte_buchungsdatum = ?,
+                    spalte_valutadatum = ?,
+                    spalte_betrag = ?,
+                    spalte_verwendungszweck = ?,
+                    spalte_empfaenger = ?,
+                    spalte_kontonummer = ?,
+                    spalte_bic = ?,
+                    dezimaltrennzeichen = ?,
+                    tausendertrennzeichen = ?,
+                    datumsformat = ?,
+                    hat_kopfzeile = ?,
+                    zeilen_ueberspringen = ?
+                WHERE gemeinschaft_id = ?
+            """, (
+                request.form.get('trennzeichen'),
+                request.form.get('kodierung'),
+                request.form.get('spalte_buchungsdatum'),
+                request.form.get('spalte_valutadatum'),
+                request.form.get('spalte_betrag'),
+                request.form.get('spalte_verwendungszweck'),
+                request.form.get('spalte_empfaenger'),
+                request.form.get('spalte_kontonummer'),
+                request.form.get('spalte_bic'),
+                request.form.get('dezimaltrennzeichen'),
+                request.form.get('tausendertrennzeichen'),
+                request.form.get('datumsformat'),
+                1 if request.form.get('hat_kopfzeile') else 0,
+                int(request.form.get('zeilen_ueberspringen', 0)),
+                gemeinschaft_id
+            ))
             
-            file = request.files['csv_file']
-            if file.filename == '':
-                flash('Keine Datei ausgewählt!', 'danger')
-                return redirect(request.url)
-            
-            if file and file.filename.endswith('.csv'):
-                try:
-                    # CSV mit Konfiguration einlesen
-                    content = file.read().decode(config['kodierung'])
-                    
-                    # Zeilen überspringen falls konfiguriert
-                    lines = content.split('\n')
-                    if config['zeilen_ueberspringen'] > 0:
-                        lines = lines[config['zeilen_ueberspringen']:]
-                        content = '\n'.join(lines)
-                    
-                    # CSV Reader erstellen - mit oder ohne Kopfzeile
-                    if config['hat_kopfzeile']:
-                        # Mit Kopfzeile - normale Spaltennamen
-                        csv_reader = csv.DictReader(
-                            StringIO(content), 
-                            delimiter=config['trennzeichen']
-                        )
-                    else:
-                        # OHNE Kopfzeile - künstliche Spaltennamen (Spalte1, Spalte2, etc.)
-                        csv_data = csv.reader(StringIO(content), delimiter=config['trennzeichen'])
-                        # Bestimme Anzahl Spalten aus erster Zeile
-                        first_row = None
-                        temp_reader = csv.reader(StringIO(content), delimiter=config['trennzeichen'])
-                        for row in temp_reader:
-                            if row:  # Erste nicht-leere Zeile
-                                first_row = row
-                                break
-                        
-                        if first_row:
-                            num_cols = len(first_row)
-                            fieldnames = [f'Spalte{i+1}' for i in range(num_cols)]
-                            csv_reader = csv.DictReader(
-                                StringIO(content), 
-                                delimiter=config['trennzeichen'],
-                                fieldnames=fieldnames
-                            )
-                        else:
-                            flash('CSV-Datei ist leer!', 'danger')
-                            return redirect(request.url)
-                    
-                    importiert = 0
-                    duplikate = 0
-                    fehler = []
-                    
-                    for row_num, row in enumerate(csv_reader, start=2):
-                        try:
-                            # Felder mit Konfiguration auslesen
-                            buchungsdatum = row.get(config['spalte_buchungsdatum'], '')
-                            verwendungszweck = row.get(config['spalte_verwendungszweck'], '')
-                            betrag_str = row.get(config['spalte_betrag'], '')
-                            
-                            if not buchungsdatum or not betrag_str:
-                                fehler.append(f"Zeile {row_num}: Fehlende Pflichtfelder")
-                                continue
-                            
-                            # Betrag konvertieren mit konfigurierbaren Trennzeichen
-                            betrag_str = betrag_str.replace(config['tausendertrennzeichen'], '')
-                            betrag_str = betrag_str.replace(config['dezimaltrennzeichen'], '.')
-                            betrag = float(betrag_str)
-                            
-                            # Datum parsen
-                            try:
-                                buchungsdatum_parsed = dt.strptime(buchungsdatum, config['datumsformat'])
-                                buchungsdatum = buchungsdatum_parsed.strftime('%Y-%m-%d')
-                            except:
-                                fehler.append(f"Zeile {row_num}: Ungültiges Datumsformat '{buchungsdatum}'")
-                                continue
-                            
-                            # Hash für Duplikatserkennung
-                            hash_string = f"{buchungsdatum}{betrag}{verwendungszweck}{row.get(config['spalte_kontonummer'], '')}"
-                            trans_hash = hashlib.md5(hash_string.encode()).hexdigest()
-                            
-                            # Prüfe auf Duplikat
-                            cursor.execute("""
-                                SELECT COUNT(*) FROM bank_transaktionen
-                                WHERE transaktions_hash = ?
-                            """, (trans_hash,))
-                            
-                            if cursor.fetchone()[0] > 0:
-                                duplikate += 1
-                                continue
-                            
-                            # Automatische Zahlungsreferenz-Erkennung nur für positive Beträge
-                            benutzer_id = None
-                            if betrag > 0:  # Nur Eingänge automatisch zuordnen
-                                cursor.execute("""
-                                    SELECT benutzer_id FROM zahlungsreferenzen
-                                    WHERE referenznummer IN (
-                                        SELECT referenznummer FROM zahlungsreferenzen
-                                        WHERE instr(?, referenznummer) > 0
-                                    ) AND gemeinschaft_id = ?
-                                """, (verwendungszweck, gemeinschaft_id))
-                                result = cursor.fetchone()
-                                if result:
-                                    benutzer_id = result[0]
-                            
-                            # Valutadatum auslesen
-                            valutadatum = row.get(config['spalte_valutadatum'], buchungsdatum)
-                            if valutadatum and valutadatum != buchungsdatum:
-                                try:
-                                    valutadatum_parsed = dt.strptime(valutadatum, config['datumsformat'])
-                                    valutadatum = valutadatum_parsed.strftime('%Y-%m-%d')
-                                except:
-                                    valutadatum = buchungsdatum
-                            
-                            # Transaktion einfügen
-                            cursor.execute("""
-                                INSERT INTO bank_transaktionen
-                                (gemeinschaft_id, buchungsdatum, valutadatum, verwendungszweck,
-                                 empfaenger, kontonummer, betrag, transaktions_hash,
-                                 benutzer_id, zugeordnet, importiert_von)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            """, (
-                                gemeinschaft_id,
-                                buchungsdatum,
-                                valutadatum,
-                                verwendungszweck,
-                                row.get(config['spalte_empfaenger'], ''),
-                                row.get(config['spalte_kontonummer'], ''),
-                                betrag,
-                                trans_hash,
-                                benutzer_id,
-                                1 if benutzer_id else 0,
-                                session['benutzer_id']
-                            ))
-                            
-                            importiert += 1
-                            
-                        except Exception as e:
-                            fehler.append(f"Zeile {row_num}: {str(e)}")
-                    
-                    db.connection.commit()
-                    
-                    # Erfolgsmeldung
-                    msg = f"✅ {importiert} Transaktionen importiert"
-                    if duplikate > 0:
-                        msg += f", {duplikate} Duplikate übersprungen"
-                    if fehler:
-                        msg += f", {len(fehler)} Fehler"
-                        for f in fehler[:5]:
-                            flash(f, 'warning')
-                    
-                    flash(msg, 'success')
-                    return redirect(url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id))
-                    
-                except Exception as e:
-                    flash(f'Fehler beim Import: {str(e)}', 'danger')
-            else:
-                flash('Bitte nur CSV-Dateien hochladen!', 'danger')
+            db.connection.commit()
+            flash('CSV-Konfiguration gespeichert!', 'success')
+            return redirect(url_for('admin_csv_import', gemeinschaft_id=gemeinschaft_id))
+        
+        # Konfiguration laden
+        cursor.execute("""
+            SELECT * FROM csv_import_konfiguration
+            WHERE gemeinschaft_id = ?
+        """, (gemeinschaft_id,))
+        
+        result = cursor.fetchone()
+        if result:
+            columns = [desc[0] for desc in cursor.description]
+            config = dict(zip(columns, result))
+        else:
+            # Standard-Konfiguration erstellen
+            cursor.execute("""
+                INSERT INTO csv_import_konfiguration (gemeinschaft_id)
+                VALUES (?)
+            """, (gemeinschaft_id,))
+            db.connection.commit()
+            return redirect(request.url)
         
         # Gemeinschaftsname laden
         cursor.execute("SELECT name FROM gemeinschaften WHERE id = ?", (gemeinschaft_id,))
@@ -3405,7 +4296,7 @@ def import_loeschen(gemeinschaft_id):
                 WHERE benutzer_id = ? AND gemeinschaft_id = ?
             """, (session['benutzer_id'], gemeinschaft_id))
             if cursor.fetchone()[0] == 0:
-                flash('Keine Berechtigung!', 'danger')
+                flash('Keine Berechtigung für diese Gemeinschaft!', 'danger')
                 return redirect(url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id))
         
         import_datum = request.form.get('import_datum')
@@ -3515,22 +4406,9 @@ def anfangssaldo_bearbeiten(gemeinschaft_id):
     return render_template('anfangssaldo_bearbeiten.html', gemeinschaft=gemeinschaft)
 
 
-if __name__ == '__main__':
-    # Port aus Umgebungsvariable (für Launcher) oder Standard
-    port = int(os.environ.get('FLASK_PORT', 5000))
-    
-    # Host: Bei Launcher nur lokal, sonst für alle Geräte
-    host = '127.0.0.1' if os.environ.get('DB_PATH') else '0.0.0.0'
-    
-    print(f"\n{'='*60}")
-    print(f"Maschinengemeinschaft Server")
-    print(f"{'='*60}")
-    print(f"Datenbank: {DB_PATH}")
-    print(f"URL: http://{host}:{port}")
-    print(f"{'='*60}\n")
-    
-    # threaded=True verhindert Hostname-Auflösung-Probleme
-    app.run(host=host, port=port, debug=False, threaded=True, use_reloader=False)
+if __name__ == "__main__":
+    # Für Entwicklung: Flask-eigener Server (nicht für Produktion!)
+    app.run(host="0.0.0.0", port=5000, debug=False)
 
 
 

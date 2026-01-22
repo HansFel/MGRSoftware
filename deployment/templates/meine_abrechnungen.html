@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Meine Abrechnungen - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h2 class="text-white mb-4">
+            <i class="bi bi-receipt"></i> Meine Abrechnungen
+        </h2>
+    </div>
+</div>
+
+<!-- Statistiken -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+                <h6>Offene Abrechnungen</h6>
+                <h3>{{ anzahl_offen }}</h3>
+                <h4>{{ "%.2f"|format(summe_offen) }} €</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h6>Bezahlt</h6>
+                <h4>{{ "%.2f"|format(summe_bezahlt) }} €</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h6>Gesamt</h6>
+                <h4>{{ "%.2f"|format(summe_offen + summe_bezahlt) }} €</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Abrechnungsliste -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-ul"></i> Alle Abrechnungen
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if abrechnungen %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Zeitraum</th>
+                                <th>Gemeinschaft</th>
+                                <th class="text-end">Maschinen</th>
+                                <th class="text-end">Treibstoff</th>
+                                <th class="text-end">Gesamt</th>
+                                <th>Status</th>
+                                <th>Erstellt</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for abr in abrechnungen %}
+                            <tr>
+                                <td>
+                                    <strong>{{ abr.zeitraum_von }}</strong>
+                                    <br>
+                                    <small class="text-muted">bis {{ abr.zeitraum_bis }}</small>
+                                </td>
+                                <td>{{ abr.gemeinschaft_name }}</td>
+                                <td class="text-end">{{ "%.2f"|format(abr.betrag_maschinen) }} €</td>
+                                <td class="text-end">{{ "%.2f"|format(abr.betrag_treibstoff) }} €</td>
+                                <td class="text-end">
+                                    <strong>{{ "%.2f"|format(abr.betrag_gesamt) }} €</strong>
+                                </td>
+                                <td>
+                                    {% if abr.status == 'offen' %}
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="bi bi-clock"></i> Offen
+                                    </span>
+                                    {% elif abr.status == 'bezahlt' %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle"></i> Bezahlt
+                                    </span>
+                                    {% if abr.bezahlt_am %}
+                                    <br><small class="text-muted">{{ abr.bezahlt_am[:10] }}</small>
+                                    {% endif %}
+                                    {% elif abr.status == 'storniert' %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-x-circle"></i> Storniert
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ abr.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ abr.erstellt_am[:10] }}</small>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('abrechnung_pdf', abrechnung_id=abr.id) }}" 
+                                       class="btn btn-sm btn-info"
+                                       target="_blank"
+                                       title="Abrechnung anzeigen">
+                                        <i class="bi bi-file-pdf"></i> PDF
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Keine Abrechnungen vorhanden.</strong><br>
+                    Es wurden noch keine Abrechnungen für Sie erstellt.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Zahlungsinformationen -->
+{% if anzahl_offen > 0 %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">
+                    <i class="bi bi-credit-card"></i> Zahlungsinformationen
+                </h5>
+            </div>
+            <div class="card-body">
+                <p><strong>So bezahlen Sie Ihre Abrechnungen:</strong></p>
+                <ol>
+                    <li>Kontaktieren Sie Ihren Gemeinschaftsadministrator für Bankverbindung</li>
+                    <li>Verwenden Sie bei der Überweisung unbedingt die <strong>Zahlungsreferenz</strong> aus Ihrer Abrechnung</li>
+                    <li>Nach Zahlungseingang wird die Abrechnung automatisch als "Bezahlt" markiert</li>
+                </ol>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    Die Zahlungsreferenz finden Sie in der PDF-Ansicht jeder Abrechnung.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

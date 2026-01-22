@@ -3,38 +3,19 @@ FROM python:3.11-slim
 # Arbeitsverzeichnis erstellen
 WORKDIR /app
 
-# System-Abhängigkeiten installieren
-RUN apt-get update && apt-get install -y \
-    gcc \
-    libjpeg-dev \
-    zlib1g-dev \
-    libfreetype6-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Python-Abhängigkeiten kopieren und installieren
+# Abhängigkeiten installieren
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Anwendungscode kopieren
-COPY database.py .
-COPY web_app.py .
-COPY schema.sql .
-COPY templates ./templates/
+# Projektdateien kopieren
+COPY . .
 
-# Datenverzeichnis erstellen
-RUN mkdir -p /data
-
-# Umgebungsvariablen
-ENV PYTHONUNBUFFERED=1
-ENV DB_PATH=/data/maschinengemeinschaft.db
-
-# Port exponieren
+# Port freigeben
 EXPOSE 5000
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/login')" || exit 1
+# Umgebungsvariablen (optional)
+ENV FLASK_APP=web_app.py
+ENV FLASK_RUN_HOST=0.0.0.0
 
-# Startskript
-CMD ["python", "web_app.py"]
+# Start mit Gunicorn (empfohlen für Produktion)
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "web_app:app"]

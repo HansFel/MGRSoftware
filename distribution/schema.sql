@@ -165,14 +165,6 @@ FROM gemeinschaften g
 LEFT JOIN maschinen m ON g.id = m.gemeinschaft_id AND m.aktiv = 1
 LEFT JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
 GROUP BY g.id, g.name, g.beschreibung, g.aktiv;
- 
--- Standard-Admin-Benutzer für neue Datenbanken
--- Wird nur angelegt, wenn noch kein Admin-Benutzer existiert
--- Login: Benutzername = admin, Passwort = admin123
--- Der password_hash ist der SHA-256 Hash von "admin123"
-INSERT OR IGNORE INTO benutzer (id, name, vorname, username, password_hash, is_admin, admin_level, aktiv)
-VALUES (1, 'Admin', 'System', 'admin', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 1, 2, 1);
-
 
 -- Tabelle für Gemeinschafts-Administratoren
 CREATE TABLE IF NOT EXISTS gemeinschafts_admin (
@@ -204,3 +196,10 @@ CREATE INDEX IF NOT EXISTS idx_gemeinschafts_admin_gemeinschaft
 
 CREATE INDEX IF NOT EXISTS idx_backup_bestaetigung_status 
     ON backup_bestaetigung(status);
+
+-- Standard-Admin-Benutzer für neue Datenbanken
+-- Wird nur angelegt, wenn noch kein Admin-Benutzer existiert
+-- Login: Benutzername = admin, Passwort = admin123
+-- Der password_hash ist der SHA-256 Hash von "admin123"
+INSERT OR IGNORE INTO benutzer (id, name, vorname, username, password_hash, is_admin, admin_level, aktiv)
+VALUES (1, 'Admin', 'System', 'admin', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 1, 2, 1);

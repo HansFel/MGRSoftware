@@ -1,0 +1,3 @@
+ml76y0cjb8gqzf3p.myfritz.net {
+    reverse_proxy maschinengemeinschaft:5000
+}

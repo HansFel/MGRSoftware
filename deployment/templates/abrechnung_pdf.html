@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Abrechnung {{ abrechnung.id }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            color: #333;
+        }
+        .header {
+            border-bottom: 3px solid #0066cc;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #0066cc;
+            margin: 0;
+        }
+        .info-box {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .label {
+            font-weight: bold;
+            color: #666;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th {
+            background-color: #0066cc;
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        .text-right {
+            text-align: right;
+        }
+        .totals {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 30px;
+        }
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 16px;
+        }
+        .total-final {
+            border-top: 2px solid #0066cc;
+            padding-top: 12px;
+            margin-top: 12px;
+            font-weight: bold;
+            font-size: 20px;
+            color: #0066cc;
+        }
+        .payment-info {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-top: 30px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .status-offen {
+            background-color: #ffc107;
+            color: #000;
+        }
+        .status-bezahlt {
+            background-color: #28a745;
+            color: #fff;
+        }
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+        @media print {
+            body {
+                margin: 20px;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Abrechnung #{{ abrechnung.id }}</h1>
+        <p>{{ abrechnung.gemeinschaft_name }}</p>
+    </div>
+
+    <div class="info-box">
+        <div class="info-row">
+            <span class="label">Mitglied:</span>
+            <span>{{ abrechnung.mitglied_name }}</span>
+        </div>
+        <div class="info-row">
+            <span class="label">E-Mail:</span>
+            <span>{{ abrechnung.mitglied_email }}</span>
+        </div>
+        <div class="info-row">
+            <span class="label">Abrechnungszeitraum:</span>
+            <span>{{ abrechnung.zeitraum_von }} bis {{ abrechnung.zeitraum_bis }}</span>
+        </div>
+        <div class="info-row">
+            <span class="label">Erstellt am:</span>
+            <span>{{ abrechnung.erstellt_am[:10] }}</span>
+        </div>
+        <div class="info-row">
+            <span class="label">Status:</span>
+            <span>
+                {% if abrechnung.status == 'offen' %}
+                <span class="status-badge status-offen">Offen</span>
+                {% elif abrechnung.status == 'bezahlt' %}
+                <span class="status-badge status-bezahlt">Bezahlt</span>
+                {% else %}
+                <span class="status-badge">{{ abrechnung.status }}</span>
+                {% endif %}
+            </span>
+        </div>
+    </div>
+
+    <h2>Maschineneinsätze</h2>
+    {% if einsaetze %}
+    <table>
+        <thead>
+            <tr>
+                <th>Datum</th>
+                <th>Maschine</th>
+                <th class="text-right">Betriebsstunden</th>
+                <th class="text-right">Preis/Std.</th>
+                <th class="text-right">Maschinenbetrag</th>
+                <th class="text-right">Treibstoff (L)</th>
+                <th class="text-right">Treibstoffkosten</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for einsatz in einsaetze %}
+            <tr>
+                <td>{{ einsatz.datum }}</td>
+                <td>{{ einsatz.maschine }}</td>
+                <td class="text-right">{{ "%.2f"|format(einsatz.betriebsstunden) }}</td>
+                <td class="text-right">{{ "%.2f"|format(einsatz.preis_pro_stunde) }} €</td>
+                <td class="text-right">{{ "%.2f"|format(einsatz.betrag_maschine) }} €</td>
+                <td class="text-right">{{ "%.2f"|format(einsatz.treibstoff_liter) if einsatz.treibstoff_liter else '-' }}</td>
+                <td class="text-right">{{ "%.2f"|format(einsatz.treibstoffkosten) if einsatz.treibstoffkosten else '-' }} €</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>Keine Maschineneinsätze in diesem Zeitraum.</p>
+    {% endif %}
+
+    <div class="totals">
+        <div class="total-row">
+            <span class="label">Summe Maschineneinsätze:</span>
+            <span>{{ "%.2f"|format(abrechnung.betrag_maschinen) }} €</span>
+        </div>
+        <div class="total-row">
+            <span class="label">Summe Treibstoffkosten:</span>
+            <span>{{ "%.2f"|format(abrechnung.betrag_treibstoff) }} €</span>
+        </div>
+        <div class="total-row total-final">
+            <span>Gesamtbetrag:</span>
+            <span>{{ "%.2f"|format(abrechnung.betrag_gesamt) }} €</span>
+        </div>
+    </div>
+
+    {% if abrechnung.status == 'offen' %}
+    <div class="payment-info">
+        <h3 style="margin-top: 0;">Zahlungsinformationen</h3>
+        <p><strong>Bitte überweisen Sie den Betrag von {{ "%.2f"|format(abrechnung.betrag_gesamt) }} € an folgendes Konto:</strong></p>
+        
+        {% if abrechnung.bank_iban %}
+        <table style="margin: 15px 0; background: white;">
+            <tr style="border: none;">
+                <td style="border: none; font-weight: bold; width: 150px;">Kontoinhaber:</td>
+                <td style="border: none;">{{ abrechnung.bank_kontoinhaber if abrechnung.bank_kontoinhaber else '-' }}</td>
+            </tr>
+            {% if abrechnung.bank_name %}
+            <tr style="border: none;">
+                <td style="border: none; font-weight: bold;">Bank:</td>
+                <td style="border: none;">{{ abrechnung.bank_name }}</td>
+            </tr>
+            {% endif %}
+            <tr style="border: none;">
+                <td style="border: none; font-weight: bold;">IBAN:</td>
+                <td style="border: none;">{{ abrechnung.bank_iban }}</td>
+            </tr>
+            {% if abrechnung.bank_bic %}
+            <tr style="border: none;">
+                <td style="border: none; font-weight: bold;">BIC:</td>
+                <td style="border: none;">{{ abrechnung.bank_bic }}</td>
+            </tr>
+            {% endif %}
+        </table>
+        {% else %}
+        <p>Kontaktieren Sie Ihren Administrator für die Bankverbindung.</p>
+        {% endif %}
+        
+        <p><strong>Wichtig:</strong> Geben Sie bei der Überweisung unbedingt die Referenznummer <strong>ABR-{{ abrechnung.id }}</strong> an, damit die Zahlung automatisch zugeordnet werden kann.</p>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <p>Erstellt mit der Maschinengemeinschafts-Software | {{ abrechnung.gemeinschaft_name }}</p>
+        <p class="no-print">
+            <button onclick="window.print()" style="padding: 10px 20px; background-color: #0066cc; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                Drucken / Als PDF speichern
+            </button>
+        </p>
+    </div>
+</body>
+</html>

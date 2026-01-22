@@ -65,18 +65,30 @@
                                         <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ "%.1f"|format(einsatz.anfangstand) }} h</td>
-                                <td>{{ "%.1f"|format(einsatz.endstand) }} h</td>
                                 <td>
-                                    {% if einsatz.abrechnungsart == 'hektar' and einsatz.flaeche_menge %}
-                                        <strong>{{ "%.2f"|format(einsatz.flaeche_menge) }} ha</strong>
-                                    {% elif einsatz.abrechnungsart == 'kilometer' and einsatz.flaeche_menge %}
-                                        <strong>{{ "%.2f"|format(einsatz.flaeche_menge) }} km</strong>
-                                    {% elif einsatz.abrechnungsart == 'stueck' and einsatz.flaeche_menge %}
-                                        <strong>{{ "%.0f"|format(einsatz.flaeche_menge) }} St</strong>
+                                    {% if einsatz.abrechnungsart == 'hektar' %}
+                                        {{ "%.2f"|format(einsatz.anfangstand) }} ha
+                                    {% elif einsatz.abrechnungsart == 'kilometer' %}
+                                        {{ "%.1f"|format(einsatz.anfangstand) }} km
+                                    {% elif einsatz.abrechnungsart == 'stueck' %}
+                                        {{ "%.0f"|format(einsatz.anfangstand) }} St
                                     {% else %}
-                                        <strong>{{ "%.1f"|format(einsatz.betriebsstunden) }} h</strong>
+                                        {{ "%.1f"|format(einsatz.anfangstand) }} h
                                     {% endif %}
+                                </td>
+                                <td>
+                                    {% if einsatz.abrechnungsart == 'hektar' %}
+                                        {{ "%.2f"|format(einsatz.endstand) }} ha
+                                    {% elif einsatz.abrechnungsart == 'kilometer' %}
+                                        {{ "%.1f"|format(einsatz.endstand) }} km
+                                    {% elif einsatz.abrechnungsart == 'stueck' %}
+                                        {{ "%.0f"|format(einsatz.endstand) }} St
+                                    {% else %}
+                                        {{ "%.1f"|format(einsatz.endstand) }} h
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>{{ einsatz.menge_berechnet }}</strong>
                                 </td>
                                 <td>
                                     {% if einsatz.treibstoffverbrauch %}
@@ -93,11 +105,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if einsatz.kosten_berechnet %}
-                                        <strong class="text-success">{{ "%.2f"|format(einsatz.kosten_berechnet) }} €</strong>
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
+                                    <strong class="text-success">{{ "%.2f"|format(einsatz.maschinenkosten_berechnet) }} €</strong>
                                 </td>
                                 <td>
                                     {% if einsatz.anmerkungen %}
@@ -119,7 +127,39 @@
                         <tfoot class="table-light">
                             <tr>
                                 <td colspan="6" class="text-end"><strong>Gesamt:</strong></td>
-                                <td><strong>{{ "%.1f"|format(einsaetze|sum(attribute='betriebsstunden')) }} h</strong></td>
+                                <td>
+                                    {# Summen-Menge dynamisch nach Abrechnungsart und Erfassungsmodus #}
+                                    {% set summe = 0 %}
+                                    {% if einsaetze|length > 0 %}
+                                        {% set abrechnungsart = einsaetze[0].abrechnungsart %}
+                                        {% set erfassungsmodus = einsaetze[0].erfassungsmodus %}
+                                        {% if erfassungsmodus == 'fortlaufend' %}
+                                                {% set end_sum = einsaetze|map(attribute='endstand')|map('default', 0)|sum %}
+                                                {% set anfang_sum = einsaetze|map(attribute='anfangstand')|map('default', 0)|sum %}
+                                                {% set summe = end_sum - anfang_sum %}
+                                                {% if abrechnungsart == 'hektar' %}
+                                                    <strong>{{ "%.2f"|format(summe) }} ha</strong>
+                                                {% elif abrechnungsart == 'kilometer' %}
+                                                    <strong>{{ "%.1f"|format(summe) }} km</strong>
+                                                {% elif abrechnungsart == 'stueck' %}
+                                                    <strong>{{ "%.0f"|format(summe) }} St</strong>
+                                                {% else %}
+                                                    <strong>{{ "%.1f"|format(summe) }} h</strong>
+                                                {% endif %}
+                                        {% else %}
+                                                {% set summe = einsaetze|map(attribute='flaeche_menge')|map('default', 0)|sum %}
+                                                {% if abrechnungsart == 'hektar' %}
+                                                    <strong>{{ "%.2f"|format(summe) }} ha</strong>
+                                                {% elif abrechnungsart == 'kilometer' %}
+                                                    <strong>{{ "%.1f"|format(summe) }} km</strong>
+                                                {% elif abrechnungsart == 'stueck' %}
+                                                    <strong>{{ "%.0f"|format(summe) }} St</strong>
+                                                {% else %}
+                                                    <strong>{{ "%.1f"|format(summe) }} h</strong>
+                                                {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% set treibstoff_gesamt = einsaetze|selectattr('treibstoffverbrauch')|sum(attribute='treibstoffverbrauch') %}
                                     {% if treibstoff_gesamt > 0 %}

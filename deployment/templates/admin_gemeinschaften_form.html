@@ -32,6 +32,38 @@
                         <label class="form-check-label" for="aktiv">Aktiv</label>
                     </div>
 
+                    <hr class="my-4">
+                    <h5 class="mb-3"><i class="bi bi-bank"></i> Bankverbindung</h5>
+                    <p class="text-muted small">Diese Informationen werden auf den Abrechnungen für Mitglieder angezeigt.</p>
+
+                    <div class="mb-3">
+                        <label for="bank_name" class="form-label">Bankname</label>
+                        <input type="text" class="form-control" id="bank_name" name="bank_name" 
+                               value="{{ gemeinschaft.bank_name if gemeinschaft and gemeinschaft.bank_name else '' }}"
+                               placeholder="z.B. Raiffeisenbank">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="bank_iban" class="form-label">IBAN</label>
+                        <input type="text" class="form-control" id="bank_iban" name="bank_iban" 
+                               value="{{ gemeinschaft.bank_iban if gemeinschaft and gemeinschaft.bank_iban else '' }}"
+                               placeholder="AT12 3456 7890 1234 5678">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="bank_bic" class="form-label">BIC</label>
+                        <input type="text" class="form-control" id="bank_bic" name="bank_bic" 
+                               value="{{ gemeinschaft.bank_bic if gemeinschaft and gemeinschaft.bank_bic else '' }}"
+                               placeholder="z.B. RZOOAT2L">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="bank_kontoinhaber" class="form-label">Kontoinhaber</label>
+                        <input type="text" class="form-control" id="bank_kontoinhaber" name="bank_kontoinhaber" 
+                               value="{{ gemeinschaft.bank_kontoinhaber if gemeinschaft and gemeinschaft.bank_kontoinhaber else '' }}"
+                               placeholder="Name des Kontoinhabers">
+                    </div>
+
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                         <a href="{{ url_for('admin_gemeinschaften') }}" class="btn btn-secondary">
                             <i class="bi bi-x-circle"></i> Abbrechen

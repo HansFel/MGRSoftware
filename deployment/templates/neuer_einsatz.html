@@ -63,20 +63,20 @@
                     <!-- Fortlaufender Modus (Start/Ende) -->
                     <div class="row" id="fortlaufendContainer" style="display: none;">
                         <div class="col-md-4 mb-3">
-                            <label for="anfangstand" class="form-label">Anfangstand (h) *</label>
+                            <label for="anfangstand" class="form-label" id="anfangLabel">Anfangstand *</label>
                             <input type="number" class="form-control" id="anfangstand" 
                                    name="anfangstand" step="0.1">
                             <small class="text-muted" id="aktuellerStand"></small>
                         </div>
 
                         <div class="col-md-4 mb-3">
-                            <label for="endstand" class="form-label">Endstand (h) *</label>
+                            <label for="endstand" class="form-label" id="endLabel">Endstand *</label>
                             <input type="number" class="form-control" id="endstand" 
                                    name="endstand" step="0.1">
                         </div>
 
                         <div class="col-md-4 mb-3">
-                            <label for="betriebsstunden" class="form-label">Betriebsstunden</label>
+                            <label for="betriebsstunden" class="form-label" id="mengeLabel">Menge</label>
                             <input type="text" class="form-control" id="betriebsstunden" 
                                    readonly style="background-color: #e9ecef;">
                         </div>
@@ -273,30 +273,22 @@ document.getElementById('maschine_id').addEventListener('change', function() {
     const flaecheHinweis = document.getElementById('flaecheHinweis');
     const flaecheInput = document.getElementById('flaeche_menge');
     
-    if (erfassungsmodus === 'fortlaufend' && abrechnungsart !== 'stunden' && preis > 0) {
-        flaecheContainer.style.display = 'flex';
-        
-        // Label und Hinweis anpassen
-        switch(abrechnungsart) {
-            case 'hektar':
-                flaecheLabel.textContent = 'Fläche (ha) *';
-                flaecheHinweis.textContent = `Preis: €${preis.toFixed(2)} pro Hektar`;
-                break;
-            case 'kilometer':
-                flaecheLabel.textContent = 'Strecke (km) *';
-                flaecheHinweis.textContent = `Preis: €${preis.toFixed(2)} pro Kilometer`;
-                break;
-            case 'stueck':
-                flaecheLabel.textContent = 'Anzahl (Stück) *';
-                flaecheHinweis.textContent = `Preis: €${preis.toFixed(2)} pro Stück`;
-                break;
-        }
-        flaecheInput.required = true;
-    } else {
-        flaecheContainer.style.display = 'none';
-        flaecheInput.required = false;
-        flaecheInput.value = '';
+    // Bei fortlaufend und Abrechnungsart != 'stunden' wird das flaeche_menge Feld NICHT angezeigt!
+    flaecheContainer.style.display = 'none';
+    flaecheInput.required = false;
+    flaecheInput.value = '';
+
+    // Einheiten für Anfang/Ende/Menge dynamisch setzen
+    let einheit = 'h';
+    switch(abrechnungsart) {
+        case 'hektar': einheit = 'ha'; break;
+        case 'kilometer': einheit = 'km'; break;
+        case 'stueck': einheit = 'St'; break;
+        default: einheit = 'h'; break;
     }
+    document.getElementById('anfangLabel').textContent = `Anfangstand (${einheit}) *`;
+    document.getElementById('endLabel').textContent = `Endstand (${einheit}) *`;
+    document.getElementById('mengeLabel').textContent = `Menge (${einheit})`;
     
     berechneKosten();
 });

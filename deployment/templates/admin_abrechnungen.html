@@ -44,8 +44,11 @@
                     <a href="{{ url_for('admin_transaktionen', gemeinschaft_id=gem.id) }}" class="btn btn-primary">
                         <i class="bi bi-list-ul"></i> Transaktionen anzeigen
                     </a>
-                    <a href="#" class="btn btn-info disabled">
+                    <a href="{{ url_for('abrechnungen_erstellen', gemeinschaft_id=gem.id) }}" class="btn btn-info">
                         <i class="bi bi-file-earmark-text"></i> Abrechnungen erstellen
+                    </a>
+                    <a href="{{ url_for('abrechnungen_liste', gemeinschaft_id=gem.id) }}" class="btn btn-secondary">
+                        <i class="bi bi-file-earmark-check"></i> Abrechnungen anzeigen
                     </a>
                 </div>
             </div>
