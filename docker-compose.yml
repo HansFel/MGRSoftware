@@ -2,45 +2,40 @@ services:
   maschinengemeinschaft:
     build: .
     container_name: maschinengemeinschaft
+    expose:
+      - "5000"
     volumes:
-      services:
-        maschinengemeinschaft:
-          build: .
-          container_name: maschinengemeinschaft
-          expose:
-            - "5000"
-          volumes:
-            - ./data:/data
-          environment:
-            - DB_PATH=/data/maschinengemeinschaft.db
-          restart: unless-stopped
-          healthcheck:
-            test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/login')"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
-          networks:
-            - web
+      - ./data:/data
+    environment:
+      - DB_PATH=/data/maschinengemeinschaft.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/login')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - web
 
-        caddy:
-          image: caddy:latest
-          container_name: caddy
-          ports:
-            - "80:80"
-            - "443:443"
-          volumes:
-            - ./deployment/Caddyfile:/etc/caddy/Caddyfile
-            - caddy_data:/data
-            - caddy_config:/config
-          depends_on:
-            - maschinengemeinschaft
-          networks:
-            - web
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /home/mgserver/mgserver/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - maschinengemeinschaft
+    networks:
+      - web
 
-      volumes:
-        caddy_data:
-        caddy_config:
+volumes:
+  caddy_data:
+  caddy_config:
 
-      networks:
-        web:
-          driver: bridge
+networks:
+  web:
+    driver: bridge

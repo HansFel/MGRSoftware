@@ -165,6 +165,8 @@ def login():
                 session['gemeinschaften'] = gemeinschaften
                 
                 flash(f"Willkommen, {benutzer['vorname']}!", 'success')
+                if session['is_admin']:
+                    return redirect(url_for('admin_dashboard'))
                 return redirect(url_for('dashboard'))
             else:
                 flash('Ungültiger Benutzername oder Passwort.', 'danger')
