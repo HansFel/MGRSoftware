@@ -9,8 +9,79 @@ import os
 import csv
 import glob as glob_module
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify, make_response
-from database import MaschinenDBContext
+from database import MaschinenDBContext, USING_POSTGRESQL
 from datetime import datetime
+import re
+
+
+def convert_sql(sql: str) -> str:
+    """Konvertiert SQLite-SQL zu PostgreSQL wenn nötig"""
+    if not USING_POSTGRESQL:
+        return sql
+
+    # INSERT OR IGNORE -> INSERT ... ON CONFLICT DO NOTHING
+    if 'INSERT OR IGNORE' in sql.upper():
+        sql = re.sub(r'INSERT OR IGNORE', 'INSERT', sql, flags=re.IGNORECASE)
+        # Finde das Ende des VALUES-Teils und füge ON CONFLICT DO NOTHING hinzu
+        if 'VALUES' in sql.upper() and 'ON CONFLICT' not in sql.upper():
+            # Füge am Ende hinzu (vor eventuellem Semikolon)
+            sql = sql.rstrip().rstrip(';') + ' ON CONFLICT DO NOTHING'
+
+    # datetime(zeitpunkt, '+24 hours') -> zeitpunkt + INTERVAL '24 hours'
+    sql = re.sub(
+        r"datetime\((\w+),\s*'\+(\d+)\s*hours?'\)",
+        r"\1 + INTERVAL '\2 hours'",
+        sql,
+        flags=re.IGNORECASE
+    )
+
+    # datetime('now') -> NOW()
+    sql = re.sub(r"datetime\('now'\)", "NOW()", sql, flags=re.IGNORECASE)
+
+    # strftime('%Y', datum) -> TO_CHAR(datum, 'YYYY')
+    sql = re.sub(
+        r"strftime\s*\(\s*'%Y'\s*,\s*(\w+\.?\w*)\s*\)",
+        r"TO_CHAR(\1, 'YYYY')",
+        sql,
+        flags=re.IGNORECASE
+    )
+
+    # strftime('%m', datum) -> TO_CHAR(datum, 'MM')
+    sql = re.sub(
+        r"strftime\s*\(\s*'%m'\s*,\s*(\w+\.?\w*)\s*\)",
+        r"TO_CHAR(\1, 'MM')",
+        sql,
+        flags=re.IGNORECASE
+    )
+
+    # strftime('%Y-%m-%d', datum) -> TO_CHAR(datum, 'YYYY-MM-DD')
+    sql = re.sub(
+        r"strftime\s*\(\s*'%Y-%m-%d'\s*,\s*(\w+\.?\w*)\s*\)",
+        r"TO_CHAR(\1, 'YYYY-MM-DD')",
+        sql,
+        flags=re.IGNORECASE
+    )
+
+    # ? -> %s für Parameterisierung
+    sql = sql.replace('?', '%s')
+
+    # aktiv = 1 -> aktiv = true (nur bei Vergleichen, nicht bei SET)
+    # Vorsicht: nicht bei SET aktiv = 1 ändern
+    sql = re.sub(r'\baktiv\s*=\s*1\b', 'aktiv = true', sql)
+    sql = re.sub(r'\baktiv\s*=\s*0\b', 'aktiv = false', sql)
+    sql = re.sub(r'\bis_admin\s*=\s*1\b', 'is_admin = true', sql)
+    sql = re.sub(r'\bis_admin\s*=\s*0\b', 'is_admin = false', sql)
+
+    return sql
+
+
+def db_execute(cursor, sql: str, params: tuple = None):
+    """Führt SQL aus mit automatischer Konvertierung"""
+    sql = convert_sql(sql)
+    if params:
+        cursor.execute(sql, params)
+    else:
+        cursor.execute(sql)
 from io import StringIO, BytesIO
 from functools import wraps
 
@@ -266,7 +337,7 @@ def login():
                     SELECT g.id, g.name
                     FROM gemeinschaften g
                     JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
-                    WHERE mg.mitglied_id = ? AND g.aktiv = 1
+                    WHERE mg.mitglied_id = ? AND g.aktiv = true
                     ORDER BY g.name
                 """, (benutzer['id'],))
                 gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
@@ -337,7 +408,7 @@ def datenbank_wechseln():
                 SELECT g.id, g.name
                 FROM gemeinschaften g
                 JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
-                WHERE mg.mitglied_id = ? AND g.aktiv = 1
+                WHERE mg.mitglied_id = ? AND g.aktiv = true
                 ORDER BY g.name
             """, (session['benutzer_id'],))
             gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
@@ -428,7 +499,7 @@ def dashboard():
             SELECT z.*, g.name as gemeinschaft_name
             FROM zahlungsreferenzen z
             JOIN gemeinschaften g ON z.gemeinschaft_id = g.id
-            WHERE z.benutzer_id = ? AND z.aktiv = 1
+            WHERE z.benutzer_id = ? AND z.aktiv = true
             ORDER BY g.name
         """, (benutzer_id,))
         
@@ -533,8 +604,8 @@ def neuer_einsatz():
             JOIN gemeinschaften g ON m.gemeinschaft_id = g.id
             JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
             WHERE mg.mitglied_id = ? 
-              AND m.aktiv = 1 
-              AND g.aktiv = 1
+              AND m.aktiv = true 
+              AND g.aktiv = true
             ORDER BY m.bezeichnung
         """, (session['benutzer_id'],))
         
@@ -1210,7 +1281,7 @@ def nachricht_lesen(nachricht_id):
         
         if cursor.fetchone():
             # Als gelesen markieren
-            cursor.execute("""
+            db_execute(cursor, """
                 INSERT OR IGNORE INTO nachricht_gelesen (nachricht_id, benutzer_id, gelesen_am)
                 VALUES (?, ?, ?)
             """, (nachricht_id, session['benutzer_id'], datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
@@ -1255,7 +1326,7 @@ def nachricht_neu():
         cursor.execute("""
             SELECT DISTINCT g.* FROM gemeinschaften g
             JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
-            WHERE mg.mitglied_id = ? AND g.aktiv = 1
+            WHERE mg.mitglied_id = ? AND g.aktiv = true
             ORDER BY g.name
         """, (session['benutzer_id'],))
         
@@ -1275,7 +1346,7 @@ def admin_backup_bestaetigen():
         bemerkung = request.form.get('bemerkung', '')
         
         # Prüfe ob bereits eine offene Bestätigung existiert
-        cursor.execute("""
+        db_execute(cursor, """
             SELECT * FROM backup_bestaetigung
             WHERE status = 'wartend'
             AND datetime(zeitpunkt, '+24 hours') > datetime('now')
@@ -1605,7 +1676,7 @@ def admin_dashboard():
         BACKUP_SCHWELLWERT = schwellwert_row[0] if schwellwert_row and schwellwert_row[0] else 50
         
         # Prüfe auf offene Backup-Bestätigung (für alle Admins)
-        cursor.execute("""
+        db_execute(cursor, """
             SELECT b.id, b.admin_id, b.zeitpunkt, b.bemerkung,
                    u.name, u.vorname
             FROM backup_bestaetigung b
@@ -1884,13 +1955,13 @@ def admin_maschinen_rentabilitaet(maschine_id):
         bankkosten_gesamt = sum(b['betrag'] for b in bankbuchungen)
 
         # Einsätze pro Jahr
-        cursor.execute("""
-            SELECT 
+        db_execute(cursor, """
+            SELECT
                 strftime('%Y', e.datum) as jahr,
                 COUNT(e.id) as anzahl,
                 SUM(e.endstand - e.anfangstand) as stunden,
                 SUM(
-                    CASE 
+                    CASE
                         WHEN m.abrechnungsart = 'stunden' THEN (e.endstand - e.anfangstand) * COALESCE(m.preis_pro_einheit, 0)
                         ELSE COALESCE(e.flaeche_menge, 0) * COALESCE(m.preis_pro_einheit, 0)
                     END
@@ -2028,13 +2099,13 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
         )
         
         # Einsätze pro Jahr
-        cursor.execute("""
-            SELECT 
+        db_execute(cursor, """
+            SELECT
                 strftime('%Y', e.datum) as jahr,
                 COUNT(e.id) as anzahl,
                 SUM(e.endstand - e.anfangstand) as stunden,
                 SUM(
-                    CASE 
+                    CASE
                         WHEN m.abrechnungsart = 'stunden' THEN (e.endstand - e.anfangstand) * COALESCE(m.preis_pro_einheit, 0)
                         ELSE COALESCE(e.flaeche_menge, 0) * COALESCE(m.preis_pro_einheit, 0)
                     END
@@ -2045,10 +2116,10 @@ def admin_maschinen_rentabilitaet_pdf(maschine_id):
             GROUP BY jahr
             ORDER BY jahr DESC
         """, (maschine_id,))
-        
+
         columns = [desc[0] for desc in cursor.description]
         einsaetze_pro_jahr = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        
+
         # Aufwendungen zu Jahresübersicht hinzufügen
         aufwendungen_dict = {str(a['jahr']): a for a in alle_aufwendungen}
         for einsatz in einsaetze_pro_jahr:
@@ -2311,7 +2382,7 @@ def admin_maschinen_neu():
         
         # Hole Gemeinschaften fÃ¼r Dropdown
         cursor = db.cursor
-        cursor.execute("SELECT id, name FROM gemeinschaften WHERE aktiv = 1 ORDER BY name")
+        cursor.execute("SELECT id, name FROM gemeinschaften WHERE aktiv = true ORDER BY name")
         gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
         
     return render_template('admin_maschinen_form.html', maschine=None, gemeinschaften=gemeinschaften)
@@ -2364,7 +2435,7 @@ def admin_maschinen_edit(maschine_id):
         maschine['treibstoff_berechnen'] = result[0] if result else 0
         
         # Hole Gemeinschaften fÃ¼r Dropdown
-        cursor.execute("SELECT id, name FROM gemeinschaften WHERE aktiv = 1 ORDER BY name")
+        cursor.execute("SELECT id, name FROM gemeinschaften WHERE aktiv = true ORDER BY name")
         gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
         
     return render_template('admin_maschinen_form.html', maschine=maschine, gemeinschaften=gemeinschaften)
@@ -3234,7 +3305,7 @@ def admin_gemeinschaften_mitglieder(gemeinschaft_id):
             if action == 'hinzufuegen':
                 mitglieder = request.form.getlist('mitglieder')
                 for mitglied_id in mitglieder:
-                    cursor.execute("""
+                    db_execute(cursor, """
                         INSERT OR IGNORE INTO mitglied_gemeinschaft (mitglied_id, gemeinschaft_id)
                         VALUES (?, ?)
                     """, (mitglied_id, gemeinschaft_id))
@@ -3262,7 +3333,7 @@ def admin_gemeinschaften_mitglieder(gemeinschaft_id):
         cursor.execute("""
             SELECT b.* FROM benutzer b
             JOIN mitglied_gemeinschaft mg ON b.id = mg.mitglied_id
-            WHERE mg.gemeinschaft_id = ? AND b.aktiv = 1
+            WHERE mg.gemeinschaft_id = ? AND b.aktiv = true
             ORDER BY b.name
         """, (gemeinschaft_id,))
         columns = [desc[0] for desc in cursor.description]
@@ -3271,7 +3342,7 @@ def admin_gemeinschaften_mitglieder(gemeinschaft_id):
         # VerfÃ¼gbare Benutzer (noch nicht in Gemeinschaft)
         cursor.execute("""
             SELECT b.* FROM benutzer b
-            WHERE b.aktiv = 1 AND b.id NOT IN (
+            WHERE b.aktiv = true AND b.id NOT IN (
                 SELECT mitglied_id FROM mitglied_gemeinschaft 
                 WHERE gemeinschaft_id = ?
             )
@@ -3457,26 +3528,52 @@ def admin_einsaetze_loeschen():
 def admin_database_backup():
     """Erstellt ein Backup der Datenbank als Download"""
     import shutil
+    import tempfile
+    import subprocess
     from datetime import datetime
-    
+
     try:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_filename = f"maschinengemeinschaft_backup_{timestamp}.db"
-        
-        # Erstelle temporäres Backup
-        import tempfile
-        temp_dir = tempfile.gettempdir()
-        temp_backup_path = os.path.join(temp_dir, backup_filename)
-        
-        # Kopiere Datenbank
-        shutil.copy2(DB_PATH, temp_backup_path)
-        
+
+        if USING_POSTGRESQL:
+            # PostgreSQL: pg_dump verwenden
+            from database import PG_HOST, PG_PORT, PG_DATABASE, PG_USER, PG_PASSWORD
+
+            backup_filename = f"maschinengemeinschaft_backup_{timestamp}.sql"
+            temp_dir = tempfile.gettempdir()
+            temp_backup_path = os.path.join(temp_dir, backup_filename)
+
+            # pg_dump ausführen
+            env = os.environ.copy()
+            env['PGPASSWORD'] = PG_PASSWORD
+
+            result = subprocess.run([
+                'pg_dump',
+                '-h', PG_HOST,
+                '-p', str(PG_PORT),
+                '-U', PG_USER,
+                '-d', PG_DATABASE,
+                '-f', temp_backup_path
+            ], env=env, capture_output=True, text=True)
+
+            if result.returncode != 0:
+                raise Exception(f"pg_dump Fehler: {result.stderr}")
+
+            mimetype = 'application/sql'
+        else:
+            # SQLite: Datei kopieren
+            backup_filename = f"maschinengemeinschaft_backup_{timestamp}.db"
+            temp_dir = tempfile.gettempdir()
+            temp_backup_path = os.path.join(temp_dir, backup_filename)
+            shutil.copy2(DB_PATH, temp_backup_path)
+            mimetype = 'application/x-sqlite3'
+
         # Sende als Download
         return send_file(
             temp_backup_path,
             as_attachment=True,
             download_name=backup_filename,
-            mimetype='application/x-sqlite3'
+            mimetype=mimetype
         )
     except Exception as e:
         flash(f'Fehler beim Erstellen des Backups: {str(e)}', 'danger')
@@ -3491,61 +3588,113 @@ def admin_database_restore():
         if 'backup_file' not in request.files:
             flash('Keine Datei ausgewählt!', 'danger')
             return redirect(url_for('admin_database_restore'))
-        
+
         backup_file = request.files['backup_file']
-        
+
         if backup_file.filename == '':
             flash('Keine Datei ausgewählt!', 'danger')
             return redirect(url_for('admin_database_restore'))
-        
-        if not backup_file.filename.endswith('.db'):
-            flash('Ungültiges Dateiformat! Nur .db Dateien sind erlaubt.', 'danger')
-            return redirect(url_for('admin_database_restore'))
-        
-        try:
-            import shutil
-            import tempfile
-            
-            # Speichere Upload temporär
-            temp_dir = tempfile.gettempdir()
-            temp_upload_path = os.path.join(temp_dir, 'temp_restore.db')
-            backup_file.save(temp_upload_path)
-            
-            # Validiere dass es eine SQLite Datenbank ist
-            try:
-                import sqlite3
-                test_conn = sqlite3.connect(temp_upload_path)
-                test_cursor = test_conn.cursor()
-                test_cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-                tables = test_cursor.fetchall()
-                test_conn.close()
-                
-                if not tables:
-                    raise Exception("Keine Tabellen in der Datenbank gefunden")
-            except Exception as e:
-                os.remove(temp_upload_path)
-                flash(f'Ungültige Datenbank-Datei: {str(e)}', 'danger')
+
+        if USING_POSTGRESQL:
+            # PostgreSQL: .sql Dateien akzeptieren
+            if not backup_file.filename.endswith('.sql'):
+                flash('Ungültiges Dateiformat! Nur .sql Dateien sind erlaubt.', 'danger')
                 return redirect(url_for('admin_database_restore'))
-            
-            # Erstelle Backup der aktuellen Datenbank
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_current = f"{DB_PATH}.backup_{timestamp}"
-            shutil.copy2(DB_PATH, backup_current)
-            
-            # Ersetze aktuelle Datenbank
-            shutil.copy2(temp_upload_path, DB_PATH)
-            os.remove(temp_upload_path)
-            
-            flash(f'Datenbank erfolgreich wiederhergestellt! Alte Datenbank gesichert als: {os.path.basename(backup_current)}', 'success')
-            flash('WICHTIG: Bitte starten Sie die Anwendung neu!', 'warning')
-            
-            return redirect(url_for('admin_dashboard'))
-            
-        except Exception as e:
-            flash(f'Fehler bei der Wiederherstellung: {str(e)}', 'danger')
-            return redirect(url_for('admin_database_restore'))
-    
-    return render_template('admin_restore.html')
+
+            try:
+                import tempfile
+                import subprocess
+                from database import PG_HOST, PG_PORT, PG_DATABASE, PG_USER, PG_PASSWORD
+
+                # Speichere Upload temporär
+                temp_dir = tempfile.gettempdir()
+                temp_upload_path = os.path.join(temp_dir, 'temp_restore.sql')
+                backup_file.save(temp_upload_path)
+
+                # Erstelle zuerst ein Backup der aktuellen Datenbank
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_current = os.path.join(temp_dir, f"backup_before_restore_{timestamp}.sql")
+
+                env = os.environ.copy()
+                env['PGPASSWORD'] = PG_PASSWORD
+
+                # Backup erstellen
+                subprocess.run([
+                    'pg_dump', '-h', PG_HOST, '-p', str(PG_PORT),
+                    '-U', PG_USER, '-d', PG_DATABASE, '-f', backup_current
+                ], env=env, check=True)
+
+                # Restore durchführen
+                result = subprocess.run([
+                    'psql', '-h', PG_HOST, '-p', str(PG_PORT),
+                    '-U', PG_USER, '-d', PG_DATABASE, '-f', temp_upload_path
+                ], env=env, capture_output=True, text=True)
+
+                os.remove(temp_upload_path)
+
+                if result.returncode != 0:
+                    raise Exception(f"psql Fehler: {result.stderr}")
+
+                flash(f'Datenbank erfolgreich wiederhergestellt! Backup erstellt: {os.path.basename(backup_current)}', 'success')
+                flash('WICHTIG: Bitte starten Sie die Anwendung neu!', 'warning')
+
+                return redirect(url_for('admin_dashboard'))
+
+            except Exception as e:
+                flash(f'Fehler bei der Wiederherstellung: {str(e)}', 'danger')
+                return redirect(url_for('admin_database_restore'))
+        else:
+            # SQLite: .db Dateien
+            if not backup_file.filename.endswith('.db'):
+                flash('Ungültiges Dateiformat! Nur .db Dateien sind erlaubt.', 'danger')
+                return redirect(url_for('admin_database_restore'))
+
+            try:
+                import shutil
+                import tempfile
+
+                # Speichere Upload temporär
+                temp_dir = tempfile.gettempdir()
+                temp_upload_path = os.path.join(temp_dir, 'temp_restore.db')
+                backup_file.save(temp_upload_path)
+
+                # Validiere dass es eine SQLite Datenbank ist
+                try:
+                    import sqlite3
+                    test_conn = sqlite3.connect(temp_upload_path)
+                    test_cursor = test_conn.cursor()
+                    test_cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                    tables = test_cursor.fetchall()
+                    test_conn.close()
+
+                    if not tables:
+                        raise Exception("Keine Tabellen in der Datenbank gefunden")
+                except Exception as e:
+                    os.remove(temp_upload_path)
+                    flash(f'Ungültige Datenbank-Datei: {str(e)}', 'danger')
+                    return redirect(url_for('admin_database_restore'))
+
+                # Erstelle Backup der aktuellen Datenbank
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_current = f"{DB_PATH}.backup_{timestamp}"
+                shutil.copy2(DB_PATH, backup_current)
+
+                # Ersetze aktuelle Datenbank
+                shutil.copy2(temp_upload_path, DB_PATH)
+                os.remove(temp_upload_path)
+
+                flash(f'Datenbank erfolgreich wiederhergestellt! Alte Datenbank gesichert als: {os.path.basename(backup_current)}', 'success')
+                flash('WICHTIG: Bitte starten Sie die Anwendung neu!', 'warning')
+
+                return redirect(url_for('admin_dashboard'))
+
+            except Exception as e:
+                flash(f'Fehler bei der Wiederherstellung: {str(e)}', 'danger')
+                return redirect(url_for('admin_database_restore'))
+
+    # Template-Variable für Dateiendung
+    file_extension = '.sql' if USING_POSTGRESQL else '.db'
+    return render_template('admin_restore.html', file_extension=file_extension)
 
 
 @app.route('/admin/export/alle-einsaetze-csv')
@@ -3634,7 +3783,7 @@ def admin_rollen():
             FROM benutzer b
             LEFT JOIN gemeinschafts_admin ga ON b.id = ga.benutzer_id
             LEFT JOIN gemeinschaften g ON ga.gemeinschaft_id = g.id
-            WHERE b.aktiv = 1
+            WHERE b.aktiv = true
             GROUP BY b.id, b.name, b.vorname, b.username, b.admin_level, b.is_admin
             ORDER BY b.admin_level DESC, b.name
         """)
@@ -3643,7 +3792,7 @@ def admin_rollen():
         benutzer = [dict(zip(columns, row)) for row in cursor.fetchall()]
         
         # Hole alle Gemeinschaften
-        cursor.execute("SELECT * FROM gemeinschaften WHERE aktiv = 1 ORDER BY name")
+        cursor.execute("SELECT * FROM gemeinschaften WHERE aktiv = true ORDER BY name")
         columns = [desc[0] for desc in cursor.description]
         gemeinschaften = [dict(zip(columns, row)) for row in cursor.fetchall()]
     
@@ -3668,7 +3817,7 @@ def admin_rollen_set_level():
         
         # PrÃ¼fe, dass nicht der letzte Haupt-Admin entfernt wird
         if level < 2:
-            cursor.execute('SELECT COUNT(*) FROM benutzer WHERE admin_level = 2 AND aktiv = 1')
+            cursor.execute('SELECT COUNT(*) FROM benutzer WHERE admin_level = 2 AND aktiv = true')
             anzahl_haupt_admins = cursor.fetchone()[0]
             
             cursor.execute("SELECT admin_level FROM benutzer WHERE id = ?", (benutzer_id,))
@@ -3734,14 +3883,14 @@ def admin_abrechnungen():
         # Gemeinschaften des Admins laden
         if session.get('admin_level', 0) >= 2:
             # Hauptadmin sieht alle Gemeinschaften
-            cursor.execute("SELECT id, name FROM gemeinschaften WHERE aktiv = 1")
+            cursor.execute("SELECT id, name FROM gemeinschaften WHERE aktiv = true")
         else:
             # Gemeinschafts-Admin sieht nur seine Gemeinschaften
             cursor.execute(""" 
                 SELECT g.id, g.name 
                 FROM gemeinschaften g
                 JOIN gemeinschafts_admin ga ON g.id = ga.gemeinschaft_id
-                WHERE ga.benutzer_id = ? AND g.aktiv = 1
+                WHERE ga.benutzer_id = ? AND g.aktiv = true
             """, (session['benutzer_id'],))
         
         gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
@@ -4826,7 +4975,7 @@ def admin_training_datenbanken():
             try:
                 with MaschinenDBContext(path) as db:
                     cursor = db.connection.cursor()
-                    cursor.execute("SELECT COUNT(*) FROM benutzer WHERE aktiv = 1")
+                    cursor.execute("SELECT COUNT(*) FROM benutzer WHERE aktiv = true")
                     db_info['users'] = cursor.fetchone()[0]
                     cursor.execute("SELECT COUNT(*) FROM maschineneinsaetze")
                     db_info['einsaetze'] = cursor.fetchone()[0]
