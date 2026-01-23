@@ -7,6 +7,7 @@ Ermöglicht Benutzern den Zugriff von extern (z.B. Mobiltelefon)
 
 import os
 import csv
+import glob as glob_module
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify, make_response
 from database import MaschinenDBContext
 from datetime import datetime
@@ -16,8 +17,80 @@ from functools import wraps
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))  # Für Session-Management
 
-# Datenbank-Pfad aus Umgebungsvariable oder Standard-Pfad
-DB_PATH = os.environ.get('DB_PATH', './data/maschinengemeinschaft.db')
+# Datenbank-Pfade
+DB_PATH_PRODUCTION = os.environ.get('DB_PATH', './data/maschinengemeinschaft.db')
+DB_PATH = DB_PATH_PRODUCTION  # Standard für Kompatibilität
+TRAINING_DB_DIR = './data/training'
+
+# Trainings-Datenbanken Konfiguration
+TRAINING_DATABASES = {
+    'uebung_leer': {
+        'name': 'Leere Übungsdatenbank',
+        'description': 'Zum freien Üben - nur Admin-Benutzer vorhanden',
+        'file': 'uebung_leer.db',
+        'level': 'anfaenger'
+    },
+    'uebung_anfaenger': {
+        'name': 'Anfänger-Training',
+        'description': 'Einfache Daten: 5 Benutzer, 3 Maschinen, ca. 25 Einsätze',
+        'file': 'uebung_anfaenger.db',
+        'level': 'anfaenger'
+    },
+    'uebung_fortgeschritten': {
+        'name': 'Fortgeschrittenen-Training',
+        'description': 'Mehr Daten: 15 Benutzer, 8 Maschinen, 2 Gemeinschaften, 250+ Einsätze',
+        'file': 'uebung_fortgeschritten.db',
+        'level': 'fortgeschritten'
+    },
+    'uebung_admin': {
+        'name': 'Admin-Training',
+        'description': 'Komplexe Daten: 25 Benutzer, 15 Maschinen, 3 Gemeinschaften, 700+ Einsätze',
+        'file': 'uebung_admin.db',
+        'level': 'admin'
+    }
+}
+
+
+def get_current_db_path():
+    """Gibt den aktuellen Datenbankpfad basierend auf Session zurück"""
+    if 'current_database' in session and session['current_database'] != 'produktion':
+        db_key = session['current_database']
+        if db_key in TRAINING_DATABASES:
+            training_path = os.path.join(TRAINING_DB_DIR, TRAINING_DATABASES[db_key]['file'])
+            if os.path.exists(training_path):
+                return training_path
+    return DB_PATH_PRODUCTION
+
+
+def get_available_training_dbs():
+    """Gibt Liste der verfügbaren Trainingsdatenbanken zurück"""
+    available = []
+    for key, config in TRAINING_DATABASES.items():
+        path = os.path.join(TRAINING_DB_DIR, config['file'])
+        if os.path.exists(path):
+            size_kb = os.path.getsize(path) / 1024
+            available.append({
+                'key': key,
+                'name': config['name'],
+                'description': config['description'],
+                'level': config['level'],
+                'size_kb': round(size_kb, 1)
+            })
+    return available
+
+
+def is_training_mode():
+    """Prüft ob aktuell im Trainingsmodus"""
+    return session.get('current_database', 'produktion') != 'produktion'
+
+
+def can_access_production():
+    """Prüft ob Benutzer Zugriff auf Produktionsdatenbank hat"""
+    # Admins haben immer Zugriff
+    if session.get('is_admin'):
+        return True
+    # Prüfe ob nur Trainingsmodus erlaubt
+    return not session.get('nur_training', False)
 
 
 def login_required(f):
@@ -60,6 +133,31 @@ def hauptadmin_required(f):
             return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
     return decorated_function
+
+
+@app.context_processor
+def inject_database_info():
+    """Fügt Datenbank-Info zu allen Templates hinzu"""
+    current_db = session.get('current_database', 'produktion')
+    is_training = current_db != 'produktion'
+
+    db_info = {
+        'current_database': current_db,
+        'is_training_mode': is_training,
+        'database_name': 'Produktion'
+    }
+
+    if is_training and current_db in TRAINING_DATABASES:
+        db_info['database_name'] = TRAINING_DATABASES[current_db]['name']
+
+    return {'db_info': db_info}
+
+
+@app.before_request
+def set_database_path():
+    """Setzt DB_PATH basierend auf Session vor jedem Request"""
+    global DB_PATH
+    DB_PATH = get_current_db_path()
 
 
 def archiviere_abgelaufene_reservierungen():
@@ -144,14 +242,24 @@ def login():
                 session['benutzer_name'] = f"{benutzer['name']}, {benutzer['vorname']}"
                 session['is_admin'] = bool(benutzer.get('is_admin', False))
                 session['admin_level'] = benutzer.get('admin_level', 0)
-                
+
+                # Trainings-Modus Einstellung laden
+                nur_training = benutzer.get('nur_training', 0)
+                session['nur_training'] = bool(nur_training)
+
+                # Wenn nur Training erlaubt, direkt auf Training-DB setzen
+                if nur_training and not session['is_admin']:
+                    session['current_database'] = 'uebung_anfaenger'  # Standard-Training
+                else:
+                    session['current_database'] = 'produktion'
+
                 # Gemeinschafts-Admin Zuordnungen laden
                 if session['admin_level'] == 1:
                     gemeinschafts_ids = db.get_gemeinschafts_admin_ids(benutzer['id'])
                     session['gemeinschafts_admin_ids'] = gemeinschafts_ids
                 else:
                     session['gemeinschafts_admin_ids'] = []
-                
+
                 # Lade Gemeinschaften des Benutzers für das Menü
                 cursor = db.connection.cursor()
                 cursor.execute("""
@@ -163,8 +271,13 @@ def login():
                 """, (benutzer['id'],))
                 gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
                 session['gemeinschaften'] = gemeinschaften
-                
-                flash(f"Willkommen, {benutzer['vorname']}!", 'success')
+
+                # Begrüßung mit Info über Datenbank-Modus
+                if nur_training and not session['is_admin']:
+                    flash(f"Willkommen, {benutzer['vorname']}! (Übungsmodus)", 'info')
+                else:
+                    flash(f"Willkommen, {benutzer['vorname']}!", 'success')
+
                 if session['is_admin']:
                     return redirect(url_for('admin_dashboard'))
                 return redirect(url_for('dashboard'))
@@ -180,6 +293,59 @@ def logout():
     session.clear()
     flash('Sie wurden abgemeldet.', 'info')
     return redirect(url_for('login'))
+
+
+@app.route('/datenbank-auswahl')
+@login_required
+def datenbank_auswahl():
+    """Seite zur Auswahl der Datenbank (Produktion oder Training)"""
+    training_dbs = get_available_training_dbs()
+    current_db = session.get('current_database', 'produktion')
+    allow_production = can_access_production()
+
+    return render_template('datenbank_auswahl.html',
+                         training_dbs=training_dbs,
+                         current_db=current_db,
+                         allow_production=allow_production)
+
+
+@app.route('/datenbank-wechseln', methods=['POST'])
+@login_required
+def datenbank_wechseln():
+    """Wechselt die aktive Datenbank"""
+    target_db = request.form.get('database', 'produktion')
+
+    if target_db == 'produktion':
+        if not can_access_production():
+            flash('Sie haben keinen Zugriff auf die Produktionsdatenbank.', 'danger')
+            return redirect(url_for('datenbank_auswahl'))
+        session['current_database'] = 'produktion'
+        flash('Gewechselt zur Produktionsdatenbank.', 'success')
+    elif target_db in TRAINING_DATABASES:
+        session['current_database'] = target_db
+        db_name = TRAINING_DATABASES[target_db]['name']
+        flash(f'Gewechselt zu: {db_name}', 'info')
+    else:
+        flash('Ungültige Datenbank ausgewählt.', 'danger')
+
+    # Gemeinschaften für neue DB laden
+    db_path = get_current_db_path()
+    try:
+        with MaschinenDBContext(db_path) as db:
+            cursor = db.connection.cursor()
+            cursor.execute("""
+                SELECT g.id, g.name
+                FROM gemeinschaften g
+                JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
+                WHERE mg.mitglied_id = ? AND g.aktiv = 1
+                ORDER BY g.name
+            """, (session['benutzer_id'],))
+            gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
+            session['gemeinschaften'] = gemeinschaften
+    except:
+        session['gemeinschaften'] = []
+
+    return redirect(url_for('dashboard'))
 
 
 @app.route('/dashboard')
@@ -4563,6 +4729,141 @@ def anfangssaldo_bearbeiten(gemeinschaft_id):
         }
     
     return render_template('anfangssaldo_bearbeiten.html', gemeinschaft=gemeinschaft)
+
+
+@app.route('/admin/training-rechte')
+@admin_required
+def admin_training_rechte():
+    """Verwaltet Trainings-Zugriffsrechte für Benutzer"""
+    with MaschinenDBContext(DB_PATH_PRODUCTION) as db:
+        cursor = db.connection.cursor()
+
+        # Hole alle Benutzer mit Training-Info
+        cursor.execute("""
+            SELECT id, name, vorname, username, is_admin, admin_level,
+                   COALESCE(nur_training, 0) as nur_training,
+                   aktiv
+            FROM benutzer
+            WHERE id != 1
+            ORDER BY name, vorname
+        """)
+
+        columns = [desc[0] for desc in cursor.description]
+        benutzer = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    training_dbs = get_available_training_dbs()
+
+    return render_template('admin_training_rechte.html',
+                         benutzer=benutzer,
+                         training_dbs=training_dbs)
+
+
+@app.route('/admin/training-rechte/update', methods=['POST'])
+@admin_required
+def admin_training_rechte_update():
+    """Aktualisiert Trainings-Zugriffsrechte eines Benutzers"""
+    benutzer_id = request.form.get('benutzer_id', type=int)
+    nur_training = request.form.get('nur_training', '0') == '1'
+
+    if not benutzer_id:
+        flash('Ungültiger Benutzer!', 'danger')
+        return redirect(url_for('admin_training_rechte'))
+
+    with MaschinenDBContext(DB_PATH_PRODUCTION) as db:
+        cursor = db.connection.cursor()
+
+        # Prüfe ob Spalte existiert, wenn nicht, füge sie hinzu
+        cursor.execute("PRAGMA table_info(benutzer)")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        if 'nur_training' not in columns:
+            cursor.execute("ALTER TABLE benutzer ADD COLUMN nur_training BOOLEAN DEFAULT 0")
+
+        # Update Benutzer
+        cursor.execute("""
+            UPDATE benutzer
+            SET nur_training = ?
+            WHERE id = ?
+        """, (1 if nur_training else 0, benutzer_id))
+
+        db.connection.commit()
+
+        # Hole Benutzername für Meldung
+        cursor.execute("SELECT name, vorname FROM benutzer WHERE id = ?", (benutzer_id,))
+        row = cursor.fetchone()
+        name = f"{row[1]} {row[0]}" if row else "Benutzer"
+
+    if nur_training:
+        flash(f'{name}: Nur Übungsmodus erlaubt', 'info')
+    else:
+        flash(f'{name}: Vollzugriff (Produktion + Übung) erlaubt', 'success')
+
+    return redirect(url_for('admin_training_rechte'))
+
+
+@app.route('/admin/training-datenbanken')
+@hauptadmin_required
+def admin_training_datenbanken():
+    """Übersicht und Verwaltung der Trainingsdatenbanken"""
+    training_dbs = []
+
+    for key, config in TRAINING_DATABASES.items():
+        path = os.path.join(TRAINING_DB_DIR, config['file'])
+        db_info = {
+            'key': key,
+            'name': config['name'],
+            'description': config['description'],
+            'level': config['level'],
+            'file': config['file'],
+            'exists': os.path.exists(path),
+            'size_kb': 0,
+            'users': 0,
+            'einsaetze': 0
+        }
+
+        if db_info['exists']:
+            db_info['size_kb'] = round(os.path.getsize(path) / 1024, 1)
+            try:
+                with MaschinenDBContext(path) as db:
+                    cursor = db.connection.cursor()
+                    cursor.execute("SELECT COUNT(*) FROM benutzer WHERE aktiv = 1")
+                    db_info['users'] = cursor.fetchone()[0]
+                    cursor.execute("SELECT COUNT(*) FROM maschineneinsaetze")
+                    db_info['einsaetze'] = cursor.fetchone()[0]
+            except:
+                pass
+
+        training_dbs.append(db_info)
+
+    return render_template('admin_training_datenbanken.html', training_dbs=training_dbs)
+
+
+@app.route('/admin/training-datenbanken/neu-erstellen', methods=['POST'])
+@hauptadmin_required
+def admin_training_db_erstellen():
+    """Erstellt Trainingsdatenbanken neu"""
+    import subprocess
+
+    script_path = os.path.join(os.path.dirname(__file__), 'create_training_databases.py')
+
+    if os.path.exists(script_path):
+        try:
+            result = subprocess.run(
+                ['python', script_path],
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            if result.returncode == 0:
+                flash('Trainingsdatenbanken wurden neu erstellt!', 'success')
+            else:
+                flash(f'Fehler: {result.stderr}', 'danger')
+        except Exception as e:
+            flash(f'Fehler beim Erstellen: {str(e)}', 'danger')
+    else:
+        flash('Script nicht gefunden!', 'danger')
+
+    return redirect(url_for('admin_training_datenbanken'))
 
 
 if __name__ == "__main__":

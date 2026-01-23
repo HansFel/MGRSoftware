@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Übungsdatenbanken verwalten - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h1 class="text-white mb-4">
+            <i class="bi bi-database-gear"></i> Übungsdatenbanken verwalten
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-mortarboard"></i> Verfügbare Übungsdatenbanken
+                </h5>
+                <form method="POST" action="{{ url_for('admin_training_db_erstellen') }}" class="d-inline">
+                    <button type="submit" class="btn btn-warning"
+                            onclick="return confirm('Alle Übungsdatenbanken werden neu erstellt. Vorhandene Daten in den Übungsdatenbanken gehen verloren. Fortfahren?')">
+                        <i class="bi bi-arrow-clockwise"></i> Alle neu erstellen
+                    </button>
+                </form>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-info-circle"></i> Information:</h6>
+                    <p class="mb-0">
+                        Übungsdatenbanken ermöglichen es Benutzern, die Software zu testen und zu lernen,
+                        ohne echte Daten zu verändern. Die Datenbanken befinden sich im Ordner
+                        <code>data/training/</code>.
+                    </p>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Beschreibung</th>
+                                <th>Schwierigkeit</th>
+                                <th>Status</th>
+                                <th>Benutzer</th>
+                                <th>Einsätze</th>
+                                <th>Größe</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for db in training_dbs %}
+                            <tr>
+                                <td>
+                                    <strong>{{ db.name }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ db.file }}</small>
+                                </td>
+                                <td>{{ db.description }}</td>
+                                <td>
+                                    {% if db.level == 'anfaenger' %}
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-1-circle"></i> Anfänger
+                                        </span>
+                                    {% elif db.level == 'fortgeschritten' %}
+                                        <span class="badge bg-primary">
+                                            <i class="bi bi-2-circle"></i> Fortgeschritten
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger">
+                                            <i class="bi bi-3-circle"></i> Admin
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if db.exists %}
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-check-circle"></i> Vorhanden
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger">
+                                            <i class="bi bi-x-circle"></i> Nicht vorhanden
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if db.exists %}
+                                        <i class="bi bi-people"></i> {{ db.users }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if db.exists %}
+                                        <i class="bi bi-list-check"></i> {{ db.einsaetze }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if db.exists %}
+                                        {{ db.size_kb }} KB
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Beschreibung der Datenbanken -->
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card border-success h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-1-circle"></i> Anfänger</h5>
+            </div>
+            <div class="card-body">
+                <p>Ideal für neue Benutzer:</p>
+                <ul class="mb-0">
+                    <li>Wenige Datensätze</li>
+                    <li>Übersichtliche Struktur</li>
+                    <li>Grundfunktionen lernen</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-primary h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-2-circle"></i> Fortgeschritten</h5>
+            </div>
+            <div class="card-body">
+                <p>Für erfahrene Benutzer:</p>
+                <ul class="mb-0">
+                    <li>Mehr Daten und Benutzer</li>
+                    <li>Mehrere Gemeinschaften</li>
+                    <li>Komplexere Szenarien</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-danger h-100">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="bi bi-3-circle"></i> Admin-Training</h5>
+            </div>
+            <div class="card-body">
+                <p>Für Administrator-Schulung:</p>
+                <ul class="mb-0">
+                    <li>Viele Datensätze</li>
+                    <li>Verschiedene Benutzerrollen</li>
+                    <li>Alle Admin-Funktionen testen</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Login-Info -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-key"></i> Login-Informationen</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Administrator:</h6>
+                        <ul>
+                            <li>Benutzername: <code>admin</code></li>
+                            <li>Passwort: <code>admin123</code></li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Testbenutzer:</h6>
+                        <ul>
+                            <li>Benutzername: <code>[vorname][nachname]</code> (kleingeschrieben)</li>
+                            <li>Beispiel: <code>mmustermann</code></li>
+                            <li>Passwort: <code>test123</code></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3 mb-5">
+    <div class="col-12">
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück zum Dashboard
+        </a>
+        <a href="{{ url_for('admin_training_rechte') }}" class="btn btn-outline-primary">
+            <i class="bi bi-people"></i> Benutzer-Rechte verwalten
+        </a>
+    </div>
+</div>
+{% endblock %}

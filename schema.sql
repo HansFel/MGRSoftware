@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS benutzer (
     aktiv BOOLEAN DEFAULT 1,
     bemerkungen TEXT,
     treibstoffkosten_preis REAL DEFAULT 1.50,
-    backup_schwellwert REAL DEFAULT 10.0
+    backup_schwellwert REAL DEFAULT 10.0,
+    nur_training BOOLEAN DEFAULT 0
 );
 
 -- Tabelle für Maschinen

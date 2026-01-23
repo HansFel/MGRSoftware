@@ -160,16 +160,37 @@
                                 <i class="bi bi-wallet2"></i> Mitgliederkonten
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_training_rechte') }}">
+                                <i class="bi bi-mortarboard"></i> Training-Rechte
+                            </a></li>
+                            {% if session.admin_level >= 2 %}
+                            <li><a class="dropdown-item" href="{{ url_for('admin_training_datenbanken') }}">
+                                <i class="bi bi-database-gear"></i> Übungsdatenbanken
+                            </a></li>
+                            {% endif %}
                         </ul>
                     </li>
                     {% endif %}
                 </ul>
                 <ul class="navbar-nav">
+                    <!-- Datenbank-Modus Anzeige -->
+                    {% if db_info and db_info.is_training_mode %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('datenbank_auswahl') }}">
+                            <span class="badge bg-warning text-dark">
+                                <i class="bi bi-mortarboard-fill"></i> {{ db_info.database_name }}
+                            </span>
+                        </a>
+                    </li>
+                    {% endif %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="bi bi-person-circle"></i> {{ session.get('benutzer_name') }}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{{ url_for('datenbank_auswahl') }}">
+                                <i class="bi bi-database"></i> Datenbank wechseln
+                            </a></li>
                             <li><a class="dropdown-item" href="{{ url_for('passwort_aendern') }}">
                                 <i class="bi bi-key"></i> Passwort ändern
                             </a></li>
