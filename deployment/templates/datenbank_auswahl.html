@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Datenbank-Auswahl - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h1 class="text-white mb-4">
+            <i class="bi bi-database-gear"></i> Datenbank-Auswahl
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Aktuelle Datenbank -->
+        <div class="card mb-4">
+            <div class="card-header {% if db_info.is_training_mode %}bg-warning{% else %}bg-success{% endif %} text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-database-check"></i> Aktuelle Datenbank
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    {% if db_info.is_training_mode %}
+                        <i class="bi bi-mortarboard-fill text-warning fs-1 me-3"></i>
+                        <div>
+                            <h4 class="mb-1">{{ db_info.database_name }}</h4>
+                            <p class="text-muted mb-0">Sie arbeiten im Übungsmodus. Änderungen betreffen nur die Übungsdatenbank.</p>
+                        </div>
+                    {% else %}
+                        <i class="bi bi-database-fill-check text-success fs-1 me-3"></i>
+                        <div>
+                            <h4 class="mb-1">Produktionsdatenbank</h4>
+                            <p class="text-muted mb-0">Sie arbeiten mit echten Daten. Änderungen sind permanent.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Produktionsdatenbank -->
+        {% if allow_production %}
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-database-fill"></i> Produktionsdatenbank
+                </h5>
+            </div>
+            <div class="card-body">
+                <p>Die echte Datenbank mit allen Mitgliedern, Maschinen und Einsätzen.</p>
+                <div class="alert alert-success mb-3">
+                    <i class="bi bi-check-circle"></i> Alle Änderungen werden gespeichert und sind für alle Mitglieder sichtbar.
+                </div>
+                <form method="POST" action="{{ url_for('datenbank_wechseln') }}">
+                    <input type="hidden" name="database" value="produktion">
+                    <button type="submit" class="btn btn-success btn-lg" {% if current_db == 'produktion' %}disabled{% endif %}>
+                        {% if current_db == 'produktion' %}
+                            <i class="bi bi-check-circle"></i> Aktiv
+                        {% else %}
+                            <i class="bi bi-box-arrow-in-right"></i> Zu Produktion wechseln
+                        {% endif %}
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <div class="card mb-4 border-secondary">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-database-fill-lock"></i> Produktionsdatenbank
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-lock-fill"></i>
+                    <strong>Zugriff eingeschränkt:</strong> Sie haben aktuell nur Zugriff auf Übungsdatenbanken.
+                    Kontaktieren Sie einen Administrator, wenn Sie Zugriff auf die Produktionsdatenbank benötigen.
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Übungsdatenbanken -->
+        <div class="card mb-4">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0">
+                    <i class="bi bi-mortarboard-fill"></i> Übungsdatenbanken
+                </h5>
+            </div>
+            <div class="card-body">
+                <p>Übungsdatenbanken zum Testen und Lernen. Änderungen beeinflussen nicht die echten Daten.</p>
+
+                {% if training_dbs %}
+                <div class="row">
+                    {% for db in training_dbs %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 {% if current_db == db.key %}border-warning border-2{% endif %}">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    {% if db.level == 'anfaenger' %}
+                                        <i class="bi bi-1-circle text-success"></i>
+                                    {% elif db.level == 'fortgeschritten' %}
+                                        <i class="bi bi-2-circle text-primary"></i>
+                                    {% else %}
+                                        <i class="bi bi-3-circle text-danger"></i>
+                                    {% endif %}
+                                    {{ db.name }}
+                                </h5>
+                                <p class="card-text small text-muted">{{ db.description }}</p>
+                                <p class="card-text">
+                                    <small class="text-muted">
+                                        <i class="bi bi-hdd"></i> {{ db.size_kb }} KB
+                                    </small>
+                                </p>
+                                <form method="POST" action="{{ url_for('datenbank_wechseln') }}">
+                                    <input type="hidden" name="database" value="{{ db.key }}">
+                                    <button type="submit" class="btn btn-sm {% if current_db == db.key %}btn-warning{% else %}btn-outline-warning{% endif %}"
+                                            {% if current_db == db.key %}disabled{% endif %}>
+                                        {% if current_db == db.key %}
+                                            <i class="bi bi-check-circle"></i> Aktiv
+                                        {% else %}
+                                            <i class="bi bi-play-circle"></i> Auswählen
+                                        {% endif %}
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Keine Übungsdatenbanken verfügbar.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- Info-Box -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Hinweise</h5>
+            </div>
+            <div class="card-body">
+                <h6><i class="bi bi-database-fill text-success"></i> Produktionsdatenbank</h6>
+                <ul class="small mb-3">
+                    <li>Echte Daten aller Mitglieder</li>
+                    <li>Änderungen sind permanent</li>
+                    <li>Für den täglichen Gebrauch</li>
+                </ul>
+
+                <h6><i class="bi bi-mortarboard-fill text-warning"></i> Übungsdatenbanken</h6>
+                <ul class="small mb-0">
+                    <li>Zum Lernen und Testen</li>
+                    <li>Keine Auswirkung auf echte Daten</li>
+                    <li>Können jederzeit zurückgesetzt werden</li>
+                    <li>Verschiedene Schwierigkeitsstufen</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3 mb-5">
+    <div class="col-12">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück zum Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}

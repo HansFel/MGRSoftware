@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h1 class="text-white mb-4">
+            <i class="bi bi-speedometer2"></i> Mitglieder-Dashboard
+        </h1>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 d-flex flex-column flex-md-row gap-3">
+        <a href="{{ url_for('neuer_einsatz') }}" class="btn btn-primary btn-lg flex-fill">
+            <i class="bi bi-plus-lg"></i> Einsatz erfassen
+        </a>
+        <a href="{{ url_for('meine_einsaetze') }}" class="btn btn-warning btn-lg flex-fill fw-bold border border-dark shadow">
+            <i class="bi bi-list-check"></i> Meine Einsätze
+        </a>
+        <a href="{{ url_for('reservierungen_balken') }}" class="btn btn-outline-info btn-lg flex-fill">
+            <i class="bi bi-calendar-range"></i> Timeline
+        </a>
+        <!-- Untermenü für weitere Punkte -->
+        <div class="dropdown flex-fill">
+            <button class="btn btn-secondary btn-lg dropdown-toggle w-100" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-list"></i> Mehr
+            </button>
+            <ul class="dropdown-menu w-100" aria-labelledby="dropdownMenuButton">
+                <li><a class="dropdown-item" href="{{ url_for('meine_reservierungen') }}">Meine Reservierungen</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('meine_abrechnungen') }}">Meine Abrechnungen</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('nachrichten') }}">Nachrichten</a></li>
+                <!-- Weitere Menüpunkte nach Bedarf -->
+            </ul>
+        </div>
+    </div>
+</div>
+
+
+<!-- Letzte Einsätze -->
+{% if einsaetze %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Letzte Einsätze</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Datum</th>
+                                <th>Maschine</th>
+                                <th>Zweck</th>
+                                <th>Menge</th>
+                                <th>Treibstoff</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for einsatz in einsaetze %}
+                            <tr>
+                                <td>{{ einsatz.datum }}</td>
+                                <td>{{ einsatz.maschine }}</td>
+                                <td>{{ einsatz.einsatzzweck }}</td>
+                                <td>
+                                    {% if einsatz.abrechnungsart == 'hektar' and einsatz.flaeche_menge %}
+                                        {{ "%.2f"|format(einsatz.flaeche_menge) }} ha
+                                    {% elif einsatz.abrechnungsart == 'kilometer' and einsatz.flaeche_menge %}
+                                        {{ "%.2f"|format(einsatz.flaeche_menge) }} km
+                                    {% elif einsatz.abrechnungsart == 'stueck' and einsatz.flaeche_menge %}
+                                        {{ "%.0f"|format(einsatz.flaeche_menge) }} St
+                                    {% else %}
+                                        {{ "%.1f"|format(einsatz.betriebsstunden) }} h
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if einsatz.treibstoffverbrauch %}
+                                        {{ "%.1f"|format(einsatz.treibstoffverbrauch) }} l
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Abrechnung {{ gemeinschaft.name }} - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+{% include "abrechnung_header.html" %}
+
+
+<!-- Gemeinschaftsdaten und Administratoren -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        {% if gemeinschaft.beschreibung %}
+        <div class="alert alert-info mb-2">
+            <i class="bi bi-info-circle"></i> {{ gemeinschaft.beschreibung }}
+        </div>
+        {% endif %}
+        <div class="card mb-2">
+            <div class="card-body">
+                <strong>Adresse:</strong> {{ gemeinschaft.adresse or '-' }}<br>
+                <strong>Telefon:</strong> {{ gemeinschaft.telefon or '-' }}<br>
+                <strong>E-Mail:</strong> {{ gemeinschaft.email or '-' }}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <strong>Administratoren:</strong><br>
+                {% if admins and admins|length > 0 %}
+                    <ul class="mb-0">
+                    {% for admin in admins %}
+                        <li>{{ admin.vorname }} {{ admin.name }}{% if admin.email %} &lt;{{ admin.email }}&gt;{% endif %}</li>
+                    {% endfor %}
+                    </ul>
+                {% else %}
+                    <span class="text-muted">Keine Administratoren hinterlegt</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Zusammenfassung -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <p class="text-muted mb-1">Einsätze</p>
+                <h4 class="mb-0">{{ gesamtsummen.anzahl_einsaetze }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <p class="text-muted mb-1">Betriebsstunden</p>
+                <h4 class="mb-0">{{ "%.1f"|format(gesamtsummen.betriebsstunden) }} h</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <p class="text-muted mb-1">Maschinenkosten</p>
+                <h4 class="mb-0 text-success">{{ "%.2f"|format(gesamtsummen.maschinenkosten) }}€</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card bg-primary text-white">
+            <div class="card-body">
+                <p class="mb-1 opacity-75">Gesamt</p>
+                <h4 class="mb-0">{{ "%.2f"|format(gesamtsummen.gesamtkosten) }}€</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Abrechnung pro Mitglied -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-people"></i> Abrechnung pro Mitglied
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if mitglieder_abrechnung %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Mitglied</th>
+                                <th class="text-end">Einsätze</th>
+                                <th class="text-end">Betriebsstunden</th>
+                                <th class="text-end">Maschinenkosten</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for mitglied in mitglieder_abrechnung %}
+                            <tr>
+                                <td>
+                                    <strong>{{ mitglied.name }}, {{ mitglied.vorname }}</strong>
+                                </td>
+                                <td class="text-end">{{ mitglied.anzahl_einsaetze or 0 }}</td>
+                                <td class="text-end">{{ "%.1f"|format(mitglied.betriebsstunden or 0) }} h</td>
+                                <td class="text-end">
+                                    <strong class="text-primary">{{ "%.2f"|format(mitglied.gesamtkosten or 0) }}€</strong>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <th>Gesamt</th>
+                                <th class="text-end">{{ gesamtsummen.anzahl_einsaetze }}</th>
+                                <th class="text-end">{{ "%.1f"|format(gesamtsummen.betriebsstunden) }} h</th>
+                                <th class="text-end">
+                                    <strong class="text-primary">{{ "%.2f"|format(gesamtsummen.gesamtkosten) }}€</strong>
+                                </th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i> 
+                    Keine Einsätze in dieser Gemeinschaft vorhanden.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hinweise -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">
+                    <i class="bi bi-info-circle"></i> Hinweise zur Abrechnung
+                </h6>
+                <ul class="small text-muted mb-0">
+                    <li><strong>Treibstoffkosten werden NICHT der Gemeinschaft zugerechnet</strong> - diese trägt jedes Mitglied selbst</li>
+                    <li>Maschinenkosten: Berechnet nach Abrechnungsart (Stunden/Hektar/Kilometer/Stück) × Preis pro Einheit</li>
+                    <li>Es werden nur Einsätze berücksichtigt, die Maschinen dieser Gemeinschaft betreffen</li>
+                    <li>Exportieren Sie die Abrechnung als CSV für weitere Verarbeitung</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

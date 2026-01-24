@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}Mein Konto - {{ gemeinschaft.name }}{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2><i class="bi bi-wallet2"></i> Mein Konto</h2>
+                <p class="text-muted">{{ gemeinschaft.name }}</p>
+            </div>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Zurück
+            </a>
+        </div>
+
+        <!-- Kontostand -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card {% if saldo < 0 %}border-danger{% elif saldo > 0 %}border-success{% endif %}">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Ihr Kontostand</h5>
+                        <h1 class="{% if saldo < 0 %}text-danger{% elif saldo > 0 %}text-success{% else %}text-secondary{% endif %}">
+                            {{ "%.2f"|format(saldo) }} €
+                        </h1>
+                        {% if saldo < -0.01 %}
+                        <p class="text-muted">Sie haben Schulden bei der Gemeinschaft</p>
+                        {% elif saldo > 0.01 %}
+                        <p class="text-muted">Sie haben Guthaben bei der Gemeinschaft</p>
+                        {% else %}
+                        <p class="text-muted">Ihr Konto ist ausgeglichen</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Übersicht</h5>
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td>Offene Abrechnungen:</td>
+                                <td class="text-end">
+                                    <strong>{{ offene_abrechnungen|length }}</strong>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Offener Betrag:</td>
+                                <td class="text-end">
+                                    <strong class="text-danger">
+                                        {{ "%.2f"|format(offene_abrechnungen|sum(attribute='betrag_gesamt')) }} €
+                                    </strong>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Anzahl Buchungen:</td>
+                                <td class="text-end">
+                                    <strong>{{ buchungen|length }}</strong>
+                                </td>
+                            </tr>
+                            {% if saldo_vorjahr != 0 %}
+                            <tr>
+                                <td>Saldo Vorjahr:</td>
+                                <td class="text-end">
+                                    {{ "%.2f"|format(saldo_vorjahr) }} €
+                                </td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Offene Abrechnungen -->
+        {% if offene_abrechnungen %}
+        <div class="card mb-4 border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">
+                    <i class="bi bi-exclamation-triangle-fill"></i> Offene Abrechnungen
+                </h5>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Abrechnungszeitraum</th>
+                            <th class="text-end">Maschineneinsätze</th>
+                            <th class="text-end">Treibstoff</th>
+                            <th class="text-end">Gesamt</th>
+                            <th>Erstellt am</th>
+                            <th>Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for abr in offene_abrechnungen %}
+                        <tr>
+                            <td>{{ abr.zeitraum_von }} bis {{ abr.zeitraum_bis }}</td>
+                            <td class="text-end">{{ "%.2f"|format(abr.betrag_maschinen) }} €</td>
+                            <td class="text-end">{{ "%.2f"|format(abr.betrag_treibstoff) }} €</td>
+                            <td class="text-end"><strong>{{ "%.2f"|format(abr.betrag_gesamt) }} €</strong></td>
+                            <td>{{ abr.erstellt_am[:10] }}</td>
+                            <td>
+                                <a href="{{ url_for('abrechnung_pdf', abrechnung_id=abr.id) }}" 
+                                   class="btn btn-sm btn-outline-primary" target="_blank">
+                                    <i class="bi bi-file-pdf"></i> PDF
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="table-warning">
+                            <td colspan="3"><strong>Summe offen:</strong></td>
+                            <td class="text-end">
+                                <strong>{{ "%.2f"|format(offene_abrechnungen|sum(attribute='betrag_gesamt')) }} €</strong>
+                            </td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                {% if gemeinschaft.bank_iban %}
+                <div class="alert alert-info mt-3">
+                    <h6><i class="bi bi-bank"></i> Überweisungsdaten</h6>
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td><strong>Kontoinhaber:</strong></td>
+                            <td>{{ gemeinschaft.bank_kontoinhaber or '-' }}</td>
+                        </tr>
+                        {% if gemeinschaft.bank_name %}
+                        <tr>
+                            <td><strong>Bank:</strong></td>
+                            <td>{{ gemeinschaft.bank_name }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td><strong>IBAN:</strong></td>
+                            <td><code>{{ gemeinschaft.bank_iban }}</code></td>
+                        </tr>
+                        {% if gemeinschaft.bank_bic %}
+                        <tr>
+                            <td><strong>BIC:</strong></td>
+                            <td><code>{{ gemeinschaft.bank_bic }}</code></td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                    <p class="mb-0 mt-2">
+                        <strong>Wichtig:</strong> Bitte geben Sie bei der Überweisung immer Ihren Namen an!
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Kontobewegungen -->
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-list-ul"></i> Kontobewegungen</h5>
+            </div>
+            <div class="card-body">
+                {% if buchungen %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Datum</th>
+                                <th>Typ</th>
+                                <th>Beschreibung</th>
+                                <th class="text-end">Betrag</th>
+                                <th class="text-end">Saldo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set running_saldo = saldo_vorjahr %}
+                            {% for buchung in buchungen %}
+                            {% set running_saldo = running_saldo + buchung.betrag %}
+                            <tr>
+                                <td>{{ buchung.datum }}</td>
+                                <td>
+                                    {% if buchung.typ == 'abrechnung' %}
+                                    <span class="badge bg-warning text-dark">Abrechnung</span>
+                                    {% elif buchung.typ == 'einzahlung' %}
+                                    <span class="badge bg-success">Einzahlung</span>
+                                    {% elif buchung.typ == 'auszahlung' %}
+                                    <span class="badge bg-info">Auszahlung</span>
+                                    {% elif buchung.typ == 'korrektur' %}
+                                    <span class="badge bg-secondary">Korrektur</span>
+                                    {% elif buchung.typ == 'jahresuebertrag' %}
+                                    <span class="badge bg-primary">Jahresübertrag</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ buchung.beschreibung }}
+                                    {% if buchung.referenz_typ == 'abrechnung' and buchung.referenz_id %}
+                                    <a href="{{ url_for('abrechnung_pdf', abrechnung_id=buchung.referenz_id) }}" 
+                                       class="btn btn-sm btn-link p-0" target="_blank">
+                                        <i class="bi bi-file-pdf"></i>
+                                    </a>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    {% if buchung.betrag < 0 %}
+                                    <span class="text-danger">{{ "%.2f"|format(buchung.betrag) }} €</span>
+                                    {% else %}
+                                    <span class="text-success">+{{ "%.2f"|format(buchung.betrag) }} €</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <small class="text-muted">{{ "%.2f"|format(running_saldo) }} €</small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">Noch keine Buchungen vorhanden</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

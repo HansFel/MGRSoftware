@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Meine Einsätze - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="bi bi-list-ul"></i> Meine Einsätze
+                </h4>
+                <div>
+                    <a href="{{ url_for('meine_stornierten_einsaetze') }}"
+                        class="btn btn-outline-secondary btn-sm me-2">
+                        <i class="bi bi-archive"></i> Stornierte Einsätze
+                    </a>
+                    <a href="{{ url_for('meine_einsaetze_csv') }}" class="btn btn-success btn-sm me-2">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> CSV Export
+                    </a>
+                    <a href="{{ url_for('neuer_einsatz') }}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-circle"></i> Neuer Einsatz
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if einsaetze %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Datum</th>
+                                <th>Maschine</th>
+                                <th>Einsatzzweck</th>
+                                <th>Preis/Einh.</th>
+                                <th>Anfang</th>
+                                <th>Ende</th>
+                                <th>Menge</th>
+                                <th>Treibstoff</th>
+                                <th>T-Kosten</th>
+                                <th>M-Kosten</th>
+                                <th>Anmerkungen</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for einsatz in einsaetze %}
+                            <tr>
+                                <td>
+                                    {% if einsatz.datum %}
+                                    {% if einsatz.datum is string %}
+                                    {{ einsatz.datum }}
+                                    {% else %}
+                                    {{ einsatz.datum.strftime('%d.%m.%Y') }}
+                                    {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td>{{ einsatz.maschine }}</td>
+                                <td>{{ einsatz.einsatzzweck }}</td>
+                                <td>{{ "%.2f"|format(einsatz.preis_pro_einheit)|replace('.', ',') }} €</td>
+                                <td>
+                                    {% if einsatz.abrechnungsart == 'hektar' %}
+                                    {{ "%.2f"|format(einsatz.anfangstand)|replace('.', ',') }} ha
+                                    {% elif einsatz.abrechnungsart == 'kilometer' %}
+                                    {{ "%.1f"|format(einsatz.anfangstand)|replace('.', ',') }} km
+                                    {% elif einsatz.abrechnungsart == 'stueck' %}
+                                    {{ "%.0f"|format(einsatz.anfangstand) }} St
+                                    {% else %}
+                                    {{ "%.1f"|format(einsatz.anfangstand)|replace('.', ',') }} h
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if einsatz.abrechnungsart == 'hektar' %}
+                                    {{ "%.2f"|format(einsatz.endstand)|replace('.', ',') }} ha
+                                    {% elif einsatz.abrechnungsart == 'kilometer' %}
+                                    {{ "%.1f"|format(einsatz.endstand)|replace('.', ',') }} km
+                                    {% elif einsatz.abrechnungsart == 'stueck' %}
+                                    {{ "%.0f"|format(einsatz.endstand) }} St
+                                    {% else %}
+                                    {{ "%.1f"|format(einsatz.endstand)|replace('.', ',') }} h
+                                    {% endif %}
+                                </td>
+                                <td><strong>{% if einsatz.menge_berechnet is not none and einsatz.menge_berechnet != ''
+                                        %}{{ einsatz.menge_berechnet|replace('.', ',') }}{% endif %}</strong></td>
+                                <td>
+                                    {% if einsatz.treibstoffverbrauch %}
+                                    {{ "%.1f"|format(einsatz.treibstoffverbrauch)|replace('.', ',') }} l
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if einsatz.treibstoffkosten %}
+                                    {{ "%.2f"|format(einsatz.treibstoffkosten)|replace('.', ',') }} €
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td><strong class="text-success">{{
+                                        "%.2f"|format(einsatz.maschinenkosten_berechnet)|replace('.', ',') }} €</strong>
+                                </td>
+                                <td>
+                                    {% if einsatz.anmerkungen %}
+                                    <small class="text-muted">{{ einsatz.anmerkungen[:50] }}{% if
+                                        einsatz.anmerkungen|length > 50 %}...{% endif %}</small>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('einsatz_stornieren', einsatz_id=einsatz.id) }}"
+                                        class="btn btn-sm btn-outline-danger"
+                                        onclick="return confirm('Soll dieser Einsatz wirklich storniert werden?')">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr class="table-info">
+                                <td colspan="7" class="text-end"><strong>Gesamt:</strong></td>
+                                <td>
+                                    {% set treibstoff_gesamt =
+                                    einsaetze|selectattr('treibstoffverbrauch')|sum(attribute='treibstoffverbrauch') %}
+                                    {% if treibstoff_gesamt > 0 %}
+                                    <strong>{{ "%.1f"|format(treibstoff_gesamt) }} l</strong>
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                                <td></td>
+                                <td>
+                                    {% if summe_maschine > 0 %}
+                                    <strong class="text-success">{{ "%.2f"|format(summe_maschine)|replace('.', ',') }}
+                                        €</strong>
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox" style="font-size: 4rem; color: #ccc;"></i>
+                    <p class="text-muted mt-3">Noch keine Einsätze vorhanden</p>
+                    <a href="{{ url_for('neuer_einsatz') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Ersten Einsatz erfassen
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

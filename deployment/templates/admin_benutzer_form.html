@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Benutzer bearbeiten' if benutzer else 'Neuer Benutzer' }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h4>
+                        <i class="bi bi-person{% if not benutzer %}-plus{% endif %}"></i>
+                        {{ 'Benutzer bearbeiten' if benutzer else 'Neuer Benutzer' }}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="name" class="form-label">Nachname *</label>
+                                <input type="text" class="form-control" id="name" name="name" 
+                                       value="{{ benutzer.name if benutzer else '' }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="vorname" class="form-label">Vorname</label>
+                                <input type="text" class="form-control" id="vorname" name="vorname" 
+                                       value="{{ benutzer.vorname if benutzer else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="username" class="form-label">Benutzername</label>
+                                <input type="text" class="form-control" id="username" name="username" 
+                                       value="{{ benutzer.username if benutzer else '' }}">
+                                <small class="text-muted">Für Web-Login (optional)</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="password" class="form-label">
+                                    Passwort {% if not benutzer %}*{% endif %}
+                                </label>
+                                <input type="password" class="form-control" id="password" name="password" 
+                                       {% if not benutzer %}required{% endif %}>
+                                <small class="text-muted">
+                                    {% if benutzer %}Leer lassen um beizubehalten{% else %}Mindestens 6 Zeichen{% endif %}
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="telefon" class="form-label">Telefon</label>
+                                <input type="tel" class="form-control" id="telefon" name="telefon" 
+                                       value="{{ benutzer.telefon if benutzer else '' }}">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="email" class="form-label">E-Mail</label>
+                                <input type="email" class="form-control" id="email" name="email" 
+                                       value="{{ benutzer.email if benutzer else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="is_admin" name="is_admin"
+                                       {% if benutzer and benutzer.is_admin %}checked{% endif %}>
+                                <label class="form-check-label" for="is_admin">
+                                    <strong>Administrator-Rechte</strong>
+                                    <small class="text-muted d-block">
+                                        Admins können alle Daten einsehen und Benutzer/Maschinen verwalten
+                                    </small>
+                                </label>
+                            </div>
+                        </div>
+
+                        {% if not (benutzer and benutzer.is_admin) and not (request.form.get('is_admin')) %}
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="gemeinschaft_id" class="form-label">Gemeinschaft</label>
+                                <select class="form-select" id="gemeinschaft_id" name="gemeinschaft_id">
+                                    {% for g in gemeinschaften %}
+                                    <option value="{{ g.id }}" {% if benutzer and benutzer.gemeinschaft_id == g.id %}selected{% endif %}>{{ g.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">Nur normale Mitglieder können einer Gemeinschaft zugeordnet werden.</small>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <hr>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('admin_benutzer') }}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Zurück
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> Speichern
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

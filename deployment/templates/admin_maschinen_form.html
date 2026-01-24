@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Maschine bearbeiten' if maschine else 'Neue Maschine' }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-10 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h4>
+                        <i class="bi bi-tools"></i>
+                        {{ 'Maschine bearbeiten' if maschine else 'Neue Maschine' }}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="bezeichnung" class="form-label">Bezeichnung *</label>
+                                <input type="text" class="form-control" id="bezeichnung" name="bezeichnung" 
+                                       value="{{ maschine.bezeichnung if maschine else '' }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="hersteller" class="form-label">Hersteller</label>
+                                <input type="text" class="form-control" id="hersteller" name="hersteller" 
+                                       value="{{ maschine.hersteller if maschine else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="modell" class="form-label">Modell</label>
+                                <input type="text" class="form-control" id="modell" name="modell" 
+                                       value="{{ maschine.modell if maschine else '' }}">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="baujahr" class="form-label">Baujahr</label>
+                                <input type="number" class="form-control" id="baujahr" name="baujahr" 
+                                       value="{{ maschine.baujahr if maschine else '' }}" min="1900" max="2100">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="kennzeichen" class="form-label">Kennzeichen</label>
+                                <input type="text" class="form-control" id="kennzeichen" name="kennzeichen" 
+                                       value="{{ maschine.kennzeichen if maschine else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="stundenzaehler_aktuell" class="form-label">Stundenzähler aktuell (Std.)</label>
+                                <input type="number" class="form-control" id="stundenzaehler_aktuell" 
+                                       name="stundenzaehler_aktuell" step="0.1" min="0"
+                                       value="{{ '%.1f'|format(maschine.stundenzaehler_aktuell) if maschine else '0.0' }}">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="wartungsintervall" class="form-label">Wartungsintervall (Std.)</label>
+                                <input type="number" class="form-control" id="wartungsintervall" 
+                                       name="wartungsintervall" min="1"
+                                       value="{{ maschine.wartungsintervall if maschine else '50' }}">
+                                <small class="text-muted">z.B. alle 50 Stunden</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="naechste_wartung" class="form-label">Nächste Wartung bei (Std.)</label>
+                                <input type="number" class="form-control" id="naechste_wartung" 
+                                       name="naechste_wartung" step="0.1" min="0"
+                                       value="{{ '%.1f'|format(maschine.naechste_wartung) if maschine and maschine.naechste_wartung else '' }}">
+                                <small class="text-muted">Optional, wird auto-berechnet</small>
+                            </div>
+                        </div>
+
+                        <hr>
+                        <h5 class="mb-3"><i class="bi bi-people-fill"></i> Zuordnung</h5>
+
+                        <div class="mb-3">
+                            <label for="gemeinschaft_id" class="form-label">Gemeinschaft *</label>
+                            <select class="form-control" id="gemeinschaft_id" name="gemeinschaft_id" required>
+                                <option value="">Bitte wählen...</option>
+                                {% for gem in gemeinschaften %}
+                                <option value="{{ gem.id }}" 
+                                        {{ 'selected' if maschine and maschine.gemeinschaft_id == gem.id else '' }}>
+                                    {{ gem.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Die Maschine gehört zu dieser Gemeinschaft</small>
+                        </div>
+
+                        <hr>
+                        <h5 class="mb-3"><i class="bi bi-cash-coin"></i> Abrechnung</h5>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="erfassungsmodus" class="form-label">Erfassungsmodus</label>
+                                <select class="form-control" id="erfassungsmodus" name="erfassungsmodus">
+                                    <option value="fortlaufend" {{ 'selected' if not maschine or maschine.erfassungsmodus == 'fortlaufend' else '' }}>Fortlaufend (Start/Ende)</option>
+                                    <option value="direkt" {{ 'selected' if maschine and maschine.erfassungsmodus == 'direkt' else '' }}>Direkt eingeben</option>
+                                </select>
+                                <small class="text-muted">Fortlaufend: Stundenzähler Start/Ende. Direkt: z.B. 5 Stunden</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="abrechnungsart" class="form-label">Abrechnungsart</label>
+                                <select class="form-control" id="abrechnungsart" name="abrechnungsart">
+                                    <option value="stunden" {{ 'selected' if maschine and maschine.abrechnungsart == 'stunden' else '' }}>Betriebsstunden</option>
+                                    <option value="hektar" {{ 'selected' if maschine and maschine.abrechnungsart == 'hektar' else '' }}>Hektar (ha)</option>
+                                    <option value="kilometer" {{ 'selected' if maschine and maschine.abrechnungsart == 'kilometer' else '' }}>Kilometer</option>
+                                    <option value="stueck" {{ 'selected' if maschine and maschine.abrechnungsart == 'stueck' else '' }}>Stück/Einheiten</option>
+                                </select>
+                                <small class="text-muted">Wie wird die Maschine abgerechnet?</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="preis_pro_einheit" class="form-label">Preis pro Einheit (€)</label>
+                                <input type="number" class="form-control" id="preis_pro_einheit" 
+                                       name="preis_pro_einheit" step="0.01" min="0"
+                                       value="{{ '%.2f'|format(maschine.preis_pro_einheit) if maschine and maschine.preis_pro_einheit else '0.00' }}">
+                                <small class="text-muted">z.B. 25.00 € pro Stunde oder 120.00 € pro Hektar</small>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="treibstoff_berechnen" 
+                                           name="treibstoff_berechnen" value="1"
+                                           {{ 'checked' if maschine and maschine.treibstoff_berechnen else '' }}>
+                                    <label class="form-check-label" for="treibstoff_berechnen">
+                                        <strong>Treibstoffkosten in Abrechnungen berücksichtigen</strong>
+                                    </label>
+                                    <div class="form-text">
+                                        <i class="bi bi-info-circle"></i> 
+                                        Wenn aktiviert, werden die Treibstoffkosten dem Mitglied in Rechnung gestellt.
+                                        <br>
+                                        <strong>Standard: NICHT aktiviert</strong> - da die meisten Mitglieder den Treibstoff selbst kaufen.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+                        <h5 class="mb-3"><i class="bi bi-currency-euro"></i> Rentabilität</h5>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="anschaffungspreis" class="form-label">Anschaffungspreis (€)</label>
+                                <input type="number" class="form-control" id="anschaffungspreis" 
+                                       name="anschaffungspreis" step="0.01" min="0"
+                                       value="{{ '%.2f'|format(maschine.anschaffungspreis) if maschine and maschine.anschaffungspreis else '0.00' }}">
+                                <small class="text-muted">Ursprünglicher Kaufpreis</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="abschreibungsdauer_jahre" class="form-label">Abschreibungsdauer (Jahre)</label>
+                                <input type="number" class="form-control" id="abschreibungsdauer_jahre" 
+                                       name="abschreibungsdauer_jahre" min="1"
+                                       value="{{ maschine.abschreibungsdauer_jahre if maschine else '10' }}">
+                                <small class="text-muted">Übliche Nutzungsdauer</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="anschaffungsdatum" class="form-label">Anschaffungsdatum</label>
+                                <input type="date" class="form-control" id="anschaffungsdatum" 
+                                       name="anschaffungsdatum"
+                                       value="{{ maschine.anschaffungsdatum if maschine else '' }}">
+                                <small class="text-muted">Kaufdatum der Maschine</small>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <div class="mb-3">
+                            <label for="anmerkungen" class="form-label">Anmerkungen</label>
+                            <textarea class="form-control" id="anmerkungen" name="anmerkungen" rows="3">{{ maschine.anmerkungen if maschine else '' }}</textarea>
+                        </div>
+
+                        <hr>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('admin_maschinen') }}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Zurück
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> Speichern
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

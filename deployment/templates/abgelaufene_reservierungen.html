@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Abgelaufene Reservierungen - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="text-white">
+                <i class="bi bi-clock-history"></i> Abgelaufene Reservierungen
+            </h2>
+            <a href="{{ url_for('meine_reservierungen') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Zurück zu aktiven Reservierungen
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if abgelaufene %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle"></i> 
+                    Diese Reservierungen sind automatisch abgelaufen, weil ihre Zeitspanne vorbei ist.
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Abgelaufen am</th>
+                                <th>Maschine</th>
+                                <th>Datum</th>
+                                <th>Zeit</th>
+                                <th>Dauer</th>
+                                <th>Zweck</th>
+                                <th>Bemerkung</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for res in abgelaufene %}
+                            <tr>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ res.abgelaufen_am.split(' ')[0] }}<br>
+                                        {{ res.abgelaufen_am.split(' ')[1].split('.')[0] if ' ' in res.abgelaufen_am else '' }}
+                                    </small>
+                                </td>
+                                <td><strong>{{ res.maschine_bezeichnung }}</strong></td>
+                                <td>{{ res.datum }}</td>
+                                <td>{{ res.uhrzeit_von }} - {{ res.uhrzeit_bis }} Uhr</td>
+                                <td>{{ res.nutzungsdauer_stunden }} h</td>
+                                <td>{{ res.zweck or '-' }}</td>
+                                <td>{{ res.bemerkung or '-' }}</td>
+                                <td><span class="badge bg-secondary">Abgelaufen</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="row">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> 
+            Keine abgelaufenen Reservierungen vorhanden.
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

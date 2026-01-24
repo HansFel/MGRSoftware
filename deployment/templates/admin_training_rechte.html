@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Training-Zugriffsrechte - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h1 class="text-white mb-4">
+            <i class="bi bi-mortarboard"></i> Training-Zugriffsrechte verwalten
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-people-fill"></i> Benutzer-Zugriffsrechte
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-info-circle"></i> Erklärung:</h6>
+                    <ul class="mb-0">
+                        <li><strong>Vollzugriff:</strong> Benutzer kann sowohl auf Produktions- als auch auf Übungsdatenbanken zugreifen</li>
+                        <li><strong>Nur Übungsmodus:</strong> Benutzer kann nur auf Übungsdatenbanken zugreifen (zum Lernen/Testen)</li>
+                    </ul>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Benutzername</th>
+                                <th>Status</th>
+                                <th>Aktueller Zugriff</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in benutzer %}
+                            <tr>
+                                <td>{{ user.vorname }} {{ user.name }}</td>
+                                <td><code>{{ user.username }}</code></td>
+                                <td>
+                                    {% if not user.aktiv %}
+                                        <span class="badge bg-secondary">Inaktiv</span>
+                                    {% elif user.is_admin %}
+                                        <span class="badge bg-danger">
+                                            <i class="bi bi-shield-fill"></i> Admin
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-primary">
+                                            <i class="bi bi-person"></i> Mitglied
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.is_admin %}
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-check-circle"></i> Vollzugriff (Admin)
+                                        </span>
+                                    {% elif user.nur_training %}
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="bi bi-mortarboard"></i> Nur Übungsmodus
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-check-circle"></i> Vollzugriff
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if not user.is_admin and user.aktiv %}
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        {% if user.nur_training %}
+                                        <form method="POST" action="{{ url_for('admin_training_rechte_update') }}" class="d-inline">
+                                            <input type="hidden" name="benutzer_id" value="{{ user.id }}">
+                                            <input type="hidden" name="nur_training" value="0">
+                                            <button type="submit" class="btn btn-success btn-sm"
+                                                    title="Vollzugriff aktivieren">
+                                                <i class="bi bi-unlock"></i> Vollzugriff erlauben
+                                            </button>
+                                        </form>
+                                        {% else %}
+                                        <form method="POST" action="{{ url_for('admin_training_rechte_update') }}" class="d-inline">
+                                            <input type="hidden" name="benutzer_id" value="{{ user.id }}">
+                                            <input type="hidden" name="nur_training" value="1">
+                                            <button type="submit" class="btn btn-warning btn-sm"
+                                                    title="Auf Übungsmodus beschränken">
+                                                <i class="bi bi-lock"></i> Nur Übungsmodus
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                    {% else %}
+                                        {% if user.is_admin %}
+                                        <small class="text-muted">Admins haben immer Vollzugriff</small>
+                                        {% else %}
+                                        <small class="text-muted">Benutzer inaktiv</small>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Übungsdatenbanken Info -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-database"></i> Verfügbare Übungsdatenbanken
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if training_dbs %}
+                <div class="row">
+                    {% for db in training_dbs %}
+                    <div class="col-md-3 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                {% if db.level == 'anfaenger' %}
+                                    <i class="bi bi-1-circle-fill text-success fs-1"></i>
+                                {% elif db.level == 'fortgeschritten' %}
+                                    <i class="bi bi-2-circle-fill text-primary fs-1"></i>
+                                {% else %}
+                                    <i class="bi bi-3-circle-fill text-danger fs-1"></i>
+                                {% endif %}
+                                <h6 class="mt-2">{{ db.name }}</h6>
+                                <p class="small text-muted mb-0">{{ db.description }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-exclamation-triangle"></i> Keine Übungsdatenbanken gefunden.
+                    <a href="{{ url_for('admin_training_datenbanken') }}">Jetzt erstellen</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3 mb-5">
+    <div class="col-12">
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück zum Dashboard
+        </a>
+        <a href="{{ url_for('admin_training_datenbanken') }}" class="btn btn-outline-primary">
+            <i class="bi bi-database-gear"></i> Übungsdatenbanken verwalten
+        </a>
+    </div>
+</div>
+{% endblock %}
