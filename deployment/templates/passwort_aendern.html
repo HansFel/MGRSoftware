@@ -13,7 +13,7 @@
                 </h4>
             </div>
             <div class="card-body p-4">
-                <form method="POST" action="{{ url_for('passwort_aendern') }}">
+                <form method="POST" action="{{ url_for('auth.passwort_aendern') }}">
                     <input type="hidden" name="form_type" value="passwort">
                     <div class="mb-3">
                         <label for="altes_passwort" class="form-label">Altes Passwort</label>
@@ -37,7 +37,7 @@
                     </div>
 
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                        <a href="{{ url_for('dashboard.dashboard') }}" class="btn btn-secondary">
                             <i class="bi bi-x-circle"></i> Abbrechen
                         </a>
                         <button type="submit" class="btn btn-primary">
@@ -56,7 +56,7 @@
                 </h5>
             </div>
             <div class="card-body p-4">
-                <form method="POST" action="{{ url_for('passwort_aendern') }}">
+                <form method="POST" action="{{ url_for('auth.passwort_aendern') }}">
                     <input type="hidden" name="form_type" value="treibstoff">
                     <div class="mb-3">
                         <label for="treibstoffkosten_preis" class="form-label">
@@ -88,7 +88,7 @@
                 </h5>
             </div>
             <div class="card-body p-4">
-                <form method="POST" action="{{ url_for('passwort_aendern') }}">
+                <form method="POST" action="{{ url_for('auth.passwort_aendern') }}">
                     <input type="hidden" name="form_type" value="backup_schwellwert">
                     <div class="mb-3">
                         <label for="backup_schwellwert" class="form-label">

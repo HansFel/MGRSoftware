@@ -52,7 +52,7 @@
                 <div class="alert alert-success mb-3">
                     <i class="bi bi-check-circle"></i> Alle Änderungen werden gespeichert und sind für alle Mitglieder sichtbar.
                 </div>
-                <form method="POST" action="{{ url_for('datenbank_wechseln') }}">
+                <form method="POST" action="{{ url_for('auth.datenbank_wechseln') }}">
                     <input type="hidden" name="database" value="produktion">
                     <button type="submit" class="btn btn-success btn-lg" {% if current_db == 'produktion' %}disabled{% endif %}>
                         {% if current_db == 'produktion' %}
@@ -113,7 +113,7 @@
                                         <i class="bi bi-hdd"></i> {{ db.size_kb }} KB
                                     </small>
                                 </p>
-                                <form method="POST" action="{{ url_for('datenbank_wechseln') }}">
+                                <form method="POST" action="{{ url_for('auth.datenbank_wechseln') }}">
                                     <input type="hidden" name="database" value="{{ db.key }}">
                                     <button type="submit" class="btn btn-sm {% if current_db == db.key %}btn-warning{% else %}btn-outline-warning{% endif %}"
                                             {% if current_db == db.key %}disabled{% endif %}>
@@ -166,7 +166,7 @@
 
 <div class="row mt-3 mb-5">
     <div class="col-12">
-        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+        <a href="{{ url_for('dashboard.dashboard') }}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Zurück zum Dashboard
         </a>
     </div>

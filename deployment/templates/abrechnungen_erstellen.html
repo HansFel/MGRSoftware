@@ -9,7 +9,7 @@
             <h2 class="text-white">
                 <i class="bi bi-file-earmark-text"></i> Abrechnungen erstellen: {{ gemeinschaft_name }}
             </h2>
-            <a href="{{ url_for('admin_abrechnungen') }}" class="btn btn-secondary">
+            <a href="{{ url_for('admin_finanzen.admin_abrechnungen') }}" class="btn btn-secondary">
                 <i class="bi bi-arrow-left"></i> Zurück
             </a>
         </div>
@@ -89,7 +89,7 @@
                         <button type="submit" class="btn btn-success btn-lg">
                             <i class="bi bi-check-circle"></i> Abrechnungen jetzt erstellen
                         </button>
-                        <a href="{{ url_for('admin_abrechnungen') }}" class="btn btn-secondary">
+                        <a href="{{ url_for('admin_finanzen.admin_abrechnungen') }}" class="btn btn-secondary">
                             Abbrechen
                         </a>
                     </div>

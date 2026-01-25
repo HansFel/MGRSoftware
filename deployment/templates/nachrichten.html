@@ -14,7 +14,7 @@
                         <span class="badge bg-danger">{{ ungelesen }} neu</span>
                         {% endif %}
                     </h4>
-                    <a href="{{ url_for('nachricht_neu') }}" class="btn btn-primary btn-sm">
+                    <a href="{{ url_for('nachrichten.nachricht_neu') }}" class="btn btn-primary btn-sm">
                         <i class="bi bi-plus-circle"></i> Neue Nachricht
                     </a>
                 </div>
@@ -44,7 +44,7 @@
                                 </div>
                                 {% if not nachricht.gelesen %}
                                 <div class="ms-3">
-                                    <a href="{{ url_for('nachricht_lesen', nachricht_id=nachricht.id) }}" 
+                                    <a href="{{ url_for('nachrichten.nachricht_lesen', nachricht_id=nachricht.id) }}" 
                                        class="btn btn-sm btn-outline-primary">
                                         <i class="bi bi-check2"></i> Als gelesen markieren
                                     </a>
@@ -58,7 +58,7 @@
                     <div class="text-center py-5">
                         <i class="bi bi-inbox" style="font-size: 4rem; color: #ccc;"></i>
                         <p class="text-muted mt-3">Noch keine Nachrichten vorhanden</p>
-                        <a href="{{ url_for('nachricht_neu') }}" class="btn btn-primary">
+                        <a href="{{ url_for('nachrichten.nachricht_neu') }}" class="btn btn-primary">
                             <i class="bi bi-plus-circle"></i> Erste Nachricht senden
                         </a>
                     </div>

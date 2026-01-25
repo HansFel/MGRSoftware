@@ -10,16 +10,16 @@
                 <i class="bi bi-list-ul"></i> Banktransaktionen
             </h2>
             <div>
-                <a href="{{ url_for('anfangssaldo_bearbeiten', gemeinschaft_id=gemeinschaft_id) }}" class="btn btn-info">
+                <a href="{{ url_for('admin_finanzen.anfangssaldo_bearbeiten', gemeinschaft_id=gemeinschaft_id) }}" class="btn btn-info">
                     <i class="bi bi-piggy-bank"></i> Anfangssaldo
                 </a>
                 <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#importsModal">
                     <i class="bi bi-trash"></i> Importe verwalten
                 </button>
-                <a href="{{ url_for('admin_csv_import', gemeinschaft_id=gemeinschaft_id) }}" class="btn btn-success">
+                <a href="{{ url_for('admin_finanzen.admin_csv_import', gemeinschaft_id=gemeinschaft_id) }}" class="btn btn-success">
                     <i class="bi bi-upload"></i> CSV importieren
                 </a>
-                <a href="{{ url_for('admin_abrechnungen') }}" class="btn btn-secondary">
+                <a href="{{ url_for('admin_finanzen.admin_abrechnungen') }}" class="btn btn-secondary">
                     <i class="bi bi-arrow-left"></i> Zurück
                 </a>
             </div>
@@ -31,25 +31,25 @@
 <div class="row mb-3">
     <div class="col-12">
         <div class="btn-group" role="group">
-            <a href="{{ url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id, typ='alle') }}" 
+            <a href="{{ url_for('admin_finanzen.admin_transaktionen', gemeinschaft_id=gemeinschaft_id, typ='alle') }}" 
                class="btn btn-{% if filter_typ == 'alle' %}primary{% else %}outline-primary{% endif %}">
                 <i class="bi bi-list"></i> Alle
             </a>
-            <a href="{{ url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id, typ='eingaenge') }}" 
+            <a href="{{ url_for('admin_finanzen.admin_transaktionen', gemeinschaft_id=gemeinschaft_id, typ='eingaenge') }}" 
                class="btn btn-{% if filter_typ == 'eingaenge' %}success{% else %}outline-success{% endif %}">
                 <i class="bi bi-arrow-down-circle"></i> Eingänge
                 {% if statistik.unzugeordnete_eingaenge > 0 %}
                 <span class="badge bg-warning text-dark">{{ statistik.unzugeordnete_eingaenge }}</span>
                 {% endif %}
             </a>
-            <a href="{{ url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id, typ='ausgaenge') }}" 
+            <a href="{{ url_for('admin_finanzen.admin_transaktionen', gemeinschaft_id=gemeinschaft_id, typ='ausgaenge') }}" 
                class="btn btn-{% if filter_typ == 'ausgaenge' %}danger{% else %}outline-danger{% endif %}">
                 <i class="bi bi-arrow-up-circle"></i> Ausgänge
                 {% if statistik.unzugeordnete_ausgaenge > 0 %}
                 <span class="badge bg-warning text-dark">{{ statistik.unzugeordnete_ausgaenge }}</span>
                 {% endif %}
             </a>
-            <a href="{{ url_for('admin_transaktionen', gemeinschaft_id=gemeinschaft_id, typ='unzugeordnet') }}" 
+            <a href="{{ url_for('admin_finanzen.admin_transaktionen', gemeinschaft_id=gemeinschaft_id, typ='unzugeordnet') }}" 
                class="btn btn-{% if filter_typ == 'unzugeordnet' %}warning{% else %}outline-warning{% endif %}">
                 <i class="bi bi-question-circle"></i> Unzugeordnet
                 <span class="badge bg-danger">{{ statistik.unzugeordnete_eingaenge + statistik.unzugeordnete_ausgaenge }}</span>
@@ -186,7 +186,7 @@
                                             <i class="bi bi-link-45deg"></i> Zuordnen
                                         </button>
                                     {% else %}
-                                        <form method="POST" action="{{ url_for('transaktion_zuordnung_aufheben', transaktion_id=trans.id) }}" 
+                                        <form method="POST" action="{{ url_for('admin_finanzen.transaktion_zuordnung_aufheben', transaktion_id=trans.id) }}" 
                                               style="display: inline;"
                                               onsubmit="return confirm('Zuordnung wirklich aufheben?');">
                                             <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -195,7 +195,7 @@
                                         </form>
                                     {% endif %}
                                     
-                                    <form method="POST" action="{{ url_for('transaktion_loeschen', transaktion_id=trans.id) }}" 
+                                    <form method="POST" action="{{ url_for('admin_finanzen.transaktion_loeschen', transaktion_id=trans.id) }}" 
                                           style="display: inline;"
                                           onsubmit="return confirm('Transaktion wirklich löschen? Dies kann nicht rückgängig gemacht werden!');">
                                         <button type="submit" class="btn btn-sm btn-danger" title="Transaktion löschen">
@@ -228,7 +228,7 @@
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="{{ url_for('transaktion_zuordnen', transaktion_id=trans.id) }}" id="zuordnungForm{{ trans.id }}">
+            <form method="POST" action="{{ url_for('admin_finanzen.transaktion_zuordnen', transaktion_id=trans.id) }}" id="zuordnungForm{{ trans.id }}">
                 <div class="modal-body">
                     <div class="alert alert-info mb-3">
                         <strong>Betrag:</strong> {{ "%.2f"|format(trans.betrag) }} €<br>
@@ -316,7 +316,7 @@
 {% else %}
 <div class="alert alert-info">
     <i class="bi bi-info-circle"></i> Noch keine Transaktionen vorhanden.
-    <a href="{{ url_for('admin_csv_import', gemeinschaft_id=gemeinschaft_id) }}">Jetzt CSV importieren</a>
+    <a href="{{ url_for('admin_finanzen.admin_csv_import', gemeinschaft_id=gemeinschaft_id) }}">Jetzt CSV importieren</a>
 </div>
 {% endif %}
 
@@ -396,7 +396,7 @@ function loadDropdownData(transId) {
                                     <span class="badge bg-primary">{{ imp.anzahl }} Transaktionen</span>
                                 </td>
                                 <td class="text-center">
-                                    <form method="POST" action="{{ url_for('import_loeschen', gemeinschaft_id=gemeinschaft_id) }}"
+                                    <form method="POST" action="{{ url_for('admin_finanzen.import_loeschen', gemeinschaft_id=gemeinschaft_id) }}"
                                           onsubmit="return confirm('Wirklich {{ imp.anzahl }} Transaktionen vom {{ imp.datum }} löschen? Dies kann nicht rückgängig gemacht werden!');">
                                         <input type="hidden" name="import_datum" value="{{ imp.datum }}">
                                         <input type="hidden" name="importiert_von" value="{{ imp.importiert_von_id }}">

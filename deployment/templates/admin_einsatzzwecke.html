@@ -10,7 +10,7 @@
                 <h4 class="mb-0">
                     <i class="bi bi-tag"></i> Einsatzzwecke verwalten
                 </h4>
-                <a href="{{ url_for('admin_einsatzzwecke_neu') }}" class="btn btn-primary">
+                <a href="{{ url_for('admin_einsatzzwecke.admin_einsatzzwecke_neu') }}" class="btn btn-primary">
                     <i class="bi bi-plus-circle"></i> Neuer Einsatzzweck
                 </a>
             </div>
@@ -38,7 +38,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <a href="{{ url_for('admin_einsatzzwecke_edit', einsatzzweck_id=zweck.id) }}" 
+                                    <a href="{{ url_for('admin_einsatzzwecke.admin_einsatzzwecke_edit', einsatzzweck_id=zweck.id) }}" 
                                        class="btn btn-sm btn-outline-primary" title="Bearbeiten">
                                         <i class="bi bi-pencil"></i>
                                     </a>

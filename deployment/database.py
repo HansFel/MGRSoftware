@@ -50,6 +50,8 @@ def convert_sql_syntax(sql: str) -> str:
     if not USING_POSTGRESQL:
         return sql
 
+    import re
+
     # INSERT OR IGNORE -> INSERT ... ON CONFLICT DO NOTHING
     if 'INSERT OR IGNORE' in sql.upper():
         sql = sql.replace('INSERT OR IGNORE', 'INSERT')
@@ -59,9 +61,9 @@ def convert_sql_syntax(sql: str) -> str:
             sql = sql.rstrip() + ' ON CONFLICT DO NOTHING'
 
     # datetime(zeitpunkt, '+24 hours') -> zeitpunkt + INTERVAL '24 hours'
-    import re
+    # Unterstützt auch Tabellen-Aliase wie b.zeitpunkt
     sql = re.sub(
-        r"datetime\((\w+),\s*'\+(\d+)\s*hours?'\)",
+        r"datetime\(([\w.]+),\s*'\+(\d+)\s*hours?'\)",
         r"\1 + INTERVAL '\2 hours'",
         sql,
         flags=re.IGNORECASE
@@ -70,9 +72,101 @@ def convert_sql_syntax(sql: str) -> str:
     # datetime('now') -> NOW()
     sql = re.sub(r"datetime\('now'\)", "NOW()", sql, flags=re.IGNORECASE)
 
+    # datetime('now', 'localtime') -> NOW()
+    sql = re.sub(r"datetime\('now',\s*'localtime'\)", "NOW()", sql, flags=re.IGNORECASE)
+
+    # datetime(datum || ' ' || zeit) -> (datum || ' ' || zeit)::timestamp
+    sql = re.sub(
+        r"datetime\(([^)]+\|\|[^)]+)\)",
+        r"(\1)::timestamp",
+        sql,
+        flags=re.IGNORECASE
+    )
+
     # AUTOINCREMENT -> SERIAL (wird im Schema behandelt)
 
+    # PRAGMA table_info(table) -> SELECT ordinal_position, column_name, data_type FROM information_schema.columns
+    # PRAGMA returns: cid, name, type, notnull, dflt_value, pk - code uses col[1] for name
+    pragma_match = re.match(r"PRAGMA\s+table_info\((\w+)\)", sql, flags=re.IGNORECASE)
+    if pragma_match:
+        table_name = pragma_match.group(1)
+        sql = f"SELECT ordinal_position - 1, column_name, data_type, is_nullable, column_default, 0 FROM information_schema.columns WHERE table_name = '{table_name}' ORDER BY ordinal_position"
+
+    # Boolean-Spalten: 1/0 -> true/false
+    boolean_columns = ['aktiv', 'is_admin', 'nur_training', 'zugeordnet', 'storniert', 'ganztags', 'hat_kopfzeile', 'treibstoff_berechnen']
+    for col in boolean_columns:
+        sql = re.sub(rf'\b{col}\s*=\s*1\b', f'{col} = true', sql)
+        sql = re.sub(rf'\b{col}\s*=\s*0\b', f'{col} = false', sql)
+
     return convert_placeholders(sql)
+
+
+class CursorWrapper:
+    """Wrapper für Cursor, der automatisch SQL konvertiert"""
+
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def execute(self, sql, params=None):
+        sql = convert_sql_syntax(sql)
+        if params:
+            self._cursor.execute(sql, params)
+        else:
+            self._cursor.execute(sql)
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+    def fetchmany(self, size=None):
+        if size:
+            return self._cursor.fetchmany(size)
+        return self._cursor.fetchmany()
+
+    @property
+    def lastrowid(self):
+        return self._cursor.lastrowid
+
+    @property
+    def rowcount(self):
+        return self._cursor.rowcount
+
+    @property
+    def description(self):
+        return self._cursor.description
+
+    def close(self):
+        self._cursor.close()
+
+    def __iter__(self):
+        return iter(self._cursor)
+
+
+class ConnectionWrapper:
+    """Wrapper für Connection, der CursorWrapper zurückgibt"""
+
+    def __init__(self, connection):
+        self._connection = connection
+
+    def cursor(self, *args, **kwargs):
+        return CursorWrapper(self._connection.cursor(*args, **kwargs))
+
+    def commit(self):
+        self._connection.commit()
+
+    def rollback(self):
+        self._connection.rollback()
+
+    def close(self):
+        self._connection.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
 
 class MaschinenDB:
@@ -88,24 +182,30 @@ class MaschinenDB:
     def connect(self):
         """Verbindung zur Datenbank herstellen"""
         if self.using_postgresql:
-            self.connection = psycopg2.connect(
+            raw_connection = psycopg2.connect(
                 host=PG_HOST,
                 port=PG_PORT,
                 database=PG_DATABASE,
                 user=PG_USER,
                 password=PG_PASSWORD
             )
-            self.cursor = self.connection.cursor(cursor_factory=DictCursor)
+            # Wrapper für automatische SQL-Konvertierung
+            self.connection = ConnectionWrapper(raw_connection)
+            self._raw_connection = raw_connection  # Für commit/rollback
+            self.cursor = CursorWrapper(raw_connection.cursor(cursor_factory=DictCursor))
         else:
             self.connection = sqlite3.connect(self.db_path)
             self.connection.row_factory = sqlite3.Row
             self.cursor = self.connection.cursor()
+            self._raw_connection = self.connection
 
     def close(self):
         """Datenbankverbindung schließen"""
         if self.cursor:
             self.cursor.close()
-        if self.connection:
+        if hasattr(self, '_raw_connection') and self._raw_connection:
+            self._raw_connection.close()
+        elif self.connection:
             self.connection.close()
 
     def execute(self, sql: str, params: tuple = None):

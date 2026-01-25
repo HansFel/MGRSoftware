@@ -10,7 +10,7 @@
                 <h4 class="mb-0">
                     <i class="bi bi-people-fill"></i> Gemeinschaften verwalten
                 </h4>
-                <a href="{{ url_for('admin_gemeinschaften_neu') }}" class="btn btn-primary btn-sm">
+                <a href="{{ url_for('admin_gemeinschaften.admin_gemeinschaften_neu') }}" class="btn btn-primary btn-sm">
                     <i class="bi bi-plus-circle"></i> Neue Gemeinschaft
                 </a>
             </div>
@@ -48,27 +48,27 @@
                                 </td>
                                 <td>
                                     <div class="btn-group" role="group">
-                                        <a href="{{ url_for('admin_gemeinschaften_edit', gemeinschaft_id=gem.id) }}" 
+                                        <a href="{{ url_for('admin_gemeinschaften.admin_gemeinschaften_edit', gemeinschaft_id=gem.id) }}" 
                                            class="btn btn-sm btn-outline-primary"
                                            title="Bearbeiten">
                                             <i class="bi bi-pencil"></i>
                                         </a>
-                                        <a href="{{ url_for('admin_gemeinschaften_mitglieder', gemeinschaft_id=gem.id) }}" 
+                                        <a href="{{ url_for('admin_gemeinschaften.admin_gemeinschaften_mitglieder', gemeinschaft_id=gem.id) }}" 
                                            class="btn btn-sm btn-outline-info"
                                            title="Mitglieder verwalten">
                                             <i class="bi bi-people"></i>
                                         </a>
-                                        <a href="{{ url_for('admin_konten', gemeinschaft_id=gem.id) }}" 
+                                        <a href="{{ url_for('admin_finanzen.admin_konten', gemeinschaft_id=gem.id) }}" 
                                            class="btn btn-sm btn-outline-warning"
                                            title="Mitgliederkonten">
                                             <i class="bi bi-cash-coin"></i>
                                         </a>
-                                        <a href="{{ url_for('admin_gemeinschaften_abrechnung', gemeinschaft_id=gem.id) }}" 
+                                        <a href="{{ url_for('admin_gemeinschaften.admin_gemeinschaften_abrechnung', gemeinschaft_id=gem.id) }}" 
                                            class="btn btn-sm btn-outline-success"
                                            title="Abrechnung">
                                             <i class="bi bi-calculator"></i>
                                         </a>
-                                        <a href="{{ url_for('admin_gemeinschaften_maschinenuebersicht_pdf', gemeinschaft_id=gem.id) }}" 
+                                        <a href="{{ url_for('admin_gemeinschaften.admin_gemeinschaften_maschinenuebersicht_pdf', gemeinschaft_id=gem.id) }}" 
                                            class="btn btn-sm btn-outline-secondary" target="_blank"
                                            title="Maschinenübersicht PDF">
                                             <i class="bi bi-file-earmark-pdf"></i>
@@ -84,7 +84,7 @@
                 <div class="text-center py-5">
                     <i class="bi bi-inbox" style="font-size: 4rem; color: #ccc;"></i>
                     <p class="text-muted mt-3">Noch keine Gemeinschaften vorhanden</p>
-                    <a href="{{ url_for('admin_gemeinschaften_neu') }}" class="btn btn-primary">
+                    <a href="{{ url_for('admin_gemeinschaften.admin_gemeinschaften_neu') }}" class="btn btn-primary">
                         <i class="bi bi-plus-circle"></i> Erste Gemeinschaft erstellen
                     </a>
                 </div>

@@ -11,10 +11,10 @@
                 <p class="text-muted">{{ gemeinschaft.name }}</p>
             </div>
             <div>
-                <a href="{{ url_for('admin_gemeinschaften') }}" class="btn btn-secondary">
+                <a href="{{ url_for('admin_gemeinschaften.admin_gemeinschaften') }}" class="btn btn-secondary">
                     <i class="bi bi-arrow-left"></i> Zurück
                 </a>
-                <a href="{{ url_for('admin_konten_buchung_neu', gemeinschaft_id=gemeinschaft.id) }}" class="btn btn-success">
+                <a href="{{ url_for('admin_finanzen.admin_konten_buchung_neu', gemeinschaft_id=gemeinschaft.id) }}" class="btn btn-success">
                     <i class="bi bi-plus-circle"></i> Neue Buchung
                 </a>
             </div>
@@ -111,11 +111,11 @@
                                 </td>
                                 <td>
                                     <div class="btn-group btn-group-sm" role="group">
-                                        <a href="{{ url_for('admin_konten_detail', gemeinschaft_id=gemeinschaft.id, benutzer_id=konto.benutzer_id) }}" 
+                                        <a href="{{ url_for('admin_finanzen.admin_konten_detail', gemeinschaft_id=gemeinschaft.id, benutzer_id=konto.benutzer_id) }}" 
                                            class="btn btn-outline-primary" title="Kontoverlauf">
                                             <i class="bi bi-card-list"></i>
                                         </a>
-                                        <a href="{{ url_for('admin_konten_zahlung', gemeinschaft_id=gemeinschaft.id, benutzer_id=konto.benutzer_id) }}" 
+                                        <a href="{{ url_for('admin_finanzen.admin_konten_zahlung', gemeinschaft_id=gemeinschaft.id, benutzer_id=konto.benutzer_id) }}" 
                                            class="btn btn-outline-success" title="Zahlung verbuchen">
                                             <i class="bi bi-cash"></i>
                                         </a>

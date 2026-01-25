@@ -9,7 +9,7 @@
             <h2 class="text-white">
                 <i class="bi bi-file-earmark-check"></i> Erstelle Abrechnungen: {{ gemeinschaft_name }}
             </h2>
-            <a href="{{ url_for('admin_abrechnungen') }}" class="btn btn-secondary">
+            <a href="{{ url_for('admin_finanzen.admin_abrechnungen') }}" class="btn btn-secondary">
                 <i class="bi bi-arrow-left"></i> Zurück zur Übersicht
             </a>
         </div>
@@ -109,7 +109,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <a href="{{ url_for('abrechnung_pdf', abrechnung_id=abr.id) }}" 
+                                    <a href="{{ url_for('abrechnungen.abrechnung_pdf', abrechnung_id=abr.id) }}" 
                                        class="btn btn-sm btn-outline-secondary" target="_blank">
                                         <i class="bi bi-file-pdf"></i>
                                     </a>

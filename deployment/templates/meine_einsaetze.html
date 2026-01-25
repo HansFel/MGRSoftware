@@ -11,14 +11,14 @@
                     <i class="bi bi-list-ul"></i> Meine Einsätze
                 </h4>
                 <div>
-                    <a href="{{ url_for('meine_stornierten_einsaetze') }}"
+                    <a href="{{ url_for('einsaetze.meine_stornierten_einsaetze') }}"
                         class="btn btn-outline-secondary btn-sm me-2">
                         <i class="bi bi-archive"></i> Stornierte Einsätze
                     </a>
-                    <a href="{{ url_for('meine_einsaetze_csv') }}" class="btn btn-success btn-sm me-2">
+                    <a href="{{ url_for('einsaetze.meine_einsaetze_csv') }}" class="btn btn-success btn-sm me-2">
                         <i class="bi bi-file-earmark-spreadsheet"></i> CSV Export
                     </a>
-                    <a href="{{ url_for('neuer_einsatz') }}" class="btn btn-primary btn-sm">
+                    <a href="{{ url_for('einsaetze.neuer_einsatz') }}" class="btn btn-primary btn-sm">
                         <i class="bi bi-plus-circle"></i> Neuer Einsatz
                     </a>
                 </div>
@@ -108,7 +108,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <a href="{{ url_for('einsatz_stornieren', einsatz_id=einsatz.id) }}"
+                                    <a href="{{ url_for('einsaetze.einsatz_stornieren', einsatz_id=einsatz.id) }}"
                                         class="btn btn-sm btn-outline-danger"
                                         onclick="return confirm('Soll dieser Einsatz wirklich storniert werden?')">
                                         <i class="bi bi-trash"></i>
@@ -147,7 +147,7 @@
                 <div class="text-center py-5">
                     <i class="bi bi-inbox" style="font-size: 4rem; color: #ccc;"></i>
                     <p class="text-muted mt-3">Noch keine Einsätze vorhanden</p>
-                    <a href="{{ url_for('neuer_einsatz') }}" class="btn btn-primary">
+                    <a href="{{ url_for('einsaetze.neuer_einsatz') }}" class="btn btn-primary">
                         <i class="bi bi-plus-circle"></i> Ersten Einsatz erfassen
                     </a>
                 </div>

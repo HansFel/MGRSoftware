@@ -103,7 +103,7 @@
                                     <small class="text-muted">{{ abr.erstellt_am[:10] }}</small>
                                 </td>
                                 <td>
-                                    <a href="{{ url_for('abrechnung_pdf', abrechnung_id=abr.id) }}" 
+                                    <a href="{{ url_for('abrechnungen.abrechnung_pdf', abrechnung_id=abr.id) }}" 
                                        class="btn btn-sm btn-info"
                                        target="_blank"
                                        title="Abrechnung anzeigen">

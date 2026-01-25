@@ -10,13 +10,13 @@
                 <i class="bi bi-calendar-check"></i> Meine Reservierungen
             </h2>
             <div>
-                <a href="{{ url_for('reservierungen_kalender') }}" class="btn btn-info">
+                <a href="{{ url_for('reservierungen.reservierungen_kalender') }}" class="btn btn-info">
                     <i class="bi bi-calendar3"></i> Kalender-Ansicht
                 </a>
-                <a href="{{ url_for('abgelaufene_reservierungen') }}" class="btn btn-secondary">
+                <a href="{{ url_for('reservierungen.abgelaufene_reservierungen') }}" class="btn btn-secondary">
                     <i class="bi bi-clock-history"></i> Abgelaufene Reservierungen
                 </a>
-                <a href="{{ url_for('geloeschte_reservierungen') }}" class="btn btn-secondary">
+                <a href="{{ url_for('reservierungen.geloeschte_reservierungen') }}" class="btn btn-secondary">
                     <i class="bi bi-trash"></i> Gelöschte Reservierungen
                 </a>
             </div>
@@ -61,14 +61,14 @@
                                 </td>
                                 <td>
                                     {% if res.datum >= today %}
-                                    <form method="POST" action="{{ url_for('reservierung_stornieren', reservierung_id=res.id) }}" 
+                                    <form method="POST" action="{{ url_for('reservierungen.reservierung_stornieren', reservierung_id=res.id) }}" 
                                           style="display: inline;" onsubmit="return confirm('Reservierung wirklich stornieren?');">
                                         <button type="submit" class="btn btn-sm btn-danger" title="Stornieren">
                                             <i class="bi bi-trash"></i> Stornieren
                                         </button>
                                     </form>
                                     {% endif %}
-                                    <a href="{{ url_for('maschine_reservieren', maschine_id=res.maschine_id) }}" 
+                                    <a href="{{ url_for('reservierungen.maschine_reservieren', maschine_id=res.maschine_id) }}" 
                                        class="btn btn-sm btn-outline-primary" title="Neue Reservierung für diese Maschine">
                                         <i class="bi bi-plus-circle"></i>
                                     </a>
@@ -90,7 +90,7 @@
                 <i class="bi bi-calendar-x" style="font-size: 4rem; color: #667eea;"></i>
                 <h4 class="mt-3">Keine Reservierungen</h4>
                 <p class="text-muted">Sie haben derzeit keine aktiven Reservierungen.</p>
-                <a href="{{ url_for('neuer_einsatz') }}" class="btn btn-primary mt-3">
+                <a href="{{ url_for('einsaetze.neuer_einsatz') }}" class="btn btn-primary mt-3">
                     <i class="bi bi-plus-circle"></i> Maschine reservieren
                 </a>
             </div>

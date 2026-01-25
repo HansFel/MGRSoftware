@@ -41,7 +41,7 @@
     {% if session.get('benutzer_id') %}
     <nav class="navbar navbar-expand-lg navbar-light navbar-custom sticky-top">
         <div class="container">
-            <a class="navbar-brand fw-bold" href="{{ url_for('dashboard') }}">
+            <a class="navbar-brand fw-bold" href="{{ url_for('dashboard.dashboard') }}">
                 <i class="bi bi-tractor"></i> Maschinengemeinschaft
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -50,22 +50,22 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <a class="nav-link" href="{{ url_for('dashboard.dashboard') }}">
                             <i class="bi bi-house"></i> Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('neuer_einsatz') }}">
+                        <a class="nav-link" href="{{ url_for('einsaetze.neuer_einsatz') }}">
                             <i class="bi bi-plus-circle"></i> Neuer Einsatz
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('meine_einsaetze') }}">
+                        <a class="nav-link" href="{{ url_for('einsaetze.meine_einsaetze') }}">
                             <i class="bi bi-list-ul"></i> Meine Einsätze
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('meine_abrechnungen') }}">
+                        <a class="nav-link" href="{{ url_for('abrechnungen.meine_abrechnungen') }}">
                             <i class="bi bi-receipt"></i> Meine Abrechnungen
                         </a>
                     </li>
@@ -76,7 +76,7 @@
                         <ul class="dropdown-menu">
                             {% if session.get('gemeinschaften') %}
                             {% for gem in session.get('gemeinschaften', []) %}
-                            <li><a class="dropdown-item" href="{{ url_for('mein_konto', gemeinschaft_id=gem.id) }}">
+                            <li><a class="dropdown-item" href="{{ url_for('abrechnungen.mein_konto', gemeinschaft_id=gem.id) }}">
                                 <i class="bi bi-cash-coin"></i> {{ gem.name }}
                             </a></li>
                             {% endfor %}
@@ -86,7 +86,7 @@
                         </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('meine_reservierungen') }}">
+                        <a class="nav-link" href="{{ url_for('reservierungen.meine_reservierungen') }}">
                             <i class="bi bi-calendar-check"></i> Reservierungen
                         </a>
                     </li>
@@ -95,22 +95,22 @@
                             <i class="bi bi-calendar3"></i> Kalender & Archiv
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('reservierungen_kalender') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('reservierungen.reservierungen_kalender') }}">
                                 <i class="bi bi-calendar3"></i> Kalender
                             </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('reservierungen_balken') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('reservierungen.reservierungen_balken') }}">
                                 <i class="bi bi-clock-history"></i> Timeline
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('abgelaufene_reservierungen') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('reservierungen.abgelaufene_reservierungen') }}">
                                 <i class="bi bi-clock-history"></i> Abgelaufene Reservierungen
                             </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('geloeschte_reservierungen') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('reservierungen.geloeschte_reservierungen') }}">
                                 <i class="bi bi-trash"></i> Gelöschte Reservierungen
                             </a></li>
                         </ul>
                     </li>
-                    <li class="nav-item">                        <a class="nav-link" href="{{ url_for('nachrichten') }}">
+                    <li class="nav-item">                        <a class="nav-link" href="{{ url_for('nachrichten.nachrichten') }}">
                             <i class="bi bi-chat-dots"></i> Nachrichten
                         </a>
                     </li>
@@ -120,51 +120,51 @@
                             <i class="bi bi-shield-lock"></i> Admin
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('admin_dashboard') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('admin_system.admin_dashboard') }}">
                                 <i class="bi bi-speedometer"></i> Admin-Dashboard
                             </a></li>
                             {% if session.admin_level >= 2 %}
-                            <li><a class="dropdown-item" href="{{ url_for('admin_rollen') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('admin_system.admin_rollen') }}">
                                 <i class="bi bi-shield-lock"></i> Administrator-Rollen
                             </a></li>
                             {% endif %}
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('admin_alle_einsaetze') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('admin_system.admin_alle_einsaetze') }}">
                                 <i class="bi bi-list-check"></i> Alle Einsätze
                             </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('admin_stornierte_einsaetze') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('admin_system.admin_stornierte_einsaetze') }}">
                                 <i class="bi bi-archive"></i> Stornierte Einsätze
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('admin_benutzer') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('admin_benutzer.admin_benutzer') }}">
                                 <i class="bi bi-people"></i> Benutzer
                             </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('admin_maschinen') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('admin_maschinen.admin_maschinen') }}">
                                 <i class="bi bi-tools"></i> Maschinen
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('admin_abrechnungen') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('admin_finanzen.admin_abrechnungen') }}">
                                 <i class="bi bi-calculator"></i> Abrechnungen & CSV-Import
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('admin_database_backup') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('admin_system.admin_database_backup') }}">
                                 <i class="bi bi-download"></i> Datenbank sichern
                             </a></li>
                             {% if session.admin_level >= 2 %}
-                            <li><a class="dropdown-item text-danger" href="{{ url_for('admin_database_restore') }}">
+                            <li><a class="dropdown-item text-danger" href="{{ url_for('admin_system.admin_database_restore') }}">
                                 <i class="bi bi-arrow-counterclockwise"></i> Datenbank rücksichern
                             </a></li>
                             {% endif %}
                             {% set erste_gemeinschaft_id = (session.get('gemeinschaften') and session.get('gemeinschaften')[0].get('id')) or 1 %}
-                            <li><a class="dropdown-item" href="{{ url_for('admin_konten', gemeinschaft_id=erste_gemeinschaft_id) }}">
+                            <li><a class="dropdown-item" href="{{ url_for('admin_finanzen.admin_konten', gemeinschaft_id=erste_gemeinschaft_id) }}">
                                 <i class="bi bi-wallet2"></i> Mitgliederkonten
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('admin_training_rechte') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('admin_system.admin_training_rechte') }}">
                                 <i class="bi bi-mortarboard"></i> Training-Rechte
                             </a></li>
                             {% if session.admin_level >= 2 %}
-                            <li><a class="dropdown-item" href="{{ url_for('admin_training_datenbanken') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('admin_system.admin_training_datenbanken') }}">
                                 <i class="bi bi-database-gear"></i> Übungsdatenbanken
                             </a></li>
                             {% endif %}
@@ -176,7 +176,7 @@
                     <!-- Datenbank-Modus Anzeige -->
                     {% if db_info and db_info.is_training_mode %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('datenbank_auswahl') }}">
+                        <a class="nav-link" href="{{ url_for('auth.datenbank_auswahl') }}">
                             <span class="badge bg-warning text-dark">
                                 <i class="bi bi-mortarboard-fill"></i> {{ db_info.database_name }}
                             </span>
@@ -188,14 +188,14 @@
                             <i class="bi bi-person-circle"></i> {{ session.get('benutzer_name') }}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="{{ url_for('datenbank_auswahl') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('auth.datenbank_auswahl') }}">
                                 <i class="bi bi-database"></i> Datenbank wechseln
                             </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('passwort_aendern') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('auth.passwort_aendern') }}">
                                 <i class="bi bi-key"></i> Passwort ändern
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">
                                 <i class="bi bi-box-arrow-right"></i> Abmelden
                             </a></li>
                         </ul>

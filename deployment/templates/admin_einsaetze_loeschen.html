@@ -44,13 +44,13 @@
                 <div class="mb-4">
                     <h5>Empfohlene Backup-Optionen:</h5>
                     <div class="btn-group" role="group">
-                        <a href="{{ url_for('admin_export_json') }}" class="btn btn-info">
+                        <a href="{{ url_for('admin_system.admin_export_json') }}" class="btn btn-info">
                             <i class="bi bi-file-earmark-code"></i> JSON Export
                         </a>
-                        <a href="{{ url_for('admin_export_csv') }}" class="btn btn-success">
+                        <a href="{{ url_for('admin_system.admin_export_csv') }}" class="btn btn-success">
                             <i class="bi bi-file-earmark-spreadsheet"></i> CSV Export
                         </a>
-                        <a href="{{ url_for('admin_backup_database') }}" class="btn btn-primary">
+                        <a href="{{ url_for('admin_system.admin_backup_database') }}" class="btn btn-primary">
                             <i class="bi bi-database"></i> Datenbank Backup
                         </a>
                     </div>
@@ -81,7 +81,7 @@
                     </div>
 
                     <div class="d-flex justify-content-between">
-                        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
+                        <a href="{{ url_for('admin_system.admin_dashboard') }}" class="btn btn-secondary">
                             <i class="bi bi-arrow-left"></i> Abbrechen
                         </a>
                         <button type="submit" class="btn btn-danger">

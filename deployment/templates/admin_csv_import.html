@@ -10,10 +10,10 @@
                 <i class="bi bi-upload"></i> CSV-Import: {{ gemeinschaft_name }}
             </h2>
             <div>
-                <a href="{{ url_for('admin_csv_konfiguration', gemeinschaft_id=gemeinschaft_id) }}" class="btn btn-warning">
+                <a href="{{ url_for('admin_finanzen.admin_csv_konfiguration', gemeinschaft_id=gemeinschaft_id) }}" class="btn btn-warning">
                     <i class="bi bi-gear"></i> Format konfigurieren
                 </a>
-                <a href="{{ url_for('admin_abrechnungen') }}" class="btn btn-secondary">
+                <a href="{{ url_for('admin_finanzen.admin_abrechnungen') }}" class="btn btn-secondary">
                     <i class="bi bi-arrow-left"></i> Zurück
                 </a>
             </div>
@@ -48,7 +48,7 @@
                                 <strong>{{ config.dezimaltrennzeichen }}</strong> als Dezimaltrennzeichen</li>
                             <li>Duplikate werden automatisch erkannt und übersprungen</li>
                             <li>Transaktionen mit Zahlungsreferenz werden automatisch zugeordnet</li>
-                            <li><a href="{{ url_for('admin_csv_konfiguration', gemeinschaft_id=gemeinschaft_id) }}" 
+                            <li><a href="{{ url_for('admin_finanzen.admin_csv_konfiguration', gemeinschaft_id=gemeinschaft_id) }}" 
                                    class="alert-link">Format anpassen</a>, falls Ihr Bankenformat abweicht</li>
                         </ul>
                     </div>

@@ -1,0 +1,59 @@
+
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: maschinengemeinschaft-db
+    restart: always
+    environment:
+      POSTGRES_DB: maschinengemeinschaft
+      POSTGRES_USER: mgr_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  web:
+    build: .
+    container_name: maschinengemeinschaft-app
+    restart: always
+    depends_on:
+      - db
+    environment:
+      DB_TYPE: postgresql
+      PG_HOST: db
+      PG_PORT: 5432
+      PG_DATABASE: maschinengemeinschaft
+      PG_USER: mgr_user
+      PG_PASSWORD: ${DB_PASSWORD:-changeme}
+      FLASK_ENV: production
+      SECRET_KEY: ${SECRET_KEY:-changeme}
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/opt/maschinengemeinschaft
+    working_dir: /opt/maschinengemeinschaft
+    command: gunicorn -w 4 -b 0.0.0.0:5000 web_app:app
+
+  caddy:
+    image: caddy:2
+    container_name: maschinengemeinschaft-caddy
+    restart: always
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./Caddyfile:/etc/caddy/Caddyfile
+
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:

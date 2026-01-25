@@ -18,7 +18,7 @@
                     Bitte stornieren Sie rechtzeitig, wenn Sie die Maschine doch nicht benötigen.
                 </div>
 
-                <form method="POST" action="{{ url_for('maschine_reservieren', maschine_id=maschine.id) }}" id="reservierungsForm">
+                <form method="POST" action="{{ url_for('reservierungen.maschine_reservieren', maschine_id=maschine.id) }}" id="reservierungsForm">
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="datum" class="form-label">Datum *</label>
@@ -84,7 +84,7 @@
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-calendar-check"></i> Reservieren
                         </button>
-                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                        <a href="{{ url_for('dashboard.dashboard') }}" class="btn btn-secondary">
                             <i class="bi bi-x-circle"></i> Abbrechen
                         </a>
                     </div>
@@ -122,7 +122,7 @@
                                 <td>{{ res.zweck or '-' }}</td>
                                 <td>{{ res.bemerkung or '-' }}</td>
                                 <td>
-                                    <form method="POST" action="{{ url_for('reservierung_stornieren', reservierung_id=res.id) }}" 
+                                    <form method="POST" action="{{ url_for('reservierungen.reservierung_stornieren', reservierung_id=res.id) }}" 
                                           style="display: inline;" onsubmit="return confirm('Reservierung wirklich stornieren?');">
                                         <button type="submit" class="btn btn-sm btn-danger" title="Stornieren">
                                             <i class="bi bi-trash"></i>

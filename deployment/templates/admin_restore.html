@@ -73,7 +73,7 @@
                         <button type="submit" class="btn btn-danger btn-lg">
                             <i class="bi bi-arrow-counterclockwise"></i> Datenbank jetzt wiederherstellen
                         </button>
-                        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
+                        <a href="{{ url_for('admin_system.admin_dashboard') }}" class="btn btn-secondary">
                             <i class="bi bi-arrow-left"></i> Abbrechen
                         </a>
                     </div>
@@ -94,7 +94,7 @@
                 <p class="small">
                     Bevor Sie eine Wiederherstellung durchführen, sollten Sie ein aktuelles Backup erstellen:
                 </p>
-                <a href="{{ url_for('admin_database_backup') }}" class="btn btn-primary btn-sm w-100 mb-3">
+                <a href="{{ url_for('admin_system.admin_database_backup') }}" class="btn btn-primary btn-sm w-100 mb-3">
                     <i class="bi bi-download"></i> Backup herunterladen
                 </a>
 
@@ -134,7 +134,7 @@
 
 <div class="row mt-3 mb-5">
     <div class="col-12">
-        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
+        <a href="{{ url_for('admin_system.admin_dashboard') }}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Zurück zum Dashboard
         </a>
     </div>

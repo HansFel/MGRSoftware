@@ -12,7 +12,7 @@
                     {{ gemeinschaft.name }} - {{ mitglied.vorname }} {{ mitglied.name }}
                 </p>
             </div>
-            <a href="{{ url_for('admin_konten', gemeinschaft_id=gemeinschaft.id) }}" class="btn btn-secondary">
+            <a href="{{ url_for('admin_finanzen.admin_konten', gemeinschaft_id=gemeinschaft.id) }}" class="btn btn-secondary">
                 <i class="bi bi-arrow-left"></i> Zurück
             </a>
         </div>

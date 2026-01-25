@@ -81,7 +81,7 @@
                                         </button>
                                         <ul class="dropdown-menu">
                                             <li>
-                                                <form method="POST" action="{{ url_for('admin_rollen_set_level') }}" class="d-inline">
+                                                <form method="POST" action="{{ url_for('admin_system.admin_rollen_set_level') }}" class="d-inline">
                                                     <input type="hidden" name="benutzer_id" value="{{ user.id }}">
                                                     <input type="hidden" name="level" value="0">
                                                     <button type="submit" class="dropdown-item" 
@@ -91,7 +91,7 @@
                                                 </form>
                                             </li>
                                             <li>
-                                                <form method="POST" action="{{ url_for('admin_rollen_set_level') }}" class="d-inline">
+                                                <form method="POST" action="{{ url_for('admin_system.admin_rollen_set_level') }}" class="d-inline">
                                                     <input type="hidden" name="benutzer_id" value="{{ user.id }}">
                                                     <input type="hidden" name="level" value="1">
                                                     <button type="submit" class="dropdown-item"
@@ -101,7 +101,7 @@
                                                 </form>
                                             </li>
                                             <li>
-                                                <form method="POST" action="{{ url_for('admin_rollen_set_level') }}" class="d-inline">
+                                                <form method="POST" action="{{ url_for('admin_system.admin_rollen_set_level') }}" class="d-inline">
                                                     <input type="hidden" name="benutzer_id" value="{{ user.id }}">
                                                     <input type="hidden" name="level" value="2">
                                                     <button type="submit" class="dropdown-item"
@@ -135,7 +135,7 @@
                                             </h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                         </div>
-                                        <form method="POST" action="{{ url_for('admin_rollen_add_gemeinschaft') }}">
+                                        <form method="POST" action="{{ url_for('admin_system.admin_rollen_add_gemeinschaft') }}">
                                             <div class="modal-body">
                                                 <input type="hidden" name="benutzer_id" value="{{ user.id }}">
                                                 <div class="mb-3">
@@ -175,7 +175,7 @@
 
 <div class="row mt-3 mb-5">
     <div class="col-12">
-        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
+        <a href="{{ url_for('admin_system.admin_dashboard') }}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Zurück zum Dashboard
         </a>
     </div>

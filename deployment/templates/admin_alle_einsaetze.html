@@ -10,7 +10,7 @@
                 <h4 class="mb-0">
                     <i class="bi bi-list-check"></i> Alle Maschineneinsätze
                 </h4>
-                <a href="{{ url_for('admin_stornierte_einsaetze') }}" class="btn btn-outline-secondary btn-sm">
+                <a href="{{ url_for('admin_system.admin_stornierte_einsaetze') }}" class="btn btn-outline-secondary btn-sm">
                     <i class="bi bi-archive"></i> Stornierte Einsätze
                 </a>
             </div>
@@ -74,7 +74,7 @@
                                         <span class="text-muted">-</span>
                                     {% endif %}
                                 <td>
-                                    <a href="{{ url_for('einsatz_stornieren', einsatz_id=einsatz.id) }}" 
+                                    <a href="{{ url_for('einsaetze.einsatz_stornieren', einsatz_id=einsatz.id) }}" 
                                        class="btn btn-sm btn-outline-danger"
                                        onclick="return confirm('Soll dieser Einsatz wirklich storniert werden?')">
                                         <i class="bi bi-trash"></i>

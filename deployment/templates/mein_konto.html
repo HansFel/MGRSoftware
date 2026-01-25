@@ -10,7 +10,7 @@
                 <h2><i class="bi bi-wallet2"></i> Mein Konto</h2>
                 <p class="text-muted">{{ gemeinschaft.name }}</p>
             </div>
-            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+            <a href="{{ url_for('dashboard.dashboard') }}" class="btn btn-secondary">
                 <i class="bi bi-arrow-left"></i> Zurück
             </a>
         </div>
@@ -102,7 +102,7 @@
                             <td class="text-end"><strong>{{ "%.2f"|format(abr.betrag_gesamt) }} €</strong></td>
                             <td>{{ abr.erstellt_am[:10] }}</td>
                             <td>
-                                <a href="{{ url_for('abrechnung_pdf', abrechnung_id=abr.id) }}" 
+                                <a href="{{ url_for('abrechnungen.abrechnung_pdf', abrechnung_id=abr.id) }}" 
                                    class="btn btn-sm btn-outline-primary" target="_blank">
                                     <i class="bi bi-file-pdf"></i> PDF
                                 </a>
@@ -193,7 +193,7 @@
                                 <td>
                                     {{ buchung.beschreibung }}
                                     {% if buchung.referenz_typ == 'abrechnung' and buchung.referenz_id %}
-                                    <a href="{{ url_for('abrechnung_pdf', abrechnung_id=buchung.referenz_id) }}" 
+                                    <a href="{{ url_for('abrechnungen.abrechnung_pdf', abrechnung_id=buchung.referenz_id) }}" 
                                        class="btn btn-sm btn-link p-0" target="_blank">
                                         <i class="bi bi-file-pdf"></i>
                                     </a>

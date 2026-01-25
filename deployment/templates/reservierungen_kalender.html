@@ -127,10 +127,10 @@
                 <i class="bi bi-calendar3"></i> Reservierungen Kalender
             </h2>
             <div>
-                <a href="{{ url_for('meine_reservierungen') }}" class="btn btn-light">
+                <a href="{{ url_for('reservierungen.meine_reservierungen') }}" class="btn btn-light">
                     <i class="bi bi-list-check"></i> Meine Reservierungen
                 </a>
-                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                <a href="{{ url_for('dashboard.dashboard') }}" class="btn btn-secondary">
                     <i class="bi bi-house"></i> Dashboard
                 </a>
             </div>
@@ -140,7 +140,7 @@
 
 <!-- Filter Section -->
 <div class="filter-section">
-    <form method="GET" action="{{ url_for('reservierungen_kalender') }}" class="row g-3">
+    <form method="GET" action="{{ url_for('reservierungen.reservierungen_kalender') }}" class="row g-3">
         <div class="col-md-4">
             <label class="form-label fw-bold">Maschine filtern:</label>
             <select name="maschine_id" class="form-select" onchange="this.form.submit()">
