@@ -278,12 +278,13 @@ CREATE TABLE IF NOT EXISTS maschinen_reservierungen (
     benutzer_id INTEGER NOT NULL REFERENCES benutzer(id),
     datum DATE NOT NULL,
     ganztags BOOLEAN DEFAULT TRUE,
-    von_zeit TIME,
-    bis_zeit TIME,
+    uhrzeit_von TIME,
+    uhrzeit_bis TIME,
     zweck TEXT,
     erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     storniert BOOLEAN DEFAULT FALSE,
     storniert_am TIMESTAMP,
+    status VARCHAR(20) DEFAULT 'aktiv',
     UNIQUE(maschine_id, datum, benutzer_id)
 );
 
@@ -335,6 +336,8 @@ CREATE TABLE IF NOT EXISTS mitglieder_konten (
     benutzer_id INTEGER NOT NULL REFERENCES benutzer(id),
     gemeinschaft_id INTEGER NOT NULL REFERENCES gemeinschaften(id),
     kontostand REAL DEFAULT 0.0,
+    saldo REAL DEFAULT 0.0,
+    anfangssaldo REAL DEFAULT 0.0,
     letzte_aktualisierung TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(benutzer_id, gemeinschaft_id)
 );
@@ -343,6 +346,7 @@ CREATE TABLE IF NOT EXISTS mitglieder_konten (
 CREATE TABLE IF NOT EXISTS buchungen (
     id SERIAL PRIMARY KEY,
     konto_id INTEGER NOT NULL REFERENCES mitglieder_konten(id),
+    benutzer_id INTEGER REFERENCES benutzer(id),
     datum DATE NOT NULL,
     betrag REAL NOT NULL,
     buchungsart TEXT NOT NULL,
@@ -382,7 +386,9 @@ CREATE TABLE IF NOT EXISTS zahlungs_zuordnungen (
 CREATE TABLE IF NOT EXISTS zahlungsreferenzen (
     id SERIAL PRIMARY KEY,
     benutzer_id INTEGER NOT NULL REFERENCES benutzer(id),
+    gemeinschaft_id INTEGER REFERENCES gemeinschaften(id),
     referenz TEXT NOT NULL,
+    aktiv BOOLEAN DEFAULT TRUE,
     erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(benutzer_id, referenz)
 );

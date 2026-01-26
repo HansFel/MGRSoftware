@@ -210,3 +210,183 @@ def admin_gemeinschaften_abrechnung(gemeinschaft_id):
     return render_template('admin_gemeinschaften_abrechnung.html',
                          gemeinschaft=gemeinschaft,
                          mitglieder_kosten=mitglieder_kosten)
+
+
+@admin_gemeinschaften_bp.route('/gemeinschaften/<int:gemeinschaft_id>/abrechnung/csv')
+@admin_required
+def admin_gemeinschaften_abrechnung_csv(gemeinschaft_id):
+    """CSV Export der Gemeinschafts-Abrechnung"""
+    import csv
+    from io import StringIO
+    from datetime import datetime
+    from flask import make_response
+
+    db_path = get_current_db_path()
+
+    with MaschinenDBContext(db_path) as db:
+        cursor = db.cursor
+
+        sql = convert_sql("SELECT * FROM gemeinschaften WHERE id = ?")
+        cursor.execute(sql, (gemeinschaft_id,))
+        columns = [desc[0] for desc in cursor.description]
+        gemeinschaft = dict(zip(columns, cursor.fetchone()))
+
+        sql = convert_sql("""
+            SELECT
+                b.id, b.name, b.vorname,
+                COUNT(e.id) as anzahl_einsaetze,
+                SUM(e.endstand - e.anfangstand) as betriebsstunden,
+                SUM(
+                    CASE
+                        WHEN m.abrechnungsart = 'stunden' THEN (e.endstand - e.anfangstand) * COALESCE(m.preis_pro_einheit, 0)
+                        ELSE COALESCE(e.flaeche_menge, 0) * COALESCE(m.preis_pro_einheit, 0)
+                    END
+                ) as maschinenkosten
+            FROM benutzer b
+            JOIN mitglied_gemeinschaft mg ON b.id = mg.mitglied_id
+            LEFT JOIN maschineneinsaetze e ON b.id = e.benutzer_id
+            LEFT JOIN maschinen m ON e.maschine_id = m.id AND m.gemeinschaft_id = ?
+            WHERE mg.gemeinschaft_id = ?
+            GROUP BY b.id, b.name, b.vorname
+            ORDER BY b.name, b.vorname
+        """)
+        cursor.execute(sql, (gemeinschaft_id, gemeinschaft_id))
+
+        rows = cursor.fetchall()
+
+    output = StringIO()
+    writer = csv.writer(output, delimiter=';')
+
+    writer.writerow([f'Abrechnung: {gemeinschaft["name"]}'])
+    writer.writerow([f'Erstellt am: {datetime.now().strftime("%d.%m.%Y %H:%M")}'])
+    writer.writerow([])
+    writer.writerow(['Name', 'Vorname', 'Anzahl Einsätze', 'Betriebsstunden', 'Maschinenkosten (EUR)'])
+
+    gesamt_einsaetze = 0
+    gesamt_stunden = 0
+    gesamt_maschinenkosten = 0
+
+    for row in rows:
+        maschinenkosten = row[5] or 0
+        writer.writerow([
+            row[1], row[2], row[3] or 0,
+            f"{row[4] or 0:.1f}", f"{maschinenkosten:.2f}"
+        ])
+        gesamt_einsaetze += row[3] or 0
+        gesamt_stunden += row[4] or 0
+        gesamt_maschinenkosten += maschinenkosten
+
+    writer.writerow([])
+    writer.writerow(['GESAMT', '', gesamt_einsaetze, f"{gesamt_stunden:.1f}", f"{gesamt_maschinenkosten:.2f}"])
+
+    output.seek(0)
+    response = make_response(output.getvalue().encode('utf-8-sig'))
+    response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+    response.headers['Content-Disposition'] = f'attachment; filename=Abrechnung_{gemeinschaft["name"]}_{datetime.now().strftime("%Y%m%d")}.csv'
+    return response
+
+
+@admin_gemeinschaften_bp.route('/gemeinschaften/<int:gemeinschaft_id>/maschinenuebersicht/pdf')
+@admin_required
+def admin_gemeinschaften_maschinenuebersicht_pdf(gemeinschaft_id):
+    """PDF-Übersicht aller Maschinen einer Gemeinschaft"""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import cm
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from io import BytesIO
+    import os
+    from datetime import datetime
+
+    db_path = get_current_db_path()
+
+    with MaschinenDBContext(db_path) as db:
+        cursor = db.connection.cursor()
+
+        sql = convert_sql("SELECT * FROM gemeinschaften WHERE id = ?")
+        cursor.execute(sql, (gemeinschaft_id,))
+        columns = [desc[0] for desc in cursor.description]
+        gemeinschaft = dict(zip(columns, cursor.fetchone()))
+
+        sql = convert_sql("""
+            SELECT m.*,
+                (SELECT SUM(e.endstand - e.anfangstand) FROM maschineneinsaetze e WHERE e.maschine_id = m.id) as betriebsstunden,
+                (SELECT SUM(CASE WHEN m.abrechnungsart = 'stunden' THEN (e.endstand - e.anfangstand) * COALESCE(m.preis_pro_einheit, 0)
+                                 ELSE COALESCE(e.flaeche_menge, 0) * COALESCE(m.preis_pro_einheit, 0) END) FROM maschineneinsaetze e WHERE e.maschine_id = m.id) as einnahmen,
+                (SELECT SUM(auf.wartungskosten + auf.reparaturkosten + auf.versicherung + auf.steuern + auf.sonstige_kosten) FROM maschinen_aufwendungen auf WHERE auf.maschine_id = m.id) as aufwendungen
+            FROM maschinen m
+            WHERE m.gemeinschaft_id = ?
+            ORDER BY m.bezeichnung
+        """)
+        cursor.execute(sql, (gemeinschaft_id,))
+        maschinen = cursor.fetchall()
+        maschinen_columns = [desc[0] for desc in cursor.description]
+
+    font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'fonts', 'DejaVuSans.ttf')
+    if os.path.exists(font_path):
+        pdfmetrics.registerFont(TTFont('DejaVuSans', font_path))
+        default_font = 'DejaVuSans'
+    else:
+        default_font = 'Helvetica'
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=1.5*cm, rightMargin=1.5*cm, topMargin=2*cm, bottomMargin=2*cm)
+    elements = []
+    styles = getSampleStyleSheet()
+    for style in styles.byName.values():
+        style.fontName = default_font
+
+    title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=20, fontName=default_font)
+    elements.append(Paragraph(f"Maschinenübersicht: {gemeinschaft['name']}", title_style))
+    elements.append(Paragraph(f"Erstellt am: {datetime.now().strftime('%d.%m.%Y %H:%M')}", styles['Normal']))
+    elements.append(Spacer(1, 0.5*cm))
+
+    table_data = [[
+        'Bezeichnung', 'Hersteller', 'Modell', 'Baujahr', 'Betriebsstunden',
+        'Einnahmen', 'Aufwendungen', 'Abschreibung (Jahr)', 'Deckungsbeitrag'
+    ]]
+    for row in maschinen:
+        maschine = dict(zip(maschinen_columns, row))
+        einnahmen = maschine.get('einnahmen') or 0
+        aufwendungen = maschine.get('aufwendungen') or 0
+        anschaffungspreis = maschine.get('anschaffungspreis') or 0
+        abschreibungsdauer = maschine.get('abschreibungsdauer_jahre') or 10
+        try:
+            abschreibung_jahr = float(anschaffungspreis) / float(abschreibungsdauer) if abschreibungsdauer else 0
+        except Exception:
+            abschreibung_jahr = 0
+        deckungsbeitrag = einnahmen - aufwendungen - abschreibung_jahr
+        table_data.append([
+            maschine.get('bezeichnung', '-'),
+            maschine.get('hersteller', '-'),
+            maschine.get('modell', '-'),
+            maschine.get('baujahr', '-'),
+            f"{maschine.get('betriebsstunden') or 0:.1f}",
+            f"{einnahmen:.2f} €",
+            f"{aufwendungen:.2f} €",
+            f"{abschreibung_jahr:.2f} €",
+            f"{deckungsbeitrag:.2f} €"
+        ])
+
+    table = Table(table_data, colWidths=[3.2*cm, 2.2*cm, 2.2*cm, 1.5*cm, 2*cm, 2.2*cm, 2.2*cm, 2.2*cm, 2.2*cm])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('FONTNAME', (0, 0), (-1, -1), default_font),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('ALIGN', (4, 1), (-1, -1), 'RIGHT'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(table)
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.getvalue(), 200, {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': f'inline; filename="Maschinenuebersicht_{gemeinschaft["name"]}_{datetime.now().strftime("%Y%m%d")}.pdf"'
+    }

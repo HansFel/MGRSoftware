@@ -222,19 +222,44 @@ def admin_abrechnungen():
     with MaschinenDBContext(db_path) as db:
         cursor = db.connection.cursor()
 
-        sql = convert_sql("""
-            SELECT g.*, COUNT(ma.id) as anzahl_abrechnungen
-            FROM gemeinschaften g
-            LEFT JOIN mitglieder_abrechnungen ma ON g.id = ma.gemeinschaft_id
-            WHERE g.aktiv = true
-            GROUP BY g.id
-            ORDER BY g.name
-        """)
-        cursor.execute(sql)
-        columns = [desc[0] for desc in cursor.description]
-        gemeinschaften = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        # Gemeinschaften des Admins laden
+        if session.get('admin_level', 0) >= 2:
+            # Hauptadmin sieht alle Gemeinschaften
+            sql = convert_sql("SELECT id, name FROM gemeinschaften WHERE aktiv = true")
+            cursor.execute(sql)
+        else:
+            # Gemeinschafts-Admin sieht nur seine Gemeinschaften
+            sql = convert_sql("""
+                SELECT g.id, g.name
+                FROM gemeinschaften g
+                JOIN gemeinschafts_admin ga ON g.id = ga.gemeinschaft_id
+                WHERE ga.benutzer_id = ? AND g.aktiv = true
+            """)
+            cursor.execute(sql, (session['benutzer_id'],))
 
-    return render_template('admin_abrechnungen.html', gemeinschaften=gemeinschaften)
+        gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
+
+        # Statistiken
+        statistiken = {}
+        for gem in gemeinschaften:
+            sql = convert_sql("""
+                SELECT
+                    COUNT(*) as anzahl_offen,
+                    COALESCE(SUM(betrag_gesamt), 0) as summe_offen
+                FROM mitglieder_abrechnungen
+                WHERE gemeinschaft_id = ? AND status = 'offen'
+            """)
+            cursor.execute(sql, (gem['id'],))
+
+            row = cursor.fetchone()
+            statistiken[gem['id']] = {
+                'anzahl_offen': row[0],
+                'summe_offen': row[1]
+            }
+
+    return render_template('admin_abrechnungen.html',
+                         gemeinschaften=gemeinschaften,
+                         statistiken=statistiken)
 
 
 @admin_finanzen_bp.route('/gemeinschaften/<int:gemeinschaft_id>/konten/zahlung/<int:benutzer_id>', methods=['GET', 'POST'])

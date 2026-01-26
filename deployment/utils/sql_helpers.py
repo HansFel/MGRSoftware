@@ -69,6 +69,21 @@ def convert_sql(sql: str) -> str:
         flags=re.IGNORECASE
     )
 
+    # GROUP_CONCAT(col) -> STRING_AGG(col, ',')
+    # GROUP_CONCAT(col, 'sep') -> STRING_AGG(col, 'sep')
+    sql = re.sub(
+        r"GROUP_CONCAT\(([^,)]+)\)",
+        r"STRING_AGG(\1::text, ',')",
+        sql,
+        flags=re.IGNORECASE
+    )
+    sql = re.sub(
+        r"GROUP_CONCAT\(([^,]+),\s*('[^']+')\)",
+        r"STRING_AGG(\1::text, \2)",
+        sql,
+        flags=re.IGNORECASE
+    )
+
     # ? -> %s für Parameterisierung
     sql = sql.replace('?', '%s')
 

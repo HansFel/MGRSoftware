@@ -111,6 +111,12 @@ def migrate_table(sqlite_conn, pg_conn, table_name):
     sqlite_cursor = sqlite_conn.cursor()
     pg_cursor = pg_conn.cursor()
 
+    # Bekannte Boolean-Spalten
+    BOOLEAN_COLUMNS = {
+        'aktiv', 'is_admin', 'storniert', 'ganztags', 'zugeordnet',
+        'nur_training', 'gelesen', 'treibstoff_berechnen', 'hat_kopfzeile'
+    }
+
     # Prüfe ob Tabelle in SQLite existiert
     sqlite_cursor.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
@@ -149,14 +155,16 @@ def migrate_table(sqlite_conn, pg_conn, table_name):
 
     count = 0
     for row in rows:
-        # Konvertiere Boolean-Werte
+        # Konvertiere Boolean-Werte (SQLite 0/1 -> PostgreSQL True/False)
         converted_row = []
-        for val in row:
-            if val == 1 and isinstance(val, int):
-                # Könnte Boolean sein - prüfen wir später genauer
-                converted_row.append(val)
-            elif val == 0 and isinstance(val, int):
-                converted_row.append(val)
+        for i, val in enumerate(row):
+            col_name = columns[i]
+            if col_name in BOOLEAN_COLUMNS:
+                # Konvertiere zu echtem Boolean
+                if val is None:
+                    converted_row.append(None)
+                else:
+                    converted_row.append(bool(val))
             else:
                 converted_row.append(val)
 
