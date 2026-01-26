@@ -500,7 +500,7 @@ def admin_database_backup():
             env['PGPASSWORD'] = PG_PASSWORD
 
             result = subprocess.run([
-                'pg_dump',
+                '/usr/bin/pg_dump',
                 '-h', PG_HOST,
                 '-p', str(PG_PORT),
                 '-U', PG_USER,
@@ -572,12 +572,12 @@ def admin_database_restore():
                 env['PGPASSWORD'] = PG_PASSWORD
 
                 subprocess.run([
-                    'pg_dump', '-h', PG_HOST, '-p', str(PG_PORT),
+                    '/usr/bin/pg_dump', '-h', PG_HOST, '-p', str(PG_PORT),
                     '-U', PG_USER, '-d', PG_DATABASE, '-f', backup_current
                 ], env=env, check=True)
 
                 result = subprocess.run([
-                    'psql', '-h', PG_HOST, '-p', str(PG_PORT),
+                    '/usr/bin/psql', '-h', PG_HOST, '-p', str(PG_PORT),
                     '-U', PG_USER, '-d', PG_DATABASE, '-f', temp_upload_path
                 ], env=env, capture_output=True, text=True)
 
@@ -829,3 +829,310 @@ def admin_training_db_erstellen():
         flash('Script nicht gefunden!', 'danger')
 
     return redirect(url_for('admin_system.admin_training_datenbanken'))
+
+
+# ============================================================================
+# REPLICATION-VERWALTUNG
+# ============================================================================
+
+@admin_system_bp.route('/replication')
+@hauptadmin_required
+def admin_replication():
+    """Replication-Konfiguration und Status"""
+    from database import USING_POSTGRESQL, PG_HOST, PG_PORT, PG_DATABASE, PG_USER
+
+    if not USING_POSTGRESQL:
+        flash('Replication ist nur mit PostgreSQL verfügbar!', 'warning')
+        return redirect(url_for('admin_system.admin_dashboard'))
+
+    db_path = get_current_db_path()
+
+    with MaschinenDBContext(db_path) as db:
+        cursor = db.cursor
+
+        # Replication-Konfiguration laden
+        cursor.execute("SELECT * FROM replication_config WHERE id = 1")
+        config_row = cursor.fetchone()
+
+        config = None
+        if config_row:
+            config = {
+                'standby_host': config_row[1],
+                'standby_port': config_row[2] or 5432,
+                'standby_user': config_row[3] or 'replicator',
+                'replication_slot': config_row[4] or 'mgr_slot',
+                'aktiv': config_row[5],
+                'sync_modus': config_row[6] or 'async',
+                'letzter_status': config_row[7],
+                'letzter_check': config_row[8]
+            }
+
+        # Replication-Status von PostgreSQL abfragen
+        replication_status = None
+        try:
+            cursor.execute("""
+                SELECT client_addr, state, sent_lsn, write_lsn, flush_lsn, replay_lsn,
+                       sync_state, reply_time
+                FROM pg_stat_replication
+            """)
+            rows = cursor.fetchall()
+            if rows:
+                replication_status = []
+                for row in rows:
+                    replication_status.append({
+                        'client_addr': row[0],
+                        'state': row[1],
+                        'sent_lsn': row[2],
+                        'write_lsn': row[3],
+                        'flush_lsn': row[4],
+                        'replay_lsn': row[5],
+                        'sync_state': row[6],
+                        'reply_time': row[7]
+                    })
+        except Exception as e:
+            flash(f'Fehler beim Abrufen des Replication-Status: {str(e)}', 'warning')
+
+        # Replication-Slots abfragen
+        replication_slots = []
+        try:
+            cursor.execute("""
+                SELECT slot_name, slot_type, active, restart_lsn
+                FROM pg_replication_slots
+            """)
+            for row in cursor.fetchall():
+                replication_slots.append({
+                    'slot_name': row[0],
+                    'slot_type': row[1],
+                    'active': row[2],
+                    'restart_lsn': row[3]
+                })
+        except Exception as e:
+            pass
+
+        # Replication-Log laden
+        cursor.execute("""
+            SELECT l.zeitpunkt, l.aktion, l.status, l.details, b.name, b.vorname
+            FROM replication_log l
+            LEFT JOIN benutzer b ON l.ausgefuehrt_von = b.id
+            ORDER BY l.zeitpunkt DESC
+            LIMIT 50
+        """)
+        log_entries = []
+        for row in cursor.fetchall():
+            log_entries.append({
+                'zeitpunkt': row[0],
+                'aktion': row[1],
+                'status': row[2],
+                'details': row[3],
+                'benutzer': f"{row[4]}, {row[5]}" if row[4] else 'System'
+            })
+
+        return render_template('admin_replication.html',
+                               config=config,
+                               replication_status=replication_status,
+                               replication_slots=replication_slots,
+                               log_entries=log_entries,
+                               pg_host=PG_HOST,
+                               pg_port=PG_PORT,
+                               pg_database=PG_DATABASE)
+
+
+@admin_system_bp.route('/replication/config', methods=['POST'])
+@hauptadmin_required
+def admin_replication_config():
+    """Replication-Konfiguration speichern"""
+    from database import USING_POSTGRESQL
+
+    if not USING_POSTGRESQL:
+        flash('Replication ist nur mit PostgreSQL verfügbar!', 'warning')
+        return redirect(url_for('admin_system.admin_dashboard'))
+
+    standby_host = request.form.get('standby_host', '').strip()
+    standby_port = request.form.get('standby_port', '5432')
+    standby_user = request.form.get('standby_user', 'replicator')
+    replication_slot = request.form.get('replication_slot', 'mgr_slot')
+    sync_modus = request.form.get('sync_modus', 'async')
+
+    if not standby_host:
+        flash('Standby-Host ist erforderlich!', 'danger')
+        return redirect(url_for('admin_system.admin_replication'))
+
+    db_path = get_current_db_path()
+
+    with MaschinenDBContext(db_path) as db:
+        cursor = db.cursor
+
+        cursor.execute("""
+            UPDATE replication_config
+            SET standby_host = %s,
+                standby_port = %s,
+                standby_user = %s,
+                replication_slot = %s,
+                sync_modus = %s,
+                geaendert_am = NOW()
+            WHERE id = 1
+        """, (standby_host, int(standby_port), standby_user, replication_slot, sync_modus))
+
+        # Log-Eintrag
+        cursor.execute("""
+            INSERT INTO replication_log (aktion, status, details, ausgefuehrt_von)
+            VALUES ('Konfiguration geändert', 'erfolg', %s, %s)
+        """, (f"Host: {standby_host}:{standby_port}, Slot: {replication_slot}", session['benutzer_id']))
+
+        db.conn.commit()
+        flash('Replication-Konfiguration gespeichert!', 'success')
+
+    return redirect(url_for('admin_system.admin_replication'))
+
+
+@admin_system_bp.route('/replication/toggle', methods=['POST'])
+@hauptadmin_required
+def admin_replication_toggle():
+    """Replication ein-/ausschalten"""
+    from database import USING_POSTGRESQL
+    import subprocess
+
+    if not USING_POSTGRESQL:
+        flash('Replication ist nur mit PostgreSQL verfügbar!', 'warning')
+        return redirect(url_for('admin_system.admin_dashboard'))
+
+    action = request.form.get('action')
+    db_path = get_current_db_path()
+
+    with MaschinenDBContext(db_path) as db:
+        cursor = db.cursor
+
+        # Aktuelle Konfiguration laden
+        cursor.execute("SELECT standby_host, replication_slot, aktiv FROM replication_config WHERE id = 1")
+        config = cursor.fetchone()
+
+        if not config or not config[0]:
+            flash('Bitte zuerst Standby-Host konfigurieren!', 'danger')
+            return redirect(url_for('admin_system.admin_replication'))
+
+        standby_host = config[0]
+        replication_slot = config[1] or 'mgr_slot'
+        ist_aktiv = config[2]
+
+        try:
+            if action == 'activate':
+                if ist_aktiv:
+                    flash('Replication ist bereits aktiv!', 'info')
+                    return redirect(url_for('admin_system.admin_replication'))
+
+                # Replication-Slot erstellen (falls nicht vorhanden)
+                try:
+                    cursor.execute(f"SELECT pg_create_physical_replication_slot('{replication_slot}')")
+                except Exception:
+                    pass  # Slot existiert bereits
+
+                # Status aktualisieren
+                cursor.execute("""
+                    UPDATE replication_config
+                    SET aktiv = TRUE, letzter_status = 'Aktiviert', letzter_check = NOW()
+                    WHERE id = 1
+                """)
+
+                cursor.execute("""
+                    INSERT INTO replication_log (aktion, status, details, ausgefuehrt_von)
+                    VALUES ('Replication aktiviert', 'erfolg', %s, %s)
+                """, (f"Slot: {replication_slot}", session['benutzer_id']))
+
+                db.conn.commit()
+                flash('Replication wurde aktiviert! Bitte Standby-Server konfigurieren.', 'success')
+
+            elif action == 'deactivate':
+                if not ist_aktiv:
+                    flash('Replication ist bereits deaktiviert!', 'info')
+                    return redirect(url_for('admin_system.admin_replication'))
+
+                # Status aktualisieren
+                cursor.execute("""
+                    UPDATE replication_config
+                    SET aktiv = FALSE, letzter_status = 'Deaktiviert', letzter_check = NOW()
+                    WHERE id = 1
+                """)
+
+                cursor.execute("""
+                    INSERT INTO replication_log (aktion, status, details, ausgefuehrt_von)
+                    VALUES ('Replication deaktiviert', 'erfolg', NULL, %s)
+                """, (session['benutzer_id'],))
+
+                db.conn.commit()
+                flash('Replication wurde deaktiviert!', 'success')
+
+        except Exception as e:
+            cursor.execute("""
+                INSERT INTO replication_log (aktion, status, details, ausgefuehrt_von)
+                VALUES (%s, 'fehler', %s, %s)
+            """, (f"Replication {action}", str(e), session['benutzer_id']))
+            db.conn.commit()
+            flash(f'Fehler: {str(e)}', 'danger')
+
+    return redirect(url_for('admin_system.admin_replication'))
+
+
+@admin_system_bp.route('/replication/test', methods=['POST'])
+@hauptadmin_required
+def admin_replication_test():
+    """Verbindung zum Standby-Server testen"""
+    from database import USING_POSTGRESQL
+    import subprocess
+
+    if not USING_POSTGRESQL:
+        flash('Replication ist nur mit PostgreSQL verfügbar!', 'warning')
+        return redirect(url_for('admin_system.admin_dashboard'))
+
+    db_path = get_current_db_path()
+
+    with MaschinenDBContext(db_path) as db:
+        cursor = db.cursor
+
+        cursor.execute("SELECT standby_host, standby_port FROM replication_config WHERE id = 1")
+        config = cursor.fetchone()
+
+        if not config or not config[0]:
+            flash('Bitte zuerst Standby-Host konfigurieren!', 'danger')
+            return redirect(url_for('admin_system.admin_replication'))
+
+        standby_host = config[0]
+        standby_port = config[1] or 5432
+
+        try:
+            # Ping-Test
+            result = subprocess.run(
+                ['ping', '-c', '1', '-W', '2', standby_host],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            if result.returncode == 0:
+                cursor.execute("""
+                    UPDATE replication_config
+                    SET letzter_status = 'Erreichbar', letzter_check = NOW()
+                    WHERE id = 1
+                """)
+                cursor.execute("""
+                    INSERT INTO replication_log (aktion, status, details, ausgefuehrt_von)
+                    VALUES ('Verbindungstest', 'erfolg', %s, %s)
+                """, (f"Host {standby_host} erreichbar", session['benutzer_id']))
+                db.conn.commit()
+                flash(f'Standby-Server {standby_host} ist erreichbar!', 'success')
+            else:
+                cursor.execute("""
+                    UPDATE replication_config
+                    SET letzter_status = 'Nicht erreichbar', letzter_check = NOW()
+                    WHERE id = 1
+                """)
+                cursor.execute("""
+                    INSERT INTO replication_log (aktion, status, details, ausgefuehrt_von)
+                    VALUES ('Verbindungstest', 'fehler', %s, %s)
+                """, (f"Host {standby_host} nicht erreichbar", session['benutzer_id']))
+                db.conn.commit()
+                flash(f'Standby-Server {standby_host} ist NICHT erreichbar!', 'danger')
+
+        except Exception as e:
+            flash(f'Fehler beim Verbindungstest: {str(e)}', 'danger')
+
+    return redirect(url_for('admin_system.admin_replication'))

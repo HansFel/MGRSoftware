@@ -446,3 +446,33 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Sequenz für benutzer anpassen
 SELECT setval('benutzer_id_seq', (SELECT MAX(id) FROM benutzer));
+
+-- Tabelle für Replication-Konfiguration
+CREATE TABLE IF NOT EXISTS replication_config (
+    id SERIAL PRIMARY KEY,
+    standby_host TEXT,
+    standby_port INTEGER DEFAULT 5432,
+    standby_user TEXT DEFAULT 'replicator',
+    replication_slot TEXT DEFAULT 'mgr_slot',
+    aktiv BOOLEAN DEFAULT FALSE,
+    sync_modus TEXT DEFAULT 'async',
+    letzter_status TEXT,
+    letzter_check TIMESTAMP,
+    erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    geaendert_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabelle für Replication-Log
+CREATE TABLE IF NOT EXISTS replication_log (
+    id SERIAL PRIMARY KEY,
+    zeitpunkt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    aktion TEXT NOT NULL,
+    status TEXT NOT NULL,
+    details TEXT,
+    ausgefuehrt_von INTEGER REFERENCES benutzer(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_replication_log_zeitpunkt ON replication_log(zeitpunkt DESC);
+
+-- Initiale Replication-Konfiguration
+INSERT INTO replication_config (id, aktiv) VALUES (1, FALSE) ON CONFLICT (id) DO NOTHING;

@@ -1,0 +1,417 @@
+{% extends "base.html" %}
+
+{% block title %}Replication-Verwaltung{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-arrow-repeat"></i> PostgreSQL Streaming Replication</h2>
+        <p class="text-muted">Echtzeit-Synchronisation mit Backup-Server</p>
+    </div>
+</div>
+
+<!-- Status-Karten -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card {% if config and config.aktiv %}border-success{% else %}border-secondary{% endif %}">
+            <div class="card-body text-center">
+                <h5 class="card-title">Replication Status</h5>
+                {% if config and config.aktiv %}
+                    <span class="badge bg-success fs-5"><i class="bi bi-check-circle"></i> Aktiv</span>
+                {% else %}
+                    <span class="badge bg-secondary fs-5"><i class="bi bi-pause-circle"></i> Inaktiv</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">Primary Server</h5>
+                <p class="mb-0"><strong>{{ pg_host }}:{{ pg_port }}</strong></p>
+                <small class="text-muted">{{ pg_database }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">Standby Server</h5>
+                {% if config and config.standby_host %}
+                    <p class="mb-0"><strong>{{ config.standby_host }}:{{ config.standby_port }}</strong></p>
+                    <small class="text-muted">{{ config.letzter_status or 'Noch nicht getestet' }}</small>
+                {% else %}
+                    <p class="text-muted mb-0">Nicht konfiguriert</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Konfiguration -->
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-gear"></i> Konfiguration</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('admin_system.admin_replication_config') }}">
+                    <div class="mb-3">
+                        <label for="standby_host" class="form-label">Standby-Server Hostname/IP *</label>
+                        <input type="text" class="form-control" id="standby_host" name="standby_host"
+                               value="{{ config.standby_host if config else '' }}"
+                               placeholder="z.B. 192.168.178.100 oder backup.local">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="standby_port" class="form-label">Port</label>
+                                <input type="number" class="form-control" id="standby_port" name="standby_port"
+                                       value="{{ config.standby_port if config else 5432 }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="standby_user" class="form-label">Replication User</label>
+                                <input type="text" class="form-control" id="standby_user" name="standby_user"
+                                       value="{{ config.standby_user if config else 'replicator' }}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="replication_slot" class="form-label">Replication Slot</label>
+                                <input type="text" class="form-control" id="replication_slot" name="replication_slot"
+                                       value="{{ config.replication_slot if config else 'mgr_slot' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="sync_modus" class="form-label">Sync-Modus</label>
+                                <select class="form-select" id="sync_modus" name="sync_modus">
+                                    <option value="async" {% if not config or config.sync_modus == 'async' %}selected{% endif %}>
+                                        Asynchron (schneller)
+                                    </option>
+                                    <option value="sync" {% if config and config.sync_modus == 'sync' %}selected{% endif %}>
+                                        Synchron (sicherer)
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Konfiguration speichern
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Steuerung -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-toggles"></i> Steuerung</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex gap-2 flex-wrap">
+                    <form method="post" action="{{ url_for('admin_system.admin_replication_test') }}" class="d-inline">
+                        <button type="submit" class="btn btn-info">
+                            <i class="bi bi-wifi"></i> Verbindung testen
+                        </button>
+                    </form>
+
+                    {% if config and config.aktiv %}
+                        <form method="post" action="{{ url_for('admin_system.admin_replication_toggle') }}" class="d-inline">
+                            <input type="hidden" name="action" value="deactivate">
+                            <button type="submit" class="btn btn-danger"
+                                    onclick="return confirm('Replication wirklich deaktivieren?')">
+                                <i class="bi bi-stop-circle"></i> Replication stoppen
+                            </button>
+                        </form>
+                    {% else %}
+                        <form method="post" action="{{ url_for('admin_system.admin_replication_toggle') }}" class="d-inline">
+                            <input type="hidden" name="action" value="activate">
+                            <button type="submit" class="btn btn-success"
+                                    {% if not config or not config.standby_host %}disabled{% endif %}>
+                                <i class="bi bi-play-circle"></i> Replication starten
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+
+                {% if config and config.letzter_check %}
+                    <p class="text-muted mt-3 mb-0">
+                        <small>Letzter Check: {{ config.letzter_check.strftime('%d.%m.%Y %H:%M') if config.letzter_check else '-' }}</small>
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Status & Info -->
+    <div class="col-md-6">
+        <!-- Aktive Replikationen -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-activity"></i> Aktive Replikationen</h5>
+            </div>
+            <div class="card-body">
+                {% if replication_status %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Client</th>
+                                    <th>Status</th>
+                                    <th>Sync</th>
+                                    <th>Letzter Kontakt</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for rep in replication_status %}
+                                <tr>
+                                    <td>{{ rep.client_addr }}</td>
+                                    <td>
+                                        {% if rep.state == 'streaming' %}
+                                            <span class="badge bg-success">Streaming</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">{{ rep.state }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ rep.sync_state }}</td>
+                                    <td>{{ rep.reply_time.strftime('%H:%M:%S') if rep.reply_time else '-' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">Keine aktiven Replikationen</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Replication Slots -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-collection"></i> Replication Slots</h5>
+            </div>
+            <div class="card-body">
+                {% if replication_slots %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Slot Name</th>
+                                    <th>Typ</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for slot in replication_slots %}
+                                <tr>
+                                    <td>{{ slot.slot_name }}</td>
+                                    <td>{{ slot.slot_type }}</td>
+                                    <td>
+                                        {% if slot.active %}
+                                            <span class="badge bg-success">Aktiv</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inaktiv</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">Keine Replication Slots vorhanden</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Log -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-journal-text"></i> Replication-Log</h5>
+    </div>
+    <div class="card-body">
+        {% if log_entries %}
+            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                <table class="table table-sm table-striped">
+                    <thead>
+                        <tr>
+                            <th>Zeitpunkt</th>
+                            <th>Aktion</th>
+                            <th>Status</th>
+                            <th>Details</th>
+                            <th>Benutzer</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in log_entries %}
+                        <tr>
+                            <td>{{ entry.zeitpunkt.strftime('%d.%m.%Y %H:%M') if entry.zeitpunkt else '-' }}</td>
+                            <td>{{ entry.aktion }}</td>
+                            <td>
+                                {% if entry.status == 'erfolg' %}
+                                    <span class="badge bg-success">Erfolg</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Fehler</span>
+                                {% endif %}
+                            </td>
+                            <td><small>{{ entry.details or '-' }}</small></td>
+                            <td>{{ entry.benutzer }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-muted mb-0">Noch keine Log-Einträge</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Anleitung -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-book"></i> Setup-Anleitung für Standby-Server</h5>
+    </div>
+    <div class="card-body">
+        <div class="accordion" id="setupAnleitung">
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#step1">
+                        1. PostgreSQL auf Standby-Server installieren
+                    </button>
+                </h2>
+                <div id="step1" class="accordion-collapse collapse" data-bs-parent="#setupAnleitung">
+                    <div class="accordion-body">
+                        <pre class="bg-dark text-light p-3 rounded"><code># Ubuntu/Debian
+sudo apt update
+sudo apt install postgresql-16 postgresql-client-16
+
+# Service stoppen (wird manuell konfiguriert)
+sudo systemctl stop postgresql</code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#step2">
+                        2. Primary-Server konfigurieren ({{ pg_host }})
+                    </button>
+                </h2>
+                <div id="step2" class="accordion-collapse collapse" data-bs-parent="#setupAnleitung">
+                    <div class="accordion-body">
+                        <pre class="bg-dark text-light p-3 rounded"><code># postgresql.conf bearbeiten
+sudo nano /etc/postgresql/16/main/postgresql.conf
+
+# Folgende Zeilen hinzufügen/ändern:
+wal_level = replica
+max_wal_senders = 3
+max_replication_slots = 3
+hot_standby = on
+
+# pg_hba.conf bearbeiten
+sudo nano /etc/postgresql/16/main/pg_hba.conf
+
+# Zeile hinzufügen (IP des Standby-Servers anpassen):
+host    replication     replicator      {{ config.standby_host if config and config.standby_host else 'STANDBY_IP' }}/32         scram-sha-256
+
+# Replication-User erstellen
+sudo -u postgres psql -c "CREATE USER replicator WITH REPLICATION ENCRYPTED PASSWORD 'sicheres_passwort';"
+
+# PostgreSQL neu starten
+sudo systemctl restart postgresql</code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#step3">
+                        3. Standby-Server initialisieren
+                    </button>
+                </h2>
+                <div id="step3" class="accordion-collapse collapse" data-bs-parent="#setupAnleitung">
+                    <div class="accordion-body">
+                        <pre class="bg-dark text-light p-3 rounded"><code># Auf dem STANDBY-Server ausführen:
+
+# Datenverzeichnis leeren
+sudo systemctl stop postgresql
+sudo rm -rf /var/lib/postgresql/16/main/*
+
+# Base Backup vom Primary holen
+sudo -u postgres pg_basebackup -h {{ pg_host }} -U replicator -D /var/lib/postgresql/16/main -Fp -Xs -P -R
+
+# standby.signal erstellen (falls nicht vorhanden)
+sudo touch /var/lib/postgresql/16/main/standby.signal
+sudo chown postgres:postgres /var/lib/postgresql/16/main/standby.signal
+
+# PostgreSQL starten
+sudo systemctl start postgresql</code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#step4">
+                        4. Replication überprüfen
+                    </button>
+                </h2>
+                <div id="step4" class="accordion-collapse collapse" data-bs-parent="#setupAnleitung">
+                    <div class="accordion-body">
+                        <pre class="bg-dark text-light p-3 rounded"><code># Auf dem PRIMARY-Server:
+sudo -u postgres psql -c "SELECT * FROM pg_stat_replication;"
+
+# Auf dem STANDBY-Server:
+sudo -u postgres psql -c "SELECT pg_is_in_recovery();"
+# Sollte 't' (true) zurückgeben
+
+# Log überwachen:
+sudo tail -f /var/log/postgresql/postgresql-16-main.log</code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#step5">
+                        5. Failover (Umschalten auf Standby)
+                    </button>
+                </h2>
+                <div id="step5" class="accordion-collapse collapse" data-bs-parent="#setupAnleitung">
+                    <div class="accordion-body">
+                        <pre class="bg-dark text-light p-3 rounded"><code># NUR im Notfall auf dem STANDBY-Server ausführen:
+
+# Standby zum Primary promoten
+sudo -u postgres pg_ctl promote -D /var/lib/postgresql/16/main
+
+# Oder mit pg_ctlcluster
+sudo pg_ctlcluster 16 main promote
+
+# Dann Anwendung auf neuen Server umstellen!</code></pre>
+                        <div class="alert alert-warning mt-3">
+                            <strong>Achtung:</strong> Nach einem Failover muss der alte Primary-Server
+                            neu als Standby konfiguriert werden!
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-3">
+    <a href="{{ url_for('admin_system.admin_dashboard') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Zurück zum Dashboard
+    </a>
+</div>
+{% endblock %}

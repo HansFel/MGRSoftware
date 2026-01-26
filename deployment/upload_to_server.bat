@@ -26,8 +26,11 @@ scp -r ^
     schema.sql ^
     schema_postgresql.sql ^
     migrate_to_postgresql.py ^
+    requirements.txt ^
     templates ^
     static ^
+    routes ^
+    utils ^
     %SERVER_USER%@%SERVER_IP%:%APP_DIR%/
 
 echo.
