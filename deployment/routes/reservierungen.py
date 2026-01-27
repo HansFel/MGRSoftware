@@ -189,7 +189,8 @@ def reservierungen_balken():
     for i in range(tage):
         tag = start + timedelta(days=i)
         tage_liste.append({
-            'datum': tag.strftime('%Y-%m-%d'),
+            'datum': tag.date() if hasattr(tag, 'date') else tag,
+            'datum_str': tag.strftime('%Y-%m-%d'),
             'tag': tag.strftime('%d.%m'),
             'wochentag': ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][tag.weekday()]
         })
@@ -226,7 +227,7 @@ def meine_reservierungen():
 
     return render_template('meine_reservierungen.html',
                          reservierungen=reservierungen,
-                         today=datetime.now().strftime('%Y-%m-%d'))
+                         today=datetime.now().date())
 
 
 @reservierungen_bp.route('/reservierung/<int:reservierung_id>/stornieren', methods=['POST'])

@@ -35,7 +35,7 @@
                 <div class="alert alert-info">
                     <ol class="mb-0">
                         <li>Stellen Sie sicher, dass alle Benutzer abgemeldet sind</li>
-                        <li>Wählen Sie eine gültige Backup-Datei (*.db)</li>
+                        <li>Wählen Sie eine gültige Backup-Datei (*{{ file_extension }})</li>
                         <li>Die Backup-Datei muss vom selben System erstellt worden sein</li>
                         <li>Nach erfolgreicher Wiederherstellung die Anwendung neu starten</li>
                     </ol>
@@ -46,14 +46,14 @@
                         <label for="backup_file" class="form-label">
                             <i class="bi bi-file-earmark-arrow-up"></i> Backup-Datei auswählen
                         </label>
-                        <input type="file" 
-                               class="form-control" 
-                               id="backup_file" 
-                               name="backup_file" 
-                               accept=".db"
+                        <input type="file"
+                               class="form-control"
+                               id="backup_file"
+                               name="backup_file"
+                               accept="{{ file_extension }}"
                                required>
                         <small class="text-muted">
-                            Erlaubte Dateiformate: .db (SQLite Datenbank)
+                            Erlaubtes Dateiformat: {{ file_extension }} ({% if file_extension == '.sql' %}PostgreSQL Backup{% else %}SQLite Datenbank{% endif %})
                         </small>
                     </div>
 

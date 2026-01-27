@@ -70,7 +70,7 @@
                     <!-- Tag-Überschrift -->
                     <tr class="table-primary">
                         <td colspan="49" class="fw-bold">
-                            <i class="bi bi-calendar-day"></i> {{ tag.wochentag }}, {{ tag.datum }}
+                            <i class="bi bi-calendar-day"></i> {{ tag.wochentag }}, {{ tag.datum_str }}
                         </td>
                     </tr>
                     
@@ -96,15 +96,13 @@
                                 
                                 {# Prüfe ob eine Reservierung an diesem Slot startet #}
                                 {% for res in maschinen_reservierungen if not cell_rendered %}
-                                    {% set start_parts = res.uhrzeit_von.split(':') %}
-                                    {% set start_hour = start_parts[0]|int %}
-                                    {% set start_minute = start_parts[1]|int %}
+                                    {% set start_hour = res.uhrzeit_von.hour if res.uhrzeit_von.hour is defined else (res.uhrzeit_von.split(':')[0]|int) %}
+                                    {% set start_minute = res.uhrzeit_von.minute if res.uhrzeit_von.minute is defined else (res.uhrzeit_von.split(':')[1]|int) %}
                                     {% set start_total = start_hour * 60 + start_minute %}
-                                    
+
                                     {% if slot_minute == start_total %}
-                                        {% set end_parts = res.uhrzeit_bis.split(':') %}
-                                        {% set end_hour = end_parts[0]|int %}
-                                        {% set end_minute = end_parts[1]|int %}
+                                        {% set end_hour = res.uhrzeit_bis.hour if res.uhrzeit_bis.hour is defined else (res.uhrzeit_bis.split(':')[0]|int) %}
+                                        {% set end_minute = res.uhrzeit_bis.minute if res.uhrzeit_bis.minute is defined else (res.uhrzeit_bis.split(':')[1]|int) %}
                                         {% set end_total = end_hour * 60 + end_minute %}
                                         {% set duration_minutes = end_total - start_total %}
                                         {% set colspan = (duration_minutes / 30)|int %}
@@ -128,10 +126,12 @@
                                 {% if not cell_rendered %}
                                     {% set is_in_reservation = false %}
                                     {% for res in maschinen_reservierungen %}
-                                        {% set start_parts = res.uhrzeit_von.split(':') %}
-                                        {% set end_parts = res.uhrzeit_bis.split(':') %}
-                                        {% set start_total = (start_parts[0]|int) * 60 + (start_parts[1]|int) %}
-                                        {% set end_total = (end_parts[0]|int) * 60 + (end_parts[1]|int) %}
+                                        {% set s_hour = res.uhrzeit_von.hour if res.uhrzeit_von.hour is defined else (res.uhrzeit_von.split(':')[0]|int) %}
+                                        {% set s_minute = res.uhrzeit_von.minute if res.uhrzeit_von.minute is defined else (res.uhrzeit_von.split(':')[1]|int) %}
+                                        {% set e_hour = res.uhrzeit_bis.hour if res.uhrzeit_bis.hour is defined else (res.uhrzeit_bis.split(':')[0]|int) %}
+                                        {% set e_minute = res.uhrzeit_bis.minute if res.uhrzeit_bis.minute is defined else (res.uhrzeit_bis.split(':')[1]|int) %}
+                                        {% set start_total = s_hour * 60 + s_minute %}
+                                        {% set end_total = e_hour * 60 + e_minute %}
                                         {% if slot_minute > start_total and slot_minute < end_total %}
                                             {% set is_in_reservation = true %}
                                         {% endif %}

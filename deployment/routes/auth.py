@@ -173,4 +173,9 @@ def passwort_aendern():
             flash('Passwort wurde erfolgreich geändert!', 'success')
             return redirect(url_for('dashboard.dashboard'))
 
-    return render_template('passwort_aendern.html')
+    # GET: Benutzer laden für Einstellungsanzeige
+    db_path = get_current_db_path()
+    with MaschinenDBContext(db_path) as db:
+        benutzer = db.get_benutzer(session['benutzer_id'])
+
+    return render_template('passwort_aendern.html', benutzer=benutzer)
