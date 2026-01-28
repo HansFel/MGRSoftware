@@ -16,14 +16,8 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # Quellcode kopieren
 COPY . .
 
-# Virtuelle Umgebung (optional, für Kompatibilität mit bestehenden Skripten)
-RUN python -m venv .venv && \
-    . .venv/bin/activate && \
-    pip install --upgrade pip && \
-    pip install -r requirements.txt
-
 # Port
 EXPOSE 5000
 
-# Startbefehl (wird von docker-compose überschrieben)
-CMD ["bash", "-c", ". .venv/bin/activate && gunicorn -w 4 -b 0.0.0.0:5000 web_app:app"]
+# Startbefehl
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "web_app:app"]
