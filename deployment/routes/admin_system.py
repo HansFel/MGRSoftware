@@ -113,7 +113,7 @@ def admin_stornierte_einsaetze():
     db_path = get_current_db_path()
 
     with MaschinenDBContext(db_path) as db:
-        cursor = db.connection.cursor()
+        cursor = db.connectionection.cursor()
 
         sql = convert_sql("""
             SELECT s.*, m.bezeichnung as maschine_name,
@@ -143,7 +143,7 @@ def admin_backup_bestaetigen():
     db_path = get_current_db_path()
 
     with MaschinenDBContext(db_path) as db:
-        cursor = db.connection.cursor()
+        cursor = db.connectionection.cursor()
 
         bemerkung = request.form.get('bemerkung', '')
 
@@ -184,7 +184,7 @@ def admin_backup_bestaetigen():
             """)
             cursor.execute(sql, (offene_bestaetigung[0],))
 
-            db.connection.commit()
+            db.connectionection.commit()
             flash('Backup-Durchführung wurde von zwei Administratoren bestätigt.', 'success')
         else:
             sql = convert_sql("""
@@ -198,7 +198,7 @@ def admin_backup_bestaetigen():
                 bemerkung
             ))
 
-            db.connection.commit()
+            db.connectionection.commit()
             flash('Ihre Bestätigung wurde gespeichert. Ein zweiter Administrator muss bestätigen.', 'info')
 
     return redirect(url_for('admin_system.admin_dashboard'))
@@ -211,7 +211,7 @@ def admin_rollen():
     db_path = get_current_db_path()
 
     with MaschinenDBContext(db_path) as db:
-        cursor = db.connection.cursor()
+        cursor = db.connectionection.cursor()
 
         sql = convert_sql("""
             SELECT b.*, GROUP_CONCAT(g.name) as gemeinschaften_admin
@@ -245,7 +245,7 @@ def admin_rollen_set_level():
     admin_level = int(request.form['admin_level'])
 
     with MaschinenDBContext(db_path) as db:
-        cursor = db.connection.cursor()
+        cursor = db.connectionection.cursor()
 
         is_admin = admin_level > 0
         sql = convert_sql("""
@@ -254,7 +254,7 @@ def admin_rollen_set_level():
             WHERE id = ?
         """)
         cursor.execute(sql, (admin_level, is_admin, benutzer_id))
-        db.connection.commit()
+        db.connectionection.commit()
 
     flash('Admin-Level wurde aktualisiert.', 'success')
     return redirect(url_for('admin_system.admin_rollen'))
@@ -673,7 +673,7 @@ def admin_einsaetze_loeschen():
                     WHERE datum BETWEEN ? AND ?
                 """)
                 cursor.execute(sql, (von_datum, bis_datum))
-                db.connection.commit()
+                db.connectionection.commit()
 
                 flash(f'{anzahl} Einsätze erfolgreich gelöscht!', 'success')
                 return redirect(url_for('admin_system.admin_dashboard'))
@@ -701,7 +701,7 @@ def admin_training_rechte():
     from utils.training import get_available_training_dbs, DB_PATH_PRODUCTION
 
     with MaschinenDBContext(DB_PATH_PRODUCTION) as db:
-        cursor = db.connection.cursor()
+        cursor = db.connectionection.cursor()
 
         sql = convert_sql("""
             SELECT id, name, vorname, username, is_admin, admin_level,
@@ -736,7 +736,7 @@ def admin_training_rechte_update():
         return redirect(url_for('admin_system.admin_training_rechte'))
 
     with MaschinenDBContext(DB_PATH_PRODUCTION) as db:
-        cursor = db.connection.cursor()
+        cursor = db.connectionection.cursor()
 
         cursor.execute("PRAGMA table_info(benutzer)")
         columns = [col[1] for col in cursor.fetchall()]
@@ -747,7 +747,7 @@ def admin_training_rechte_update():
         sql = convert_sql("UPDATE benutzer SET nur_training = ? WHERE id = ?")
         cursor.execute(sql, (True if nur_training else False, benutzer_id))
 
-        db.connection.commit()
+        db.connectionection.commit()
 
         sql = convert_sql("SELECT name, vorname FROM benutzer WHERE id = ?")
         cursor.execute(sql, (benutzer_id,))
@@ -789,7 +789,7 @@ def admin_training_datenbanken():
             db_info['size_kb'] = round(os.path.getsize(path) / 1024, 1)
             try:
                 with MaschinenDBContext(path) as db:
-                    cursor = db.connection.cursor()
+                    cursor = db.connectionection.cursor()
                     cursor.execute("SELECT COUNT(*) FROM benutzer WHERE aktiv = true")
                     db_info['users'] = cursor.fetchone()[0]
                     cursor.execute("SELECT COUNT(*) FROM maschineneinsaetze")
@@ -979,7 +979,7 @@ def admin_replication_config():
             VALUES ('Konfiguration geändert', 'erfolg', %s, %s)
         """, (f"Host: {standby_host}:{standby_port}, Slot: {replication_slot}", session['benutzer_id']))
 
-        db.conn.commit()
+        db.connection.commit()
         flash('Replication-Konfiguration gespeichert!', 'success')
 
     return redirect(url_for('admin_system.admin_replication'))
@@ -1038,7 +1038,7 @@ def admin_replication_toggle():
                     VALUES ('Replication aktiviert', 'erfolg', %s, %s)
                 """, (f"Slot: {replication_slot}", session['benutzer_id']))
 
-                db.conn.commit()
+                db.connection.commit()
                 flash('Replication wurde aktiviert! Bitte Standby-Server konfigurieren.', 'success')
 
             elif action == 'deactivate':
@@ -1058,7 +1058,7 @@ def admin_replication_toggle():
                     VALUES ('Replication deaktiviert', 'erfolg', NULL, %s)
                 """, (session['benutzer_id'],))
 
-                db.conn.commit()
+                db.connection.commit()
                 flash('Replication wurde deaktiviert!', 'success')
 
         except Exception as e:
@@ -1066,7 +1066,7 @@ def admin_replication_toggle():
                 INSERT INTO replication_log (aktion, status, details, ausgefuehrt_von)
                 VALUES (%s, 'fehler', %s, %s)
             """, (f"Replication {action}", str(e), session['benutzer_id']))
-            db.conn.commit()
+            db.connection.commit()
             flash(f'Fehler: {str(e)}', 'danger')
 
     return redirect(url_for('admin_system.admin_replication'))
@@ -1117,7 +1117,7 @@ def admin_replication_test():
                     INSERT INTO replication_log (aktion, status, details, ausgefuehrt_von)
                     VALUES ('Verbindungstest', 'erfolg', %s, %s)
                 """, (f"Host {standby_host} erreichbar", session['benutzer_id']))
-                db.conn.commit()
+                db.connection.commit()
                 flash(f'Standby-Server {standby_host} ist erreichbar!', 'success')
             else:
                 cursor.execute("""
@@ -1129,7 +1129,7 @@ def admin_replication_test():
                     INSERT INTO replication_log (aktion, status, details, ausgefuehrt_von)
                     VALUES ('Verbindungstest', 'fehler', %s, %s)
                 """, (f"Host {standby_host} nicht erreichbar", session['benutzer_id']))
-                db.conn.commit()
+                db.connection.commit()
                 flash(f'Standby-Server {standby_host} ist NICHT erreichbar!', 'danger')
 
         except Exception as e:

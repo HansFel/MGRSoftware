@@ -1,12 +1,10 @@
 # Maschinengemeinschaft Caddy Configuration
 
-# MyFritz Domain (extern erreichbar mit HTTPS)
 ml76y0cjb8gqzf3p.myfritz.net {
     encode gzip
     reverse_proxy maschinengemeinschaft-app:5000
 }
 
-# Lokaler Zugriff (HTTP only - kein Zertifikat nötig)
 :80 {
     encode gzip
     reverse_proxy maschinengemeinschaft-app:5000
