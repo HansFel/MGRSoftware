@@ -173,7 +173,7 @@ def admin_gemeinschaften_mitglieder(gemeinschaft_id):
 
     return render_template('admin_gemeinschaften_mitglieder.html',
                          gemeinschaft=gemeinschaft,
-                         mitglieder=mitglieder,
+                         aktuelle_mitglieder=mitglieder,
                          verfuegbare_benutzer=verfuegbare_benutzer)
 
 
