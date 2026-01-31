@@ -28,8 +28,6 @@ Gemeinschaftswerkstätten
 
 Maker‑Spaces
 
-CNC‑Gruppen
-
 Landwirtschaftliche oder handwerkliche Gemeinschaften
 
 Private Maschinengemeinschaften
@@ -55,9 +53,24 @@ cd MGRSoftware
 
 [ ] API‑Schnittstelle
 
-💗 Unterstütze dieses Projekt
-Die Entwicklung von MGRSoftware benötigt Zeit, Hardware und KI‑Unterstützung.
-Wenn du das Projekt fördern möchtest, kannst du mich hier unterstützen:
+💛 Sponsor MGRSoftware
+Unterstütze die Entwicklung von MGRSoftware, einem offenen Werkzeugkasten für Maker, CNC‑Enthusiasten und Smart‑Home‑Tüftler.
+Jeder Beitrag — ob einmalig oder monatlich — hilft mir, neue Features zu entwickeln, Bugs schneller zu fixen und die Projekte langfristig stabil zu halten.
+
+Warum sponsern?
+Du unterstützt unabhängige Open‑Source‑Entwicklung
+
+Du hilfst, neue Module und Automatisierungen zu realisieren
+
+Du ermöglichst mehr Zeit für Dokumentation, Support und Community
+
+Du stärkst ein Projekt, das echte Probleme löst — nicht nur Spielerei
+
+Wie du helfen kannst
+👉 GitHub Sponsors  
+Schon kleine Beiträge machen einen großen Unterschied.
+
+Danke für deine Unterstützung — sie hält dieses Projekt am Leben und ermöglicht echte Weiterentwicklung.
 
 👉 https://github.com/sponsors/HansFel
 
