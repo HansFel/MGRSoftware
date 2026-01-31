@@ -7,8 +7,10 @@ import os
 from flask import session
 
 # Datenbank-Pfade
-DB_PATH_PRODUCTION = os.environ.get('DB_PATH', './data/maschinengemeinschaft.db')
-TRAINING_DB_DIR = './data/training'
+# Basis-Pfad ermitteln (relativ zum deployment-Verzeichnis oder Hauptverzeichnis)
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DB_PATH_PRODUCTION = os.environ.get('DB_PATH', os.path.join(_BASE_DIR, 'data', 'maschinengemeinschaft.db'))
+TRAINING_DB_DIR = os.path.join(_BASE_DIR, 'data', 'training')
 
 # Trainings-Datenbanken Konfiguration
 TRAINING_DATABASES = {

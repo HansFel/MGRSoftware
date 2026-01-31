@@ -112,7 +112,13 @@ def admin_gemeinschaften_mitglieder(gemeinschaft_id):
 
         if request.method == 'POST':
             action = request.form.get('action')
-            benutzer_id = int(request.form.get('benutzer_id'))
+            benutzer_id = request.form.get('benutzer_id')
+
+            if not benutzer_id:
+                flash('Bitte einen Benutzer auswählen!', 'error')
+                return redirect(url_for('admin_gemeinschaften.admin_gemeinschaften_mitglieder',
+                                       gemeinschaft_id=gemeinschaft_id))
+            benutzer_id = int(benutzer_id)
 
             if action == 'hinzufuegen':
                 sql = convert_sql("""
