@@ -112,31 +112,36 @@ def admin_gemeinschaften_mitglieder(gemeinschaft_id):
 
         if request.method == 'POST':
             action = request.form.get('action')
-            benutzer_id = request.form.get('benutzer_id')
-
-            if not benutzer_id:
-                flash('Bitte einen Benutzer auswählen!', 'error')
-                return redirect(url_for('admin_gemeinschaften.admin_gemeinschaften_mitglieder',
-                                       gemeinschaft_id=gemeinschaft_id))
-            benutzer_id = int(benutzer_id)
 
             if action == 'hinzufuegen':
-                sql = convert_sql("""
-                    INSERT INTO mitglied_gemeinschaft (mitglied_id, gemeinschaft_id)
-                    VALUES (?, ?)
-                    ON CONFLICT DO NOTHING
-                """)
-                cursor.execute(sql, (benutzer_id, gemeinschaft_id))
-                flash('Mitglied hinzugefügt!', 'success')
-            elif action == 'entfernen':
-                sql = convert_sql("""
-                    DELETE FROM mitglied_gemeinschaft
-                    WHERE mitglied_id = ? AND gemeinschaft_id = ?
-                """)
-                cursor.execute(sql, (benutzer_id, gemeinschaft_id))
-                flash('Mitglied entfernt!', 'success')
+                mitglieder_ids = request.form.getlist('mitglieder')
+                if not mitglieder_ids:
+                    flash('Bitte mindestens einen Benutzer auswählen!', 'error')
+                else:
+                    for benutzer_id in mitglieder_ids:
+                        sql = convert_sql("""
+                            INSERT INTO mitglied_gemeinschaft (mitglied_id, gemeinschaft_id)
+                            VALUES (?, ?)
+                            ON CONFLICT DO NOTHING
+                        """)
+                        cursor.execute(sql, (int(benutzer_id), gemeinschaft_id))
+                    db.connection.commit()
+                    flash(f'{len(mitglieder_ids)} Mitglied(er) hinzugefügt!', 'success')
 
-            db.connection.commit()
+            elif action == 'entfernen':
+                entfernen_ids = request.form.getlist('entfernen')
+                if not entfernen_ids:
+                    flash('Bitte mindestens ein Mitglied auswählen!', 'error')
+                else:
+                    for benutzer_id in entfernen_ids:
+                        sql = convert_sql("""
+                            DELETE FROM mitglied_gemeinschaft
+                            WHERE mitglied_id = ? AND gemeinschaft_id = ?
+                        """)
+                        cursor.execute(sql, (int(benutzer_id), gemeinschaft_id))
+                    db.connection.commit()
+                    flash(f'{len(entfernen_ids)} Mitglied(er) entfernt!', 'success')
+
             return redirect(url_for('admin_gemeinschaften.admin_gemeinschaften_mitglieder',
                                    gemeinschaft_id=gemeinschaft_id))
 
