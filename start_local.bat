@@ -1,11 +1,11 @@
 @echo off
-chcp 65001 >nul
+chcp 65001 >nul 2>&1
 echo ========================================
 echo   Maschinengemeinschaft - Lokaler Test
 echo ========================================
 echo.
 
-:: Prüfen ob Python installiert ist
+REM Pruefen ob Python installiert ist
 python --version >nul 2>&1
 if errorlevel 1 (
     echo FEHLER: Python ist nicht installiert!
@@ -14,30 +14,33 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: Virtuelle Umgebung prüfen/erstellen
+REM Virtuelle Umgebung pruefen/erstellen
 if not exist ".venv" (
     echo Erstelle virtuelle Umgebung...
     python -m venv .venv
 )
 
-:: Virtuelle Umgebung aktivieren
+REM Virtuelle Umgebung aktivieren
 call .venv\Scripts\activate.bat
 
-:: Dependencies installieren (falls nötig)
+REM Dependencies installieren (falls noetig)
 pip show flask >nul 2>&1
 if errorlevel 1 (
-    echo Installiere Abhängigkeiten...
-    pip install -r requirements.txt
+    echo Installiere Abhaengigkeiten...
+    pip install -r deployment\requirements.txt
 )
 
-:: Umgebungsvariablen für lokalen SQLite-Modus
+REM Ins deployment Verzeichnis wechseln
+cd deployment
+
+REM Umgebungsvariablen fuer lokalen SQLite-Modus
 set DB_TYPE=sqlite
-set DB_PATH=data/test_lokal.db
+set DB_PATH=../data/test_lokal.db
 set SECRET_KEY=lokaler-test-key-2026
 set FLASK_ENV=development
 
 echo.
-echo Starte lokalen Server mit SQLite...
+echo Starte lokalen Server (modulare Version)...
 echo Datenbank: %DB_PATH%
 echo.
 echo Oeffne im Browser: http://localhost:5000
@@ -46,5 +49,5 @@ echo Zum Beenden: Strg+C druecken
 echo ========================================
 echo.
 
-:: Server starten
+REM Server starten
 python web_app.py
