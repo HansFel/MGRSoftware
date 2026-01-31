@@ -34,6 +34,8 @@ desktop.ini
 # Lokale Konfiguration
 .env
 *.local
+Passwords.txt
+docker-compose-*Laptop*.yml
 
 # Backup-Dateien
 *_backup.*
