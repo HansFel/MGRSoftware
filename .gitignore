@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Datenbanken (lokal)
+*.db
+*.db-journal
+*.sqlite3
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Lokale Konfiguration
+.env
+*.local
+
+# Backup-Dateien
+*_backup.*
+*.bak
+
+# Claude Code
+.claude/
