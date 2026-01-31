@@ -309,6 +309,7 @@ CREATE TABLE IF NOT EXISTS mitglieder_abrechnungen (
     zeitraum_bis DATE NOT NULL,
     betrag_maschinen REAL DEFAULT 0.0,
     betrag_treibstoff REAL DEFAULT 0.0,
+    betrag_gesamt REAL DEFAULT 0.0,
     status TEXT DEFAULT 'offen',
     erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
     bezahlt_am DATETIME
