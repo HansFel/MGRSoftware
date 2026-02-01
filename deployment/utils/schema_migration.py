@@ -40,6 +40,9 @@ REQUIRED_COLUMNS = [
     # mitglieder_abrechnungen
     ("mitglieder_abrechnungen", "betrag_gesamt", "REAL", "REAL", "0.0"),
     ("mitglieder_abrechnungen", "status", "TEXT", "TEXT", "'offen'"),
+
+    # mitglieder_konten
+    ("mitglieder_konten", "saldo", "REAL", "REAL", "0.0"),
 ]
 
 # Liste aller erforderlichen Tabellen
