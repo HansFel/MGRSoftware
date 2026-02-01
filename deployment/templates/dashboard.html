@@ -16,8 +16,19 @@
         <a href="{{ url_for('einsaetze.neuer_einsatz') }}" class="btn btn-primary btn-lg flex-fill">
             <i class="bi bi-plus-lg"></i> Einsatz erfassen
         </a>
+        <a href="{{ url_for('reservierungen.neue_reservierung') }}" class="btn btn-success btn-lg flex-fill">
+            <i class="bi bi-calendar-plus"></i> Maschine reservieren
+        </a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 d-flex flex-column flex-md-row gap-3">
         <a href="{{ url_for('einsaetze.meine_einsaetze') }}" class="btn btn-warning btn-lg flex-fill fw-bold border border-dark shadow">
             <i class="bi bi-list-check"></i> Meine Einsätze
+        </a>
+        <a href="{{ url_for('reservierungen.meine_reservierungen') }}" class="btn btn-info btn-lg flex-fill">
+            <i class="bi bi-calendar-check"></i> Meine Reservierungen
         </a>
         <a href="{{ url_for('reservierungen.reservierungen_balken') }}" class="btn btn-outline-info btn-lg flex-fill">
             <i class="bi bi-calendar-range"></i> Timeline
@@ -28,7 +39,6 @@
                 <i class="bi bi-list"></i> Mehr
             </button>
             <ul class="dropdown-menu w-100" aria-labelledby="dropdownMenuButton">
-                <li><a class="dropdown-item" href="{{ url_for('reservierungen.meine_reservierungen') }}">Meine Reservierungen</a></li>
                 <li><a class="dropdown-item" href="{{ url_for('abrechnungen.meine_abrechnungen') }}">Meine Abrechnungen</a></li>
                 <li><a class="dropdown-item" href="{{ url_for('nachrichten.nachrichten') }}">Nachrichten</a></li>
                 <!-- Weitere Menüpunkte nach Bedarf -->
