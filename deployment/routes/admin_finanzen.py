@@ -63,12 +63,13 @@ def admin_konten(gemeinschaft_id):
             SELECT
                 bu.datum,
                 b.vorname || ' ' || b.name as mitglied_name,
-                bu.typ,
+                bu.buchungsart as typ,
                 bu.beschreibung,
                 bu.betrag
             FROM buchungen bu
-            JOIN benutzer b ON bu.benutzer_id = b.id
-            WHERE bu.gemeinschaft_id = ?
+            JOIN mitglieder_konten mk ON bu.konto_id = mk.id
+            JOIN benutzer b ON mk.benutzer_id = b.id
+            WHERE mk.gemeinschaft_id = ?
             ORDER BY bu.erstellt_am DESC
             LIMIT 20
         """)
