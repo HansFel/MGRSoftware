@@ -43,6 +43,10 @@ REQUIRED_COLUMNS = [
 
     # mitglieder_konten
     ("mitglieder_konten", "saldo", "REAL", "REAL", "0.0"),
+
+    # zahlungsreferenzen
+    ("zahlungsreferenzen", "gemeinschaft_id", "INTEGER", "INTEGER", None),
+    ("zahlungsreferenzen", "aktiv", "BOOLEAN", "BOOLEAN", "TRUE"),
 ]
 
 # Liste aller erforderlichen Tabellen
