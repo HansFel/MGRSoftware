@@ -325,7 +325,7 @@ def abgelaufene_reservierungen():
         sql = convert_sql("""
             SELECT * FROM reservierungen_abgelaufen
             WHERE benutzer_id = ?
-            ORDER BY abgelaufen_am DESC
+            ORDER BY archiviert_am DESC
             LIMIT 100
         """)
         cursor.execute(sql, (session['benutzer_id'],))
