@@ -135,16 +135,25 @@ def table_exists(cursor, table: str) -> bool:
 
 def add_column(cursor, table: str, column: str, datatype: str, default: str = None):
     """Fügt eine Spalte zu einer Tabelle hinzu"""
-    if default:
-        if USING_POSTGRESQL:
-            sql = f"ALTER TABLE {table} ADD COLUMN {column} {datatype} DEFAULT {default}"
+    try:
+        if default:
+            if USING_POSTGRESQL:
+                sql = f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {datatype} DEFAULT {default}"
+            else:
+                sql = f"ALTER TABLE {table} ADD COLUMN {column} {datatype} DEFAULT {default}"
         else:
-            sql = f"ALTER TABLE {table} ADD COLUMN {column} {datatype} DEFAULT {default}"
-    else:
-        sql = f"ALTER TABLE {table} ADD COLUMN {column} {datatype}"
+            if USING_POSTGRESQL:
+                sql = f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {datatype}"
+            else:
+                sql = f"ALTER TABLE {table} ADD COLUMN {column} {datatype}"
 
-    cursor.execute(sql)
-    print(f"  + Spalte hinzugefügt: {table}.{column}")
+        cursor.execute(sql)
+        print(f"  + Spalte hinzugefügt: {table}.{column}")
+    except Exception as e:
+        if "already exists" in str(e).lower() or "duplicate column" in str(e).lower():
+            pass  # Spalte existiert bereits - OK
+        else:
+            raise
 
 
 def create_table(cursor, table: str, create_sql: str):
