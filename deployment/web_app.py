@@ -16,6 +16,10 @@ Erstellt: Januar 2026
 import os
 from flask import Flask, session
 
+# Schema-Migration beim Start ausführen
+from utils.schema_migration import run_migrations
+run_migrations()
+
 # App initialisieren
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
