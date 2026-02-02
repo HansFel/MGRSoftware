@@ -36,6 +36,8 @@ desktop.ini
 *.local
 Passwords.txt
 docker-compose-*Laptop*.yml
+docker-compose-*Labtop*.yml
+ImportentCommands.txt
 
 # Backup-Dateien
 *_backup.*
