@@ -241,8 +241,16 @@ def admin_rollen():
 def admin_rollen_set_level():
     """Admin-Level setzen"""
     db_path = get_current_db_path()
-    benutzer_id = int(request.form['benutzer_id'])
-    admin_level = int(request.form['admin_level'])
+
+    benutzer_id = request.form.get('benutzer_id')
+    admin_level = request.form.get('admin_level') or request.form.get('level')
+
+    if not benutzer_id or admin_level is None:
+        flash('Fehlende Formulardaten.', 'danger')
+        return redirect(url_for('admin_system.admin_rollen'))
+
+    benutzer_id = int(benutzer_id)
+    admin_level = int(admin_level)
 
     with MaschinenDBContext(db_path) as db:
         cursor = db.connection.cursor()
