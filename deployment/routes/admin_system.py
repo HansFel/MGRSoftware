@@ -864,6 +864,132 @@ def admin_training_db_erstellen():
 
 
 # ============================================================================
+# BENUTZER-IMPERSONATION (nur im Übungsmodus)
+# ============================================================================
+
+@admin_system_bp.route('/training/benutzer-wechseln')
+@admin_required
+def admin_training_benutzer_wechseln():
+    """Liste der Benutzer zum Wechseln (Impersonation) im Übungsmodus"""
+    from utils.training import is_training_mode
+
+    if not is_training_mode():
+        flash('Benutzer-Wechsel ist nur im Übungsmodus verfügbar!', 'warning')
+        return redirect(url_for('admin_system.admin_dashboard'))
+
+    db_path = get_current_db_path()
+    with MaschinenDBContext(db_path) as db:
+        benutzer = db.get_all_benutzer(nur_aktive=True)
+
+    # Aktuellen Benutzer markieren
+    current_id = session.get('benutzer_id')
+    original_id = session.get('original_admin_id')
+
+    return render_template('admin_training_benutzer_wechseln.html',
+                         benutzer=benutzer,
+                         current_id=current_id,
+                         original_id=original_id,
+                         is_impersonating=original_id is not None)
+
+
+@admin_system_bp.route('/training/als-benutzer/<int:user_id>', methods=['POST'])
+@admin_required
+def admin_training_als_benutzer(user_id):
+    """Wechselt zur Ansicht eines bestimmten Benutzers (Impersonation)"""
+    from utils.training import is_training_mode
+
+    if not is_training_mode():
+        flash('Benutzer-Wechsel ist nur im Übungsmodus verfügbar!', 'warning')
+        return redirect(url_for('admin_system.admin_dashboard'))
+
+    db_path = get_current_db_path()
+    with MaschinenDBContext(db_path) as db:
+        benutzer = db.get_benutzer(user_id)
+        if not benutzer:
+            flash('Benutzer nicht gefunden!', 'danger')
+            return redirect(url_for('admin_system.admin_training_benutzer_wechseln'))
+
+        # Original-Admin-Daten speichern (nur beim ersten Wechsel)
+        if 'original_admin_id' not in session:
+            session['original_admin_id'] = session['benutzer_id']
+            session['original_admin_name'] = session['benutzer_name']
+            session['original_is_admin'] = session['is_admin']
+            session['original_admin_level'] = session['admin_level']
+            session['original_gemeinschafts_admin_ids'] = session.get('gemeinschafts_admin_ids', [])
+
+        # Session mit neuen Benutzer-Daten aktualisieren
+        session['benutzer_id'] = benutzer['id']
+        session['benutzer_name'] = f"{benutzer['name']}, {benutzer['vorname']}"
+        session['is_admin'] = bool(benutzer.get('is_admin', False))
+        session['admin_level'] = benutzer.get('admin_level', 0)
+
+        # Gemeinschaften des neuen Benutzers laden
+        cursor = db.connection.cursor()
+        sql = convert_sql("""
+            SELECT g.id, g.name
+            FROM gemeinschaften g
+            JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
+            WHERE mg.mitglied_id = ? AND g.aktiv = true
+            ORDER BY g.name
+        """)
+        cursor.execute(sql, (user_id,))
+        gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
+        session['gemeinschaften'] = gemeinschaften
+
+        flash(f'Sie sehen jetzt die Ansicht von: {benutzer["vorname"]} {benutzer["name"]}', 'info')
+
+    return redirect(url_for('dashboard.dashboard'))
+
+
+@admin_system_bp.route('/training/zurueck-zum-admin', methods=['POST'])
+def admin_training_zurueck():
+    """Wechselt zurück zum Original-Admin"""
+    from utils.training import is_training_mode
+
+    if not is_training_mode():
+        flash('Diese Funktion ist nur im Übungsmodus verfügbar!', 'warning')
+        return redirect(url_for('dashboard.dashboard'))
+
+    if 'original_admin_id' not in session:
+        flash('Kein Original-Admin gespeichert!', 'warning')
+        return redirect(url_for('dashboard.dashboard'))
+
+    db_path = get_current_db_path()
+    with MaschinenDBContext(db_path) as db:
+        # Original-Admin-Daten wiederherstellen
+        session['benutzer_id'] = session['original_admin_id']
+        session['benutzer_name'] = session['original_admin_name']
+        session['is_admin'] = session['original_is_admin']
+        session['admin_level'] = session['original_admin_level']
+        session['gemeinschafts_admin_ids'] = session.get('original_gemeinschafts_admin_ids', [])
+
+        # Gemeinschaften des Admins laden
+        cursor = db.connection.cursor()
+        sql = convert_sql("""
+            SELECT g.id, g.name
+            FROM gemeinschaften g
+            JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
+            WHERE mg.mitglied_id = ? AND g.aktiv = true
+            ORDER BY g.name
+        """)
+        cursor.execute(sql, (session['benutzer_id'],))
+        gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
+        session['gemeinschaften'] = gemeinschaften
+
+        # Original-Daten aus Session entfernen
+        del session['original_admin_id']
+        del session['original_admin_name']
+        del session['original_is_admin']
+        del session['original_admin_level']
+        if 'original_gemeinschafts_admin_ids' in session:
+            del session['original_gemeinschafts_admin_ids']
+
+        flash('Sie sind wieder als Administrator angemeldet.', 'success')
+
+    return redirect(url_for('admin_system.admin_dashboard'))
+
+
+# ============================================================================
 # REPLICATION-VERWALTUNG
 # ============================================================================
 

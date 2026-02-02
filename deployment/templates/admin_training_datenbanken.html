@@ -201,6 +201,11 @@
         <a href="{{ url_for('admin_system.admin_training_rechte') }}" class="btn btn-outline-primary">
             <i class="bi bi-people"></i> Benutzer-Rechte verwalten
         </a>
+        {% if db_info and db_info.is_training_mode %}
+        <a href="{{ url_for('admin_system.admin_training_benutzer_wechseln') }}" class="btn btn-warning">
+            <i class="bi bi-person-badge"></i> Als anderer Benutzer anmelden
+        </a>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

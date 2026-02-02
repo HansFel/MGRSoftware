@@ -168,6 +168,11 @@
                                 <i class="bi bi-database-gear"></i> Übungsdatenbanken
                             </a></li>
                             {% endif %}
+                            {% if db_info and db_info.is_training_mode %}
+                            <li><a class="dropdown-item text-warning" href="{{ url_for('admin_system.admin_training_benutzer_wechseln') }}">
+                                <i class="bi bi-person-badge"></i> Benutzer wechseln
+                            </a></li>
+                            {% endif %}
                         </ul>
                     </li>
                     {% endif %}
@@ -204,6 +209,22 @@
             </div>
         </div>
     </nav>
+    {% endif %}
+
+    <!-- Impersonation Banner -->
+    {% if session.get('original_admin_id') %}
+    <div class="bg-warning text-dark py-2 text-center" style="position: sticky; top: 56px; z-index: 1020;">
+        <i class="bi bi-eye-fill"></i>
+        <strong>Übungsmodus:</strong> Sie sehen die Ansicht von <strong>{{ session.get('benutzer_name') }}</strong>
+        <form method="POST" action="{{ url_for('admin_system.admin_training_zurueck') }}" class="d-inline ms-3">
+            <button type="submit" class="btn btn-sm btn-dark">
+                <i class="bi bi-arrow-return-left"></i> Zurück zum Admin
+            </button>
+        </form>
+        <a href="{{ url_for('admin_system.admin_training_benutzer_wechseln') }}" class="btn btn-sm btn-outline-dark ms-2">
+            <i class="bi bi-people"></i> Anderen Benutzer wählen
+        </a>
+    </div>
     {% endif %}
 
     <div class="main-container">

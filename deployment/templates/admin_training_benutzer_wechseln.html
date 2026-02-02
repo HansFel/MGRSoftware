@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Benutzer wechseln - Übungsmodus{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h1 class="text-white mb-4">
+            <i class="bi bi-people-fill"></i> Benutzer wechseln (Übungsmodus)
+        </h1>
+    </div>
+</div>
+
+{% if is_impersonating %}
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle"></i>
+    <strong>Achtung:</strong> Sie betrachten gerade die Ansicht eines anderen Benutzers.
+    <form method="POST" action="{{ url_for('admin_system.admin_training_zurueck') }}" class="d-inline">
+        <button type="submit" class="btn btn-warning btn-sm ms-2">
+            <i class="bi bi-arrow-return-left"></i> Zurück zum Admin
+        </button>
+    </form>
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-person-badge"></i> Verfügbare Benutzer
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Hinweis:</strong> Wählen Sie einen Benutzer aus, um dessen Ansicht zu sehen.
+                    Sie können die Anwendung aus der Perspektive dieses Benutzers testen.
+                    Ein Banner am oberen Bildschirmrand zeigt an, dass Sie als anderer Benutzer angemeldet sind.
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Benutzername</th>
+                                <th>Rolle</th>
+                                <th>Aktion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for b in benutzer %}
+                            <tr class="{% if b.id == current_id %}table-primary{% endif %}">
+                                <td>{{ b.id }}</td>
+                                <td>
+                                    <strong>{{ b.vorname }} {{ b.name }}</strong>
+                                    {% if b.id == current_id %}
+                                        <span class="badge bg-primary ms-2">Aktuell</span>
+                                    {% endif %}
+                                    {% if b.id == original_id %}
+                                        <span class="badge bg-success ms-2">Ihr Admin-Konto</span>
+                                    {% endif %}
+                                </td>
+                                <td><code>{{ b.username }}</code></td>
+                                <td>
+                                    {% if b.is_admin and b.admin_level >= 2 %}
+                                        <span class="badge bg-danger">
+                                            <i class="bi bi-shield-fill-check"></i> Hauptadmin
+                                        </span>
+                                    {% elif b.is_admin %}
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="bi bi-shield-fill"></i> Admin
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">
+                                            <i class="bi bi-person"></i> Mitglied
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if b.id != current_id %}
+                                    <form method="POST" action="{{ url_for('admin_system.admin_training_als_benutzer', user_id=b.id) }}" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-box-arrow-in-right"></i> Als {{ b.vorname }} anmelden
+                                        </button>
+                                    </form>
+                                    {% else %}
+                                        <span class="text-muted">Aktuell angemeldet</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4 mb-5">
+    <div class="col-12">
+        {% if is_impersonating %}
+        <form method="POST" action="{{ url_for('admin_system.admin_training_zurueck') }}" class="d-inline">
+            <button type="submit" class="btn btn-warning">
+                <i class="bi bi-arrow-return-left"></i> Zurück zum Admin
+            </button>
+        </form>
+        {% endif %}
+        <a href="{{ url_for('admin_system.admin_training_datenbanken') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück zu Übungsdatenbanken
+        </a>
+        <a href="{{ url_for('dashboard.dashboard') }}" class="btn btn-outline-light">
+            <i class="bi bi-house"></i> Zum Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}
