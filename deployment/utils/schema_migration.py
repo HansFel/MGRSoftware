@@ -47,11 +47,48 @@ REQUIRED_COLUMNS = [
     # zahlungsreferenzen
     ("zahlungsreferenzen", "gemeinschaft_id", "INTEGER", "INTEGER", None),
     ("zahlungsreferenzen", "aktiv", "BOOLEAN", "BOOLEAN", "TRUE"),
+
+    # gemeinschaften - Finanzen
+    ("gemeinschaften", "anfangssaldo_bank", "REAL", "REAL", "0.0"),
+    ("gemeinschaften", "anfangssaldo_datum", "DATE", "DATE", None),
 ]
 
 # Liste aller erforderlichen Tabellen
 # Format: (tabelle, create_statement_postgresql, create_statement_sqlite)
 REQUIRED_TABLES = [
+    (
+        "reservierungen_geloescht",
+        """CREATE TABLE IF NOT EXISTS reservierungen_geloescht (
+            id SERIAL PRIMARY KEY,
+            reservierung_id INTEGER NOT NULL,
+            maschine_id INTEGER NOT NULL,
+            maschine_bezeichnung TEXT,
+            benutzer_id INTEGER NOT NULL,
+            benutzer_name TEXT,
+            datum DATE NOT NULL,
+            uhrzeit_von TEXT,
+            uhrzeit_bis TEXT,
+            zweck TEXT,
+            grund TEXT,
+            geloescht_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            geloescht_von INTEGER
+        )""",
+        """CREATE TABLE IF NOT EXISTS reservierungen_geloescht (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            reservierung_id INTEGER NOT NULL,
+            maschine_id INTEGER NOT NULL,
+            maschine_bezeichnung TEXT,
+            benutzer_id INTEGER NOT NULL,
+            benutzer_name TEXT,
+            datum DATE NOT NULL,
+            uhrzeit_von TEXT,
+            uhrzeit_bis TEXT,
+            zweck TEXT,
+            grund TEXT,
+            geloescht_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+            geloescht_von INTEGER
+        )"""
+    ),
     (
         "reservierungen_abgelaufen",
         """CREATE TABLE IF NOT EXISTS reservierungen_abgelaufen (

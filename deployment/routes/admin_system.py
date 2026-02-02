@@ -403,14 +403,14 @@ def admin_export_alle_einsaetze_csv():
                     ma.abrechnungsart,
                     ma.preis_pro_einheit,
                     m.flaeche_menge,
-                    m.treibstoff_liter,
-                    m.treibstoff_preis,
+                    m.treibstoffverbrauch as treibstoff_liter,
+                    m.treibstoffkosten as treibstoff_preis,
                     m.treibstoffkosten,
                     m.kosten_berechnet as maschinenkosten,
                     (COALESCE(m.treibstoffkosten, 0) + COALESCE(m.kosten_berechnet, 0)) as gesamtkosten,
                     m.anfangstand,
                     m.endstand,
-                    m.bemerkung
+                    m.anmerkungen as bemerkung
                 FROM maschineneinsaetze m
                 JOIN benutzer b ON m.benutzer_id = b.id
                 JOIN maschinen ma ON m.maschine_id = ma.id
