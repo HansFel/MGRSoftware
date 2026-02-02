@@ -13,6 +13,99 @@ from utils.sql_helpers import convert_sql
 reservierungen_bp = Blueprint('reservierungen', __name__)
 
 
+@reservierungen_bp.route('/neue-reservierung', methods=['GET', 'POST'])
+@login_required
+def neue_reservierung():
+    """Neue Reservierung erstellen (mit Maschinen-Auswahl)"""
+    db_path = get_current_db_path()
+
+    with MaschinenDBContext(db_path) as db:
+        cursor = db.connection.cursor()
+
+        if request.method == 'POST':
+            maschine_id = request.form.get('maschine_id')
+            datum = request.form.get('datum')
+            uhrzeit_von = request.form.get('uhrzeit_von')
+            uhrzeit_bis = request.form.get('uhrzeit_bis')
+            zweck = request.form.get('zweck')
+            bemerkung = request.form.get('bemerkung')
+
+            if not maschine_id or not datum or not uhrzeit_von or not uhrzeit_bis:
+                flash('Bitte alle Pflichtfelder ausfüllen!', 'danger')
+                return redirect(url_for('reservierungen.neue_reservierung'))
+
+            # Nutzungsdauer berechnen
+            try:
+                von_parts = uhrzeit_von.split(':')
+                bis_parts = uhrzeit_bis.split(':')
+                von_minuten = int(von_parts[0]) * 60 + int(von_parts[1])
+                bis_minuten = int(bis_parts[0]) * 60 + int(bis_parts[1])
+                nutzungsdauer = (bis_minuten - von_minuten) / 60
+                if nutzungsdauer <= 0:
+                    flash('Ende muss nach Start liegen!', 'danger')
+                    return redirect(url_for('reservierungen.neue_reservierung'))
+            except:
+                nutzungsdauer = 1.0
+
+            # Überschneidung prüfen
+            sql = convert_sql("""
+                SELECT COUNT(*) FROM maschinen_reservierungen
+                WHERE maschine_id = ?
+                  AND datum = ?
+                  AND status = 'aktiv'
+                  AND (
+                    (uhrzeit_von <= ? AND uhrzeit_bis > ?)
+                    OR (uhrzeit_von < ? AND uhrzeit_bis >= ?)
+                    OR (uhrzeit_von >= ? AND uhrzeit_bis <= ?)
+                  )
+            """)
+            cursor.execute(sql, (maschine_id, datum, uhrzeit_von, uhrzeit_von,
+                                uhrzeit_bis, uhrzeit_bis, uhrzeit_von, uhrzeit_bis))
+
+            if cursor.fetchone()[0] > 0:
+                flash('Der gewählte Zeitraum überschneidet sich mit einer bestehenden Reservierung!', 'danger')
+                return redirect(url_for('reservierungen.neue_reservierung'))
+
+            sql = convert_sql("""
+                INSERT INTO maschinen_reservierungen
+                (maschine_id, benutzer_id, datum, uhrzeit_von, uhrzeit_bis, nutzungsdauer_stunden, zweck, bemerkung)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """)
+            cursor.execute(sql, (maschine_id, session['benutzer_id'], datum,
+                                uhrzeit_von, uhrzeit_bis, nutzungsdauer, zweck, bemerkung))
+
+            db.connection.commit()
+
+            # Maschinenname für Meldung
+            maschine = db.get_maschine_by_id(int(maschine_id))
+            flash(f'Maschine "{maschine["bezeichnung"]}" wurde erfolgreich für {datum} reserviert!', 'success')
+            return redirect(url_for('reservierungen.meine_reservierungen'))
+
+        # GET - Formular anzeigen
+        # Maschinen des Benutzers laden
+        sql = convert_sql("""
+            SELECT DISTINCT m.*
+            FROM maschinen m
+            JOIN gemeinschaften g ON m.gemeinschaft_id = g.id
+            JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
+            WHERE mg.mitglied_id = ?
+              AND m.aktiv = true
+              AND g.aktiv = true
+            ORDER BY m.bezeichnung
+        """)
+        cursor.execute(sql, (session['benutzer_id'],))
+
+        columns = [desc[0] for desc in cursor.description]
+        maschinen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        einsatzzwecke = db.get_all_einsatzzwecke()
+
+    return render_template('neue_reservierung.html',
+                         maschinen=maschinen,
+                         einsatzzwecke=einsatzzwecke,
+                         heute=datetime.now().strftime('%Y-%m-%d'))
+
+
 @reservierungen_bp.route('/maschine/<int:maschine_id>/reservieren', methods=['GET', 'POST'])
 @login_required
 def maschine_reservieren(maschine_id):
