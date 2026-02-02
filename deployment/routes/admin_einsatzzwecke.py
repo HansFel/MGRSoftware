@@ -27,9 +27,14 @@ def admin_einsatzzwecke_neu():
     """Neuer Einsatzzweck"""
     db_path = get_current_db_path()
     if request.method == 'POST':
+        bezeichnung = request.form.get('bezeichnung')
+        if not bezeichnung:
+            flash('Bezeichnung ist erforderlich!', 'danger')
+            return redirect(url_for('admin_einsatzzwecke.admin_einsatzzwecke_neu'))
+
         with MaschinenDBContext(db_path) as db:
             db.add_einsatzzweck(
-                bezeichnung=request.form['bezeichnung'],
+                bezeichnung=bezeichnung,
                 beschreibung=request.form.get('beschreibung')
             )
         flash('Einsatzzweck erfolgreich angelegt!', 'success')
@@ -44,8 +49,13 @@ def admin_einsatzzwecke_edit(einsatzzweck_id):
     db_path = get_current_db_path()
     with MaschinenDBContext(db_path) as db:
         if request.method == 'POST':
+            bezeichnung = request.form.get('bezeichnung')
+            if not bezeichnung:
+                flash('Bezeichnung ist erforderlich!', 'danger')
+                return redirect(url_for('admin_einsatzzwecke.admin_einsatzzwecke_edit', einsatzzweck_id=einsatzzweck_id))
+
             update_data = {
-                'bezeichnung': request.form['bezeichnung'],
+                'bezeichnung': bezeichnung,
                 'beschreibung': request.form.get('beschreibung'),
                 'aktiv': 1 if request.form.get('aktiv') else 0
             }

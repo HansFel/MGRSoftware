@@ -101,11 +101,18 @@ def admin_konten_buchung_neu(gemeinschaft_id):
         gemeinschaft = dict(zip(columns, cursor.fetchone()))
 
         if request.method == 'POST':
-            mitglied_id = request.form['benutzer_id']
-            typ = request.form['typ']
-            betrag_input = float(request.form['betrag'])
-            datum = request.form['datum']
-            beschreibung = request.form['beschreibung']
+            mitglied_id = request.form.get('benutzer_id')
+            typ = request.form.get('typ')
+            betrag_str = request.form.get('betrag')
+            datum = request.form.get('datum')
+            beschreibung = request.form.get('beschreibung', '')
+
+            if not all([mitglied_id, typ, betrag_str, datum]):
+                flash('Bitte alle Pflichtfelder ausfüllen!', 'danger')
+                return redirect(url_for('admin_finanzen.admin_konten_buchung_neu',
+                                       gemeinschaft_id=gemeinschaft_id))
+
+            betrag_input = float(betrag_str)
 
             if typ == 'einzahlung':
                 betrag = betrag_input

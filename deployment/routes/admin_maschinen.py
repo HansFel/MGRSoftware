@@ -31,11 +31,18 @@ def admin_maschinen_neu():
     db_path = get_current_db_path()
     with MaschinenDBContext(db_path) as db:
         if request.method == 'POST':
+            bezeichnung = request.form.get('bezeichnung')
+            gemeinschaft_id_str = request.form.get('gemeinschaft_id')
+
+            if not bezeichnung or not gemeinschaft_id_str:
+                flash('Bezeichnung und Gemeinschaft sind erforderlich!', 'danger')
+                return redirect(url_for('admin_maschinen.admin_maschinen_neu'))
+
             maschine_id = db.add_maschine(
-                bezeichnung=request.form['bezeichnung'],
+                bezeichnung=bezeichnung,
                 hersteller=request.form.get('hersteller'),
                 modell=request.form.get('modell'),
-                baujahr=int(request.form['baujahr']) if request.form.get('baujahr') else None,
+                baujahr=int(request.form.get('baujahr')) if request.form.get('baujahr') else None,
                 kennzeichen=request.form.get('kennzeichen'),
                 stundenzaehler_aktuell=float(request.form.get('stundenzaehler_aktuell', 0)),
                 wartungsintervall=int(request.form.get('wartungsintervall', 50)),
@@ -44,7 +51,7 @@ def admin_maschinen_neu():
                 abrechnungsart=request.form.get('abrechnungsart', 'stunden'),
                 preis_pro_einheit=float(request.form.get('preis_pro_einheit', 0)),
                 erfassungsmodus=request.form.get('erfassungsmodus', 'fortlaufend'),
-                gemeinschaft_id=int(request.form['gemeinschaft_id']),
+                gemeinschaft_id=int(gemeinschaft_id_str),
                 anschaffungspreis=float(request.form.get('anschaffungspreis', 0)),
                 abschreibungsdauer_jahre=int(request.form.get('abschreibungsdauer_jahre', 10)),
                 anschaffungsdatum=request.form.get('anschaffungsdatum') if request.form.get('anschaffungsdatum') else None
@@ -73,11 +80,18 @@ def admin_maschinen_edit(maschine_id):
     db_path = get_current_db_path()
     with MaschinenDBContext(db_path) as db:
         if request.method == 'POST':
+            bezeichnung = request.form.get('bezeichnung')
+            gemeinschaft_id_str = request.form.get('gemeinschaft_id')
+
+            if not bezeichnung or not gemeinschaft_id_str:
+                flash('Bezeichnung und Gemeinschaft sind erforderlich!', 'danger')
+                return redirect(url_for('admin_maschinen.admin_maschinen_edit', maschine_id=maschine_id))
+
             update_data = {
-                'bezeichnung': request.form['bezeichnung'],
+                'bezeichnung': bezeichnung,
                 'hersteller': request.form.get('hersteller'),
                 'modell': request.form.get('modell'),
-                'baujahr': int(request.form['baujahr']) if request.form.get('baujahr') else None,
+                'baujahr': int(request.form.get('baujahr')) if request.form.get('baujahr') else None,
                 'kennzeichen': request.form.get('kennzeichen'),
                 'stundenzaehler_aktuell': float(request.form.get('stundenzaehler_aktuell', 0)),
                 'wartungsintervall': int(request.form.get('wartungsintervall', 50)),
@@ -86,7 +100,7 @@ def admin_maschinen_edit(maschine_id):
                 'abrechnungsart': request.form.get('abrechnungsart', 'stunden'),
                 'preis_pro_einheit': float(request.form.get('preis_pro_einheit', 0)),
                 'erfassungsmodus': request.form.get('erfassungsmodus', 'fortlaufend'),
-                'gemeinschaft_id': int(request.form['gemeinschaft_id']),
+                'gemeinschaft_id': int(gemeinschaft_id_str),
                 'anschaffungspreis': float(request.form.get('anschaffungspreis', 0)),
                 'abschreibungsdauer_jahre': int(request.form.get('abschreibungsdauer_jahre', 10)),
                 'anschaffungsdatum': request.form.get('anschaffungsdatum') if request.form.get('anschaffungsdatum') else None

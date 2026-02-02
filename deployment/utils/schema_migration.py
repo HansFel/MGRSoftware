@@ -51,6 +51,10 @@ REQUIRED_COLUMNS = [
     # gemeinschaften - Finanzen
     ("gemeinschaften", "anfangssaldo_bank", "REAL", "REAL", "0.0"),
     ("gemeinschaften", "anfangssaldo_datum", "DATE", "DATE", None),
+    ("gemeinschaften", "bank_name", "TEXT", "TEXT", None),
+    ("gemeinschaften", "bank_iban", "TEXT", "TEXT", None),
+    ("gemeinschaften", "bank_bic", "TEXT", "TEXT", None),
+    ("gemeinschaften", "bank_kontoinhaber", "TEXT", "TEXT", None),
 ]
 
 # Liste aller erforderlichen Tabellen

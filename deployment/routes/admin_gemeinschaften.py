@@ -32,6 +32,11 @@ def admin_gemeinschaften_neu():
     """Neue Gemeinschaft"""
     db_path = get_current_db_path()
     if request.method == 'POST':
+        name = request.form.get('name')
+        if not name:
+            flash('Name ist erforderlich!', 'danger')
+            return redirect(url_for('admin_gemeinschaften.admin_gemeinschaften_neu'))
+
         with MaschinenDBContext(db_path) as db:
             cursor = db.cursor
             sql = convert_sql("""
@@ -39,7 +44,7 @@ def admin_gemeinschaften_neu():
                 VALUES (?, ?, ?)
             """)
             cursor.execute(sql, (
-                request.form['name'],
+                name,
                 request.form.get('beschreibung'),
                 1 if request.form.get('aktiv') else 0
             ))
@@ -58,6 +63,11 @@ def admin_gemeinschaften_edit(gemeinschaft_id):
         cursor = db.cursor
 
         if request.method == 'POST':
+            name = request.form.get('name')
+            if not name:
+                flash('Name ist erforderlich!', 'danger')
+                return redirect(url_for('admin_gemeinschaften.admin_gemeinschaften_edit', gemeinschaft_id=gemeinschaft_id))
+
             sql = convert_sql("""
                 UPDATE gemeinschaften
                 SET name = ?,
@@ -73,7 +83,7 @@ def admin_gemeinschaften_edit(gemeinschaft_id):
                 WHERE id = ?
             """)
             cursor.execute(sql, (
-                request.form['name'],
+                name,
                 request.form.get('beschreibung'),
                 request.form.get('adresse'),
                 request.form.get('telefon'),
