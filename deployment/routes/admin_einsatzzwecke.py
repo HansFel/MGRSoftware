@@ -57,7 +57,7 @@ def admin_einsatzzwecke_edit(einsatzzweck_id):
             update_data = {
                 'bezeichnung': bezeichnung,
                 'beschreibung': request.form.get('beschreibung'),
-                'aktiv': 1 if request.form.get('aktiv') else 0
+                'aktiv': bool(request.form.get('aktiv'))
             }
             db.update_einsatzzweck(einsatzzweck_id, **update_data)
             flash('Einsatzzweck erfolgreich aktualisiert!', 'success')

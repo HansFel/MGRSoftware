@@ -727,7 +727,7 @@ def admin_csv_konfiguration(gemeinschaft_id):
                 request.form.get('dezimaltrennzeichen'),
                 request.form.get('tausendertrennzeichen'),
                 request.form.get('datumsformat'),
-                1 if request.form.get('hat_kopfzeile') else 0,
+                bool(request.form.get('hat_kopfzeile')),
                 int(request.form.get('zeilen_ueberspringen', 0)),
                 gemeinschaft_id
             ))

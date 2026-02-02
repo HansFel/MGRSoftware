@@ -46,7 +46,7 @@ def admin_gemeinschaften_neu():
             cursor.execute(sql, (
                 name,
                 request.form.get('beschreibung'),
-                1 if request.form.get('aktiv') else 0
+                bool(request.form.get('aktiv'))
             ))
             db.connection.commit()
         flash('Gemeinschaft erfolgreich angelegt!', 'success')
@@ -88,7 +88,7 @@ def admin_gemeinschaften_edit(gemeinschaft_id):
                 request.form.get('adresse'),
                 request.form.get('telefon'),
                 request.form.get('email'),
-                1 if request.form.get('aktiv') else 0,
+                bool(request.form.get('aktiv')),
                 request.form.get('bank_name'),
                 request.form.get('bank_iban'),
                 request.form.get('bank_bic'),
