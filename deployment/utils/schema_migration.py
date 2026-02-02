@@ -55,6 +55,12 @@ REQUIRED_COLUMNS = [
     ("gemeinschaften", "bank_iban", "TEXT", "TEXT", None),
     ("gemeinschaften", "bank_bic", "TEXT", "TEXT", None),
     ("gemeinschaften", "bank_kontoinhaber", "TEXT", "TEXT", None),
+
+    # bank_transaktionen
+    ("bank_transaktionen", "benutzer_id", "INTEGER", "INTEGER", None),
+    ("bank_transaktionen", "zugeordnet", "BOOLEAN", "BOOLEAN", "FALSE"),
+    ("bank_transaktionen", "zuordnung_typ", "TEXT", "TEXT", None),
+    ("bank_transaktionen", "zuordnung_id", "INTEGER", "INTEGER", None),
 ]
 
 # Liste aller erforderlichen Tabellen
