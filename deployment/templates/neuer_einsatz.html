@@ -25,28 +25,15 @@
                             <select class="form-select" id="maschine_id" name="maschine_id" required>
                                 <option value="">Bitte wählen...</option>
                                 {% for maschine in maschinen %}
-                                <option value="{{ maschine.id }}" 
+                                <option value="{{ maschine.id }}"
                                         data-stundenzaehler="{{ maschine.stundenzaehler_aktuell }}"
                                         data-abrechnungsart="{{ maschine.abrechnungsart or 'stunden' }}"
                                         data-preis="{{ maschine.preis_pro_einheit or 0 }}"
-                                        data-erfassungsmodus="{{ maschine.erfassungsmodus or 'fortlaufend' }}"
-                                        {% if maschine.reservierung_aktiv %}
-                                        data-reservierung="{{ maschine.reservierung_info }}"
-                                        {% endif %}>
-                                    {{ maschine.bezeichnung }} 
-                                    {% if maschine.reservierung_aktiv %}
-                                    <span class="badge bg-warning">Reserviert</span>
-                                    {% endif %}
+                                        data-erfassungsmodus="{{ maschine.erfassungsmodus or 'fortlaufend' }}">
+                                    {{ maschine.bezeichnung }}
                                 </option>
                                 {% endfor %}
                             </select>
-                            <small class="text-muted" id="reservierungsHinweis"></small>
-                        </div>
-                        
-                        <div class="col-md-12 mb-3 text-end">
-                            <a href="#" id="reservierungLink" class="btn btn-sm btn-outline-primary" style="display: none;">
-                                <i class="bi bi-calendar-check"></i> Maschine reservieren
-                            </a>
                         </div>
                     </div>
 
@@ -196,24 +183,6 @@ document.getElementById('maschine_id').addEventListener('change', function() {
     const abrechnungsart = selectedOption.dataset.abrechnungsart || 'stunden';
     const preis = parseFloat(selectedOption.dataset.preis) || 0;
     const erfassungsmodus = selectedOption.dataset.erfassungsmodus || 'fortlaufend';
-    
-    // Reservierungslink anzeigen
-    if (selectedOption.value) {
-        const reservierungLink = document.getElementById('reservierungLink');
-        reservierungLink.href = '/maschine/' + selectedOption.value + '/reservieren';
-        reservierungLink.style.display = 'inline-block';
-        
-        // Reservierungshinweis
-        const hinweis = document.getElementById('reservierungsHinweis');
-        const reservierung = selectedOption.dataset.reservierung;
-        if (reservierung) {
-            hinweis.innerHTML = '<i class="bi bi-exclamation-triangle text-warning"></i> ' + reservierung;
-            hinweis.style.display = 'block';
-        } else {
-            hinweis.innerHTML = '';
-            hinweis.style.display = 'none';
-        }
-    }
     
     // Container für die Erfassungsart anzeigen/verstecken
     const fortlaufendContainer = document.getElementById('fortlaufendContainer');

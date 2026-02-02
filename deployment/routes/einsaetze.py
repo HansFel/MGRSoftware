@@ -107,29 +107,6 @@ def neuer_einsatz():
         columns = [desc[0] for desc in cursor.description]
         maschinen = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        heute_datum = datetime.now().strftime('%Y-%m-%d')
-
-        for maschine in maschinen:
-            sql = convert_sql("""
-                SELECT r.*, b.name || ' ' || COALESCE(b.vorname, '') as benutzer_name
-                FROM maschinen_reservierungen r
-                JOIN benutzer b ON r.benutzer_id = b.id
-                WHERE r.maschine_id = ?
-                  AND r.datum = ?
-                  AND r.status = 'aktiv'
-                ORDER BY r.uhrzeit_von
-                LIMIT 1
-            """)
-            cursor.execute(sql, (maschine['id'], heute_datum))
-
-            res = cursor.fetchone()
-            if res:
-                res_dict = dict(zip([desc[0] for desc in cursor.description], res))
-                maschine['reservierung_aktiv'] = True
-                maschine['reservierung_info'] = f"Heute reserviert: {res_dict['uhrzeit_von']}-{res_dict['uhrzeit_bis']} ({res_dict['benutzer_name']})"
-            else:
-                maschine['reservierung_aktiv'] = False
-
         einsatzzwecke = db.get_all_einsatzzwecke()
 
         benutzer = db.get_benutzer(session['benutzer_id'])
