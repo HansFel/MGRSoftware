@@ -57,10 +57,16 @@ REQUIRED_COLUMNS = [
     ("gemeinschaften", "bank_kontoinhaber", "TEXT", "TEXT", None),
 
     # bank_transaktionen
+    ("bank_transaktionen", "gemeinschaft_id", "INTEGER", "INTEGER", None),
     ("bank_transaktionen", "benutzer_id", "INTEGER", "INTEGER", None),
     ("bank_transaktionen", "zugeordnet", "BOOLEAN", "BOOLEAN", "FALSE"),
     ("bank_transaktionen", "zuordnung_typ", "TEXT", "TEXT", None),
     ("bank_transaktionen", "zuordnung_id", "INTEGER", "INTEGER", None),
+    ("bank_transaktionen", "buchungsdatum", "DATE", "DATE", None),
+    ("bank_transaktionen", "betrag", "REAL", "REAL", None),
+    ("bank_transaktionen", "verwendungszweck", "TEXT", "TEXT", None),
+    ("bank_transaktionen", "importiert_am", "TIMESTAMP", "DATETIME", None),
+    ("bank_transaktionen", "importiert_von", "INTEGER", "INTEGER", None),
 ]
 
 # Liste aller erforderlichen Tabellen
@@ -132,6 +138,74 @@ REQUIRED_TABLES = [
             bemerkung TEXT,
             erstellt_am DATETIME,
             archiviert_am DATETIME DEFAULT CURRENT_TIMESTAMP
+        )"""
+    ),
+    (
+        "bank_transaktionen",
+        """CREATE TABLE IF NOT EXISTS bank_transaktionen (
+            id SERIAL PRIMARY KEY,
+            gemeinschaft_id INTEGER,
+            buchungsdatum DATE NOT NULL,
+            valutadatum DATE,
+            betrag REAL NOT NULL,
+            waehrung TEXT DEFAULT 'EUR',
+            verwendungszweck TEXT,
+            auftraggeber TEXT,
+            iban TEXT,
+            bic TEXT,
+            importiert_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            importiert_von INTEGER,
+            zugeordnet BOOLEAN DEFAULT FALSE,
+            benutzer_id INTEGER,
+            zuordnung_typ TEXT,
+            zuordnung_id INTEGER,
+            import_hash TEXT UNIQUE
+        )""",
+        """CREATE TABLE IF NOT EXISTS bank_transaktionen (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            gemeinschaft_id INTEGER,
+            buchungsdatum DATE NOT NULL,
+            valutadatum DATE,
+            betrag REAL NOT NULL,
+            waehrung TEXT DEFAULT 'EUR',
+            verwendungszweck TEXT,
+            auftraggeber TEXT,
+            iban TEXT,
+            bic TEXT,
+            importiert_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+            importiert_von INTEGER,
+            zugeordnet BOOLEAN DEFAULT 0,
+            benutzer_id INTEGER,
+            zuordnung_typ TEXT,
+            zuordnung_id INTEGER,
+            import_hash TEXT UNIQUE
+        )"""
+    ),
+    (
+        "gemeinschafts_kosten",
+        """CREATE TABLE IF NOT EXISTS gemeinschafts_kosten (
+            id SERIAL PRIMARY KEY,
+            gemeinschaft_id INTEGER NOT NULL,
+            transaktion_id INTEGER,
+            maschine_id INTEGER,
+            kategorie TEXT NOT NULL,
+            betrag REAL NOT NULL,
+            datum DATE NOT NULL,
+            beschreibung TEXT,
+            erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            erstellt_von INTEGER
+        )""",
+        """CREATE TABLE IF NOT EXISTS gemeinschafts_kosten (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            gemeinschaft_id INTEGER NOT NULL,
+            transaktion_id INTEGER,
+            maschine_id INTEGER,
+            kategorie TEXT NOT NULL,
+            betrag REAL NOT NULL,
+            datum DATE NOT NULL,
+            beschreibung TEXT,
+            erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+            erstellt_von INTEGER
         )"""
     ),
 ]
