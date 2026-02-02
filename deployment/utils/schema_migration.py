@@ -38,8 +38,16 @@ REQUIRED_COLUMNS = [
     ("benutzer", "aktiv", "BOOLEAN", "BOOLEAN", "TRUE"),
 
     # mitglieder_abrechnungen
+    ("mitglieder_abrechnungen", "gemeinschaft_id", "INTEGER", "INTEGER", None),
+    ("mitglieder_abrechnungen", "benutzer_id", "INTEGER", "INTEGER", None),
+    ("mitglieder_abrechnungen", "zeitraum_von", "DATE", "DATE", None),
+    ("mitglieder_abrechnungen", "zeitraum_bis", "DATE", "DATE", None),
+    ("mitglieder_abrechnungen", "betrag_maschinen", "REAL", "REAL", "0.0"),
+    ("mitglieder_abrechnungen", "betrag_treibstoff", "REAL", "REAL", "0.0"),
     ("mitglieder_abrechnungen", "betrag_gesamt", "REAL", "REAL", "0.0"),
     ("mitglieder_abrechnungen", "status", "TEXT", "TEXT", "'offen'"),
+    ("mitglieder_abrechnungen", "erstellt_am", "TIMESTAMP", "DATETIME", None),
+    ("mitglieder_abrechnungen", "bezahlt_am", "TIMESTAMP", "DATETIME", None),
 
     # mitglieder_konten
     ("mitglieder_konten", "saldo", "REAL", "REAL", "0.0"),
@@ -67,6 +75,14 @@ REQUIRED_COLUMNS = [
     ("bank_transaktionen", "verwendungszweck", "TEXT", "TEXT", None),
     ("bank_transaktionen", "importiert_am", "TIMESTAMP", "DATETIME", None),
     ("bank_transaktionen", "importiert_von", "INTEGER", "INTEGER", None),
+
+    # buchungen
+    ("buchungen", "benutzer_id", "INTEGER", "INTEGER", None),
+    ("buchungen", "gemeinschaft_id", "INTEGER", "INTEGER", None),
+    ("buchungen", "typ", "TEXT", "TEXT", None),
+    ("buchungen", "datum", "DATE", "DATE", None),
+    ("buchungen", "betrag", "REAL", "REAL", None),
+    ("buchungen", "beschreibung", "TEXT", "TEXT", None),
 ]
 
 # Liste aller erforderlichen Tabellen
@@ -206,6 +222,35 @@ REQUIRED_TABLES = [
             beschreibung TEXT,
             erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
             erstellt_von INTEGER
+        )"""
+    ),
+    (
+        "mitglieder_abrechnungen",
+        """CREATE TABLE IF NOT EXISTS mitglieder_abrechnungen (
+            id SERIAL PRIMARY KEY,
+            gemeinschaft_id INTEGER NOT NULL,
+            benutzer_id INTEGER NOT NULL,
+            zeitraum_von DATE,
+            zeitraum_bis DATE,
+            betrag_maschinen REAL DEFAULT 0.0,
+            betrag_treibstoff REAL DEFAULT 0.0,
+            betrag_gesamt REAL DEFAULT 0.0,
+            status TEXT DEFAULT 'offen',
+            erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            bezahlt_am TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS mitglieder_abrechnungen (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            gemeinschaft_id INTEGER NOT NULL,
+            benutzer_id INTEGER NOT NULL,
+            zeitraum_von DATE,
+            zeitraum_bis DATE,
+            betrag_maschinen REAL DEFAULT 0.0,
+            betrag_treibstoff REAL DEFAULT 0.0,
+            betrag_gesamt REAL DEFAULT 0.0,
+            status TEXT DEFAULT 'offen',
+            erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+            bezahlt_am DATETIME
         )"""
     ),
 ]
