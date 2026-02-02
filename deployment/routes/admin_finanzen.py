@@ -863,12 +863,12 @@ def admin_transaktionen(gemeinschaft_id):
 
         sql = convert_sql("""
             SELECT date(importiert_am) as import_datum, importiert_von, COUNT(*) as anzahl,
-                   b.name || ' ' || COALESCE(b.vorname, '') as importiert_von_name
+                   MAX(b.name || ' ' || COALESCE(b.vorname, '')) as importiert_von_name
             FROM bank_transaktionen t
             LEFT JOIN benutzer b ON t.importiert_von = b.id
             WHERE t.gemeinschaft_id = ?
             GROUP BY date(importiert_am), importiert_von
-            ORDER BY importiert_am DESC
+            ORDER BY date(importiert_am) DESC
         """)
         cursor.execute(sql, (gemeinschaft_id,))
 
