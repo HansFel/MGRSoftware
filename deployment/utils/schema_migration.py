@@ -206,5 +206,83 @@ def run_migrations():
         return False
 
 
+def check_missing_schema():
+    """Prüft welche Tabellen und Spalten fehlen (ohne sie hinzuzufügen)"""
+    missing = {'tables': [], 'columns': []}
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Tabellen prüfen
+        for table, pg_sql, sqlite_sql in REQUIRED_TABLES:
+            if not table_exists(cursor, table):
+                missing['tables'].append(table)
+
+        # Spalten prüfen
+        for table, column, pg_type, sqlite_type, default in REQUIRED_COLUMNS:
+            if table_exists(cursor, table):
+                if not column_exists(cursor, table, column):
+                    missing['columns'].append(f"{table}.{column}")
+
+        cursor.close()
+        conn.close()
+
+    except Exception as e:
+        print(f"Schema-Check Fehler: {e}")
+
+    return missing
+
+
+def run_migrations_with_report():
+    """Führt Migrationen durch und gibt einen Bericht zurück"""
+    report = {'tables_added': [], 'columns_added': [], 'errors': []}
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Tabellen prüfen und erstellen
+        for table, pg_sql, sqlite_sql in REQUIRED_TABLES:
+            if not table_exists(cursor, table):
+                try:
+                    create_sql = pg_sql if USING_POSTGRESQL else sqlite_sql
+                    cursor.execute(create_sql)
+                    report['tables_added'].append(table)
+                except Exception as e:
+                    report['errors'].append(f"Tabelle {table}: {e}")
+
+        # Spalten prüfen und hinzufügen
+        for table, column, pg_type, sqlite_type, default in REQUIRED_COLUMNS:
+            if table_exists(cursor, table):
+                if not column_exists(cursor, table, column):
+                    try:
+                        datatype = pg_type if USING_POSTGRESQL else sqlite_type
+                        if default:
+                            if USING_POSTGRESQL:
+                                sql = f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {datatype} DEFAULT {default}"
+                            else:
+                                sql = f"ALTER TABLE {table} ADD COLUMN {column} {datatype} DEFAULT {default}"
+                        else:
+                            if USING_POSTGRESQL:
+                                sql = f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {datatype}"
+                            else:
+                                sql = f"ALTER TABLE {table} ADD COLUMN {column} {datatype}"
+                        cursor.execute(sql)
+                        report['columns_added'].append(f"{table}.{column}")
+                    except Exception as e:
+                        if "already exists" not in str(e).lower():
+                            report['errors'].append(f"Spalte {table}.{column}: {e}")
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    except Exception as e:
+        report['errors'].append(f"Verbindungsfehler: {e}")
+
+    return report
+
+
 if __name__ == "__main__":
     run_migrations()

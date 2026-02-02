@@ -586,7 +586,19 @@ def admin_database_restore():
                 if result.returncode != 0:
                     raise Exception(f"psql Fehler: {result.stderr}")
 
+                # Schema-Migration nach Restore durchführen
+                from utils.schema_migration import run_migrations_with_report
+                migration_report = run_migrations_with_report()
+
                 flash(f'Datenbank erfolgreich wiederhergestellt! Backup erstellt: {os.path.basename(backup_current)}', 'success')
+
+                if migration_report['tables_added']:
+                    flash(f"Fehlende Tabellen hinzugefügt: {', '.join(migration_report['tables_added'])}", 'info')
+                if migration_report['columns_added']:
+                    flash(f"Fehlende Spalten hinzugefügt: {', '.join(migration_report['columns_added'])}", 'info')
+                if migration_report['errors']:
+                    flash(f"Migration-Fehler: {', '.join(migration_report['errors'])}", 'warning')
+
                 flash('WICHTIG: Bitte starten Sie die Anwendung neu!', 'warning')
 
                 return redirect(url_for('admin_system.admin_dashboard'))
@@ -626,7 +638,19 @@ def admin_database_restore():
                 shutil.copy2(temp_upload_path, db_path)
                 os.remove(temp_upload_path)
 
+                # Schema-Migration nach Restore durchführen
+                from utils.schema_migration import run_migrations_with_report
+                migration_report = run_migrations_with_report()
+
                 flash(f'Datenbank erfolgreich wiederhergestellt! Alte Datenbank gesichert als: {os.path.basename(backup_current)}', 'success')
+
+                if migration_report['tables_added']:
+                    flash(f"Fehlende Tabellen hinzugefügt: {', '.join(migration_report['tables_added'])}", 'info')
+                if migration_report['columns_added']:
+                    flash(f"Fehlende Spalten hinzugefügt: {', '.join(migration_report['columns_added'])}", 'info')
+                if migration_report['errors']:
+                    flash(f"Migration-Fehler: {', '.join(migration_report['errors'])}", 'warning')
+
                 flash('WICHTIG: Bitte starten Sie die Anwendung neu!', 'warning')
 
                 return redirect(url_for('admin_system.admin_dashboard'))
