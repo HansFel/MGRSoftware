@@ -222,28 +222,24 @@ def mein_konto(gemeinschaft_id):
 
         if row:
             konto = dict(zip(columns, row))
-            konto_id = konto.get('id')
             saldo = konto.get('kontostand', 0) or 0
         else:
             konto = {'kontostand': 0}
-            konto_id = None
             saldo = 0
 
-        # Buchungen laden (über konto_id)
-        buchungen = []
-        if konto_id:
-            sql = convert_sql("""
-                SELECT b.*,
-                       b.referenz_typ,
-                       b.referenz_id
-                FROM buchungen b
-                WHERE b.konto_id = ?
-                ORDER BY b.datum DESC, b.id DESC
-                LIMIT 100
-            """)
-            cursor.execute(sql, (konto_id,))
-            columns = [desc[0] for desc in cursor.description]
-            buchungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        # Buchungen laden (über benutzer_id und gemeinschaft_id)
+        sql = convert_sql("""
+            SELECT b.*,
+                   b.referenz_typ,
+                   b.referenz_id
+            FROM buchungen b
+            WHERE b.benutzer_id = ? AND b.gemeinschaft_id = ?
+            ORDER BY b.datum DESC, b.id DESC
+            LIMIT 100
+        """)
+        cursor.execute(sql, (benutzer_id, gemeinschaft_id))
+        columns = [desc[0] for desc in cursor.description]
+        buchungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
         # Offene Abrechnungen laden
         sql = convert_sql("""

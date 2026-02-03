@@ -63,13 +63,12 @@ def admin_konten(gemeinschaft_id):
             SELECT
                 bu.datum,
                 b.vorname || ' ' || b.name as mitglied_name,
-                bu.buchungsart as typ,
+                bu.typ,
                 bu.beschreibung,
                 bu.betrag
             FROM buchungen bu
-            JOIN mitglieder_konten mk ON bu.konto_id = mk.id
-            JOIN benutzer b ON mk.benutzer_id = b.id
-            WHERE mk.gemeinschaft_id = ?
+            JOIN benutzer b ON bu.benutzer_id = b.id
+            WHERE bu.gemeinschaft_id = ?
             ORDER BY bu.erstellt_am DESC
             LIMIT 20
         """)
@@ -491,12 +490,12 @@ def abrechnungen_erstellen(gemeinschaft_id):
                     # Buchung erstellen
                     sql = convert_sql("""
                         INSERT INTO buchungen (
-                            konto_id, datum, betrag, buchungsart,
+                            benutzer_id, gemeinschaft_id, datum, betrag, typ,
                             beschreibung, referenz_typ, referenz_id, erstellt_von
-                        ) VALUES (?, ?, ?, 'abrechnung', ?, 'abrechnung', ?, ?)
+                        ) VALUES (?, ?, ?, ?, 'abrechnung', ?, 'abrechnung', ?, ?)
                     """)
                     cursor.execute(sql, (
-                        konto_id, zeitraum_bis, -betrag_gesamt,
+                        mitglied_benutzer_id, gemeinschaft_id, zeitraum_bis, -betrag_gesamt,
                         f'Abrechnung #{abrechnung_id} für {abrechnungszeitraum}',
                         abrechnung_id, session['benutzer_id']
                     ))
