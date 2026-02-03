@@ -62,6 +62,11 @@ REQUIRED_COLUMNS = [
     ("zahlungsreferenzen", "gemeinschaft_id", "INTEGER", "INTEGER", None),
     ("zahlungsreferenzen", "aktiv", "BOOLEAN", "BOOLEAN", "TRUE"),
 
+    # gemeinschaften - Stammdaten
+    ("gemeinschaften", "adresse", "TEXT", "TEXT", None),
+    ("gemeinschaften", "telefon", "TEXT", "TEXT", None),
+    ("gemeinschaften", "email", "TEXT", "TEXT", None),
+
     # gemeinschaften - Finanzen
     ("gemeinschaften", "anfangssaldo_bank", "REAL", "REAL", "0.0"),
     ("gemeinschaften", "anfangssaldo_datum", "DATE", "DATE", None),
