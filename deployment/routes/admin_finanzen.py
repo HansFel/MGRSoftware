@@ -138,7 +138,7 @@ def admin_konten_buchung_neu(gemeinschaft_id):
                 VALUES (?, ?, ?)
                 ON CONFLICT(benutzer_id, gemeinschaft_id)
                 DO UPDATE SET
-                    saldo = saldo + ?,
+                    saldo = mitglieder_konten.saldo + ?,
                     letzte_aktualisierung = CURRENT_TIMESTAMP
             """)
             cursor.execute(sql, (mitglied_id, gemeinschaft_id, betrag, betrag))
@@ -307,7 +307,7 @@ def admin_konten_zahlung(gemeinschaft_id, benutzer_id):
                 VALUES (?, ?, ?)
                 ON CONFLICT(benutzer_id, gemeinschaft_id)
                 DO UPDATE SET
-                    saldo = saldo + ?,
+                    saldo = mitglieder_konten.saldo + ?,
                     letzte_aktualisierung = CURRENT_TIMESTAMP
             """)
             cursor.execute(sql, (benutzer_id, gemeinschaft_id, betrag, betrag))
