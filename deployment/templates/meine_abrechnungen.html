@@ -100,7 +100,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <small class="text-muted">{{ abr.erstellt_am[:10] }}</small>
+                                    <small class="text-muted">{% if abr.erstellt_am %}{{ abr.erstellt_am.strftime('%Y-%m-%d') if abr.erstellt_am.strftime is defined else abr.erstellt_am[:10] }}{% endif %}</small>
                                 </td>
                                 <td>
                                     <a href="{{ url_for('abrechnungen.abrechnung_pdf', abrechnung_id=abr.id) }}" 
