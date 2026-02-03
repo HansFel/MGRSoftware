@@ -472,28 +472,41 @@ def abrechnungen_erstellen(gemeinschaft_id):
 
                     abrechnung_id = cursor.lastrowid
 
+                    # Konto erstellen oder holen
+                    sql = convert_sql("""
+                        INSERT INTO mitglieder_konten (benutzer_id, gemeinschaft_id, saldo)
+                        VALUES (?, ?, 0)
+                        ON CONFLICT(benutzer_id, gemeinschaft_id) DO NOTHING
+                    """)
+                    cursor.execute(sql, (mitglied_benutzer_id, gemeinschaft_id))
+
+                    sql = convert_sql("""
+                        SELECT id FROM mitglieder_konten
+                        WHERE benutzer_id = ? AND gemeinschaft_id = ?
+                    """)
+                    cursor.execute(sql, (mitglied_benutzer_id, gemeinschaft_id))
+                    konto_id = cursor.fetchone()[0]
+
+                    # Buchung erstellen
                     sql = convert_sql("""
                         INSERT INTO buchungen (
-                            benutzer_id, gemeinschaft_id, datum, betrag,
-                            typ, beschreibung, referenz_typ, referenz_id, erstellt_von
-                        ) VALUES (?, ?, ?, ?, 'abrechnung', ?, 'abrechnung', ?, ?)
+                            konto_id, datum, betrag, buchungsart,
+                            beschreibung, referenz_typ, referenz_id, erstellt_von
+                        ) VALUES (?, ?, ?, 'abrechnung', ?, 'abrechnung', ?, ?)
                     """)
                     cursor.execute(sql, (
-                        mitglied_benutzer_id, gemeinschaft_id, zeitraum_bis,
-                        -betrag_gesamt,
+                        konto_id, zeitraum_bis, -betrag_gesamt,
                         f'Abrechnung #{abrechnung_id} für {abrechnungszeitraum}',
                         abrechnung_id, session['benutzer_id']
                     ))
 
+                    # Saldo aktualisieren
                     sql = convert_sql("""
-                        INSERT INTO mitglieder_konten (benutzer_id, gemeinschaft_id, saldo, saldo_vorjahr)
-                        VALUES (?, ?, ?, 0)
-                        ON CONFLICT(benutzer_id, gemeinschaft_id)
-                        DO UPDATE SET
-                            saldo = saldo + ?,
-                            letzte_aktualisierung = CURRENT_TIMESTAMP
+                        UPDATE mitglieder_konten
+                        SET saldo = saldo - ?, letzte_aktualisierung = CURRENT_TIMESTAMP
+                        WHERE id = ?
                     """)
-                    cursor.execute(sql, (mitglied_benutzer_id, gemeinschaft_id, -betrag_gesamt, -betrag_gesamt))
+                    cursor.execute(sql, (betrag_gesamt, konto_id))
 
                     erstellt += 1
 
