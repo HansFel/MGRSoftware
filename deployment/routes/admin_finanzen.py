@@ -464,13 +464,14 @@ def abrechnungen_erstellen(gemeinschaft_id):
                          betrag_treibstoff, betrag_maschinen, betrag_sonstiges,
                          status, erstellt_von)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'offen', ?)
+                        RETURNING id
                     """)
                     cursor.execute(sql, (gemeinschaft_id, mitglied_benutzer_id,
                                         zeitraum_von, zeitraum_bis, betrag_gesamt,
                                         abrechnungszeitraum, zeitraum_von, zeitraum_bis, betrag_gesamt,
                                         betrag_treibstoff, betrag_maschinen, session['benutzer_id']))
 
-                    abrechnung_id = cursor.lastrowid
+                    abrechnung_id = cursor.fetchone()[0]
 
                     # Konto erstellen oder holen
                     sql = convert_sql("""
