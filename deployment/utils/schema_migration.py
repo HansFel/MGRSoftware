@@ -66,6 +66,7 @@ REQUIRED_COLUMNS = [
     ("gemeinschaften", "adresse", "TEXT", "TEXT", None),
     ("gemeinschaften", "telefon", "TEXT", "TEXT", None),
     ("gemeinschaften", "email", "TEXT", "TEXT", None),
+    ("gemeinschaften", "aktiv", "BOOLEAN", "BOOLEAN", "TRUE"),
 
     # gemeinschaften - Finanzen
     ("gemeinschaften", "anfangssaldo_bank", "REAL", "REAL", "0.0"),
