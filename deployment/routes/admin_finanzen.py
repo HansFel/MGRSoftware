@@ -252,19 +252,30 @@ def admin_abrechnungen():
         # Gemeinschaften des Admins laden
         if session.get('admin_level', 0) >= 2:
             # Hauptadmin sieht alle Gemeinschaften
-            sql = convert_sql("SELECT id, name FROM gemeinschaften WHERE aktiv = true")
+            sql = convert_sql("SELECT id, name FROM gemeinschaften WHERE aktiv = true OR aktiv IS NULL")
             cursor.execute(sql)
+            gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
         else:
-            # Gemeinschafts-Admin sieht nur seine Gemeinschaften
-            sql = convert_sql("""
-                SELECT g.id, g.name
-                FROM gemeinschaften g
-                JOIN gemeinschafts_admin ga ON g.id = ga.gemeinschaft_id
-                WHERE ga.benutzer_id = ? AND g.aktiv = true
-            """)
-            cursor.execute(sql, (session['benutzer_id'],))
-
-        gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
+            # Gemeinschafts-Admin sieht nur seine Gemeinschaften (aus Session)
+            gemeinschafts_admin_ids = session.get('gemeinschafts_admin_ids', [])
+            if gemeinschafts_admin_ids:
+                placeholders = ','.join(['?' for _ in gemeinschafts_admin_ids])
+                sql = convert_sql(f"""
+                    SELECT id, name FROM gemeinschaften
+                    WHERE id IN ({placeholders}) AND (aktiv = true OR aktiv IS NULL)
+                """)
+                cursor.execute(sql, gemeinschafts_admin_ids)
+                gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
+            else:
+                # Fallback: prüfe mitglied_gemeinschaft mit Admin-Rolle
+                sql = convert_sql("""
+                    SELECT g.id, g.name
+                    FROM gemeinschaften g
+                    JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
+                    WHERE mg.mitglied_id = ? AND mg.rolle = 'admin' AND (g.aktiv = true OR g.aktiv IS NULL)
+                """)
+                cursor.execute(sql, (session['benutzer_id'],))
+                gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
 
         # Statistiken
         statistiken = {}
