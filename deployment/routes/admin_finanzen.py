@@ -217,8 +217,10 @@ def admin_konten_detail(gemeinschaft_id, benutzer_id):
         if row:
             columns = [desc[0] for desc in cursor.description]
             konto = dict(zip(columns, row))
+            saldo = konto.get('saldo') or konto.get('kontostand') or 0
         else:
             konto = {'saldo': 0}
+            saldo = 0
 
         sql = convert_sql("""
             SELECT * FROM buchungen
@@ -233,6 +235,7 @@ def admin_konten_detail(gemeinschaft_id, benutzer_id):
                          gemeinschaft=gemeinschaft,
                          mitglied=mitglied,
                          konto=konto,
+                         saldo=saldo,
                          buchungen=buchungen)
 
 
