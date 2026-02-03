@@ -217,7 +217,7 @@ def admin_rollen():
         from utils.sql_helpers import USING_POSTGRESQL
         if USING_POSTGRESQL:
             sql = """
-                SELECT b.*, STRING_AGG(g.name, ', ') as gemeinschaften_admin
+                SELECT b.*, STRING_AGG(g.name, ', ') as gemeinschaften
                 FROM benutzer b
                 LEFT JOIN gemeinschafts_admin ga ON b.id = ga.benutzer_id
                 LEFT JOIN gemeinschaften g ON ga.gemeinschaft_id = g.id
@@ -227,7 +227,7 @@ def admin_rollen():
             """
         else:
             sql = """
-                SELECT b.*, GROUP_CONCAT(g.name) as gemeinschaften_admin
+                SELECT b.*, GROUP_CONCAT(g.name) as gemeinschaften
                 FROM benutzer b
                 LEFT JOIN gemeinschafts_admin ga ON b.id = ga.benutzer_id
                 LEFT JOIN gemeinschaften g ON ga.gemeinschaft_id = g.id
