@@ -31,7 +31,23 @@ def admin_konten(gemeinschaft_id):
                 mk.benutzer_id,
                 b.vorname || ' ' || b.name as mitglied_name,
                 b.email,
-                mk.saldo
+                mk.saldo,
+                COALESCE((
+                    SELECT COUNT(*) FROM mitglieder_abrechnungen ma
+                    WHERE ma.benutzer_id = mk.benutzer_id
+                    AND ma.gemeinschaft_id = mk.gemeinschaft_id
+                    AND ma.status = 'offen'
+                ), 0) as offene_abrechnungen,
+                COALESCE((
+                    SELECT COUNT(*) FROM buchungen bu
+                    WHERE bu.benutzer_id = mk.benutzer_id
+                    AND bu.gemeinschaft_id = mk.gemeinschaft_id
+                ), 0) as anzahl_buchungen,
+                (
+                    SELECT MAX(bu.datum) FROM buchungen bu
+                    WHERE bu.benutzer_id = mk.benutzer_id
+                    AND bu.gemeinschaft_id = mk.gemeinschaft_id
+                ) as letzte_buchung
             FROM mitglieder_konten mk
             JOIN benutzer b ON mk.benutzer_id = b.id
             WHERE mk.gemeinschaft_id = ?
