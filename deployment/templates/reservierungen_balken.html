@@ -55,13 +55,13 @@
 
 <!-- Timeline -->
 <div class="card">
-    <div class="card-body p-0" style="overflow-x: auto;">
-        <table class="table table-bordered mb-0" style="min-width: 2000px;">
+    <div class="card-body p-0">
+        <table class="table table-bordered mb-0" style="table-layout: fixed; width: 100%;">
             <thead>
                 <tr class="table-light">
-                    <th style="width: 150px; position: sticky; left: 0; background: white; z-index: 20;">Maschine</th>
+                    <th style="width: 100px; font-size: 0.75em;">Maschine</th>
                     {% for hour in range(24) %}
-                    <th colspan="2" class="text-center" style="width: 80px; font-size: 0.85em;">{{ "%02d"|format(hour) }}:00</th>
+                    <th colspan="2" class="text-center p-0" style="font-size: 0.65em;">{{ "%02d"|format(hour) }}</th>
                     {% endfor %}
                 </tr>
             </thead>
@@ -87,8 +87,8 @@
                         
                         {% if maschinen_reservierungen %}
                         <tr>
-                            <td class="fw-bold" style="position: sticky; left: 0; background: white; z-index: 10;">
-                                {{ maschine.bezeichnung }}
+                            <td class="fw-bold text-truncate" style="font-size: 0.75em; max-width: 100px;" title="{{ maschine.bezeichnung }}">
+                                {{ maschine.bezeichnung[:15] }}{% if maschine.bezeichnung|length > 15 %}...{% endif %}
                             </td>
                             {% for slot in range(48) %}{# 48 = 24 Stunden * 2 (halbe Stunden) #}
                                 {% set slot_minute = slot * 30 %}
@@ -113,10 +113,9 @@
                                             {% set bg_style = "background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;" %}
                                         {% endif %}
                                         
-                                        <td colspan="{{ colspan }}" style="{{ bg_style }} font-weight: 600; font-size: 0.85em; text-align: center; padding: 8px 4px; white-space: nowrap;"
+                                        <td colspan="{{ colspan }}" style="{{ bg_style }} font-size: 0.6em; text-align: center; padding: 2px; overflow: hidden;"
                                             title="{{ res.maschine_bezeichnung }} - {{ res.benutzer_name }} ({{ res.uhrzeit_von }}-{{ res.uhrzeit_bis }})">
-                                            <strong>{{ res.benutzer_name.split(' ')[0] }}</strong><br>
-                                            <small>{{ res.uhrzeit_von }}-{{ res.uhrzeit_bis }}</small>
+                                            {{ res.benutzer_name.split(' ')[0][:8] }}
                                         </td>
                                         {% set cell_rendered = true %}
                                     {% endif %}
@@ -138,7 +137,7 @@
                                     {% endfor %}
                                     
                                     {% if not is_in_reservation %}
-                                        <td style="background: #fafafa; min-width: 40px;"></td>
+                                        <td style="background: #fafafa; padding: 2px;"></td>
                                     {% endif %}
                                 {% endif %}
                             {% endfor %}
@@ -163,10 +162,9 @@
 <div class="alert alert-light mt-3">
     <strong><i class="bi bi-info-circle"></i> Hinweise:</strong>
     <ul class="mb-0 mt-2">
-        <li>Jede Spalte entspricht 30 Minuten</li>
-        <li>Reservierungen werden mit farbigen Blöcken dargestellt</li>
+        <li>Jede Spalte entspricht 30 Minuten (00-23 Uhr)</li>
         <li>Grün = Ihre Reservierungen, Lila = Andere Benutzer</li>
-        <li>Scrollen Sie horizontal, um alle Uhrzeiten zu sehen</li>
+        <li>Fahren Sie mit der Maus über einen Block für Details</li>
     </ul>
 </div>
 
