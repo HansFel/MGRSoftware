@@ -43,13 +43,16 @@ REQUIRED_COLUMNS = [
     # mitglieder_abrechnungen
     ("mitglieder_abrechnungen", "gemeinschaft_id", "INTEGER", "INTEGER", None),
     ("mitglieder_abrechnungen", "benutzer_id", "INTEGER", "INTEGER", None),
+    ("mitglieder_abrechnungen", "abrechnungszeitraum", "TEXT", "TEXT", None),
     ("mitglieder_abrechnungen", "zeitraum_von", "DATE", "DATE", None),
     ("mitglieder_abrechnungen", "zeitraum_bis", "DATE", "DATE", None),
     ("mitglieder_abrechnungen", "betrag_maschinen", "REAL", "REAL", "0.0"),
     ("mitglieder_abrechnungen", "betrag_treibstoff", "REAL", "REAL", "0.0"),
+    ("mitglieder_abrechnungen", "betrag_sonstiges", "REAL", "REAL", "0.0"),
     ("mitglieder_abrechnungen", "betrag_gesamt", "REAL", "REAL", "0.0"),
     ("mitglieder_abrechnungen", "status", "TEXT", "TEXT", "'offen'"),
     ("mitglieder_abrechnungen", "erstellt_am", "TIMESTAMP", "DATETIME", None),
+    ("mitglieder_abrechnungen", "erstellt_von", "INTEGER", "INTEGER", None),
     ("mitglieder_abrechnungen", "bezahlt_am", "TIMESTAMP", "DATETIME", None),
 
     # mitglieder_konten
@@ -86,6 +89,10 @@ REQUIRED_COLUMNS = [
     ("buchungen", "datum", "DATE", "DATE", None),
     ("buchungen", "betrag", "REAL", "REAL", None),
     ("buchungen", "beschreibung", "TEXT", "TEXT", None),
+    ("buchungen", "referenz_typ", "TEXT", "TEXT", None),
+    ("buchungen", "referenz_id", "INTEGER", "INTEGER", None),
+    ("buchungen", "erstellt_von", "INTEGER", "INTEGER", None),
+    ("buchungen", "erstellt_am", "TIMESTAMP", "DATETIME", None),
 ]
 
 # Liste aller erforderlichen Tabellen
