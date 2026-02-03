@@ -17,23 +17,38 @@
                     <input type="hidden" name="form_type" value="passwort">
                     <div class="mb-3">
                         <label for="altes_passwort" class="form-label">Altes Passwort</label>
-                        <input type="password" class="form-control" id="altes_passwort" 
-                               name="altes_passwort" required>
+                        <div class="input-group">
+                            <input type="password" class="form-control password-field" id="altes_passwort"
+                                   name="altes_passwort" required>
+                            <button class="btn btn-outline-secondary toggle-password" type="button" data-target="altes_passwort">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="mb-3">
                         <label for="neues_passwort" class="form-label">Neues Passwort</label>
-                        <input type="password" class="form-control" id="neues_passwort" 
-                               name="neues_passwort" required minlength="4">
+                        <div class="input-group">
+                            <input type="password" class="form-control password-field" id="neues_passwort"
+                                   name="neues_passwort" required minlength="4">
+                            <button class="btn btn-outline-secondary toggle-password" type="button" data-target="neues_passwort">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
                         <small class="text-muted">Mindestens 4 Zeichen</small>
                     </div>
 
                     <div class="mb-4">
-                        <label for="neues_passwort_wdh" class="form-label">
+                        <label for="passwort_bestaetigung" class="form-label">
                             Neues Passwort wiederholen
                         </label>
-                        <input type="password" class="form-control" id="neues_passwort_wdh" 
-                               name="neues_passwort_wdh" required minlength="4">
+                        <div class="input-group">
+                            <input type="password" class="form-control password-field" id="passwort_bestaetigung"
+                                   name="passwort_bestaetigung" required minlength="4">
+                            <button class="btn btn-outline-secondary toggle-password" type="button" data-target="passwort_bestaetigung">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
@@ -134,13 +149,32 @@
 // Validierung: Passwörter müssen übereinstimmen
 document.querySelector('form').addEventListener('submit', function(e) {
     const neues = document.getElementById('neues_passwort').value;
-    const wdh = document.getElementById('neues_passwort_wdh').value;
-    
-    if (neues !== wdh) {
+    const bestaetigung = document.getElementById('passwort_bestaetigung').value;
+
+    if (neues !== bestaetigung) {
         e.preventDefault();
         alert('Die neuen Passwörter stimmen nicht überein!');
         return false;
     }
+});
+
+// Passwort anzeigen/verstecken
+document.querySelectorAll('.toggle-password').forEach(function(button) {
+    button.addEventListener('click', function() {
+        const targetId = this.getAttribute('data-target');
+        const input = document.getElementById(targetId);
+        const icon = this.querySelector('i');
+
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
+        }
+    });
 });
 </script>
 {% endblock %}
