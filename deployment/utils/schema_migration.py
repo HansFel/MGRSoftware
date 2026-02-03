@@ -256,6 +256,23 @@ REQUIRED_TABLES = [
             bezahlt_am DATETIME
         )"""
     ),
+    (
+        "gemeinschafts_admin",
+        """CREATE TABLE IF NOT EXISTS gemeinschafts_admin (
+            id SERIAL PRIMARY KEY,
+            benutzer_id INTEGER NOT NULL,
+            gemeinschaft_id INTEGER NOT NULL,
+            erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(benutzer_id, gemeinschaft_id)
+        )""",
+        """CREATE TABLE IF NOT EXISTS gemeinschafts_admin (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            benutzer_id INTEGER NOT NULL,
+            gemeinschaft_id INTEGER NOT NULL,
+            erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(benutzer_id, gemeinschaft_id)
+        )"""
+    ),
 ]
 
 
