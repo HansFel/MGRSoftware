@@ -228,9 +228,19 @@ def admin_gemeinschaften_abrechnung(gemeinschaft_id):
         for m in mitglieder_kosten:
             m['gesamt'] = (m['maschinenkosten'] or 0) + (m['treibstoffkosten'] or 0)
 
+        # Gesamtsummen berechnen
+        gesamtsummen = {
+            'anzahl_einsaetze': sum(m.get('anzahl_einsaetze', 0) or 0 for m in mitglieder_kosten),
+            'betriebsstunden': sum(m.get('betriebsstunden', 0) or 0 for m in mitglieder_kosten),
+            'maschinenkosten': sum(m.get('maschinenkosten', 0) or 0 for m in mitglieder_kosten),
+            'treibstoffkosten': sum(m.get('treibstoffkosten', 0) or 0 for m in mitglieder_kosten),
+            'gesamtkosten': sum(m.get('gesamt', 0) or 0 for m in mitglieder_kosten)
+        }
+
     return render_template('admin_gemeinschaften_abrechnung.html',
                          gemeinschaft=gemeinschaft,
-                         mitglieder_kosten=mitglieder_kosten)
+                         mitglieder_kosten=mitglieder_kosten,
+                         gesamtsummen=gesamtsummen)
 
 
 @admin_gemeinschaften_bp.route('/gemeinschaften/<int:gemeinschaft_id>/abrechnung/csv')
