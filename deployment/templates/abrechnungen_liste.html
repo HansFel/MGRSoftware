@@ -77,7 +77,7 @@
                                     {% elif abr.status == 'bezahlt' %}
                                     <span class="badge bg-success">Bezahlt</span>
                                     {% if abr.bezahlt_am %}
-                                    <br><small class="text-muted">{{ abr.bezahlt_am[:10] }}</small>
+                                    <br><small class="text-muted">{{ abr.bezahlt_am.strftime('%Y-%m-%d') if abr.bezahlt_am.strftime is defined else abr.bezahlt_am[:10] }}</small>
                                     {% endif %}
                                     {% elif abr.status == 'storniert' %}
                                     <span class="badge bg-danger">Storniert</span>

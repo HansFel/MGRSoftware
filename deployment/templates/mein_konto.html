@@ -100,7 +100,7 @@
                             <td class="text-end">{{ "%.2f"|format(abr.betrag_maschinen) }} €</td>
                             <td class="text-end">{{ "%.2f"|format(abr.betrag_treibstoff) }} €</td>
                             <td class="text-end"><strong>{{ "%.2f"|format(abr.betrag_gesamt) }} €</strong></td>
-                            <td>{{ abr.erstellt_am[:10] }}</td>
+                            <td>{% if abr.erstellt_am %}{{ abr.erstellt_am.strftime('%Y-%m-%d') if abr.erstellt_am.strftime is defined else abr.erstellt_am[:10] }}{% endif %}</td>
                             <td>
                                 <a href="{{ url_for('abrechnungen.abrechnung_pdf', abrechnung_id=abr.id) }}" 
                                    class="btn btn-sm btn-outline-primary" target="_blank">

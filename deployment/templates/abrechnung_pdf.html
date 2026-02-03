@@ -144,7 +144,7 @@
         </div>
         <div class="info-row">
             <span class="label">Erstellt am:</span>
-            <span>{{ abrechnung.erstellt_am[:10] }}</span>
+            <span>{% if abrechnung.erstellt_am %}{{ abrechnung.erstellt_am.strftime('%Y-%m-%d') if abrechnung.erstellt_am.strftime is defined else abrechnung.erstellt_am[:10] }}{% endif %}</span>
         </div>
         <div class="info-row">
             <span class="label">Status:</span>

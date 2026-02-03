@@ -104,7 +104,7 @@
                                 <td class="text-end">{{ konto.anzahl_buchungen }}</td>
                                 <td>
                                     {% if konto.letzte_buchung %}
-                                    {{ konto.letzte_buchung[:10] }}
+                                    {{ konto.letzte_buchung.strftime('%Y-%m-%d') if konto.letzte_buchung.strftime is defined else konto.letzte_buchung[:10] }}
                                     {% else %}
                                     <span class="text-muted">-</span>
                                     {% endif %}
