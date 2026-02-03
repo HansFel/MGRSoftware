@@ -27,6 +27,9 @@ REQUIRED_COLUMNS = [
     ("maschinen_reservierungen", "geaendert_am", "TIMESTAMP", "DATETIME", None),
     ("maschinen_reservierungen", "uhrzeit_von", "TEXT", "TEXT", None),
     ("maschinen_reservierungen", "uhrzeit_bis", "TEXT", "TEXT", None),
+    ("maschinen_reservierungen", "nutzungsdauer_stunden", "REAL", "REAL", None),
+    ("maschinen_reservierungen", "zweck", "TEXT", "TEXT", None),
+    ("maschinen_reservierungen", "bemerkung", "TEXT", "TEXT", None),
 
     # maschinen
     ("maschinen", "treibstoff_berechnen", "BOOLEAN", "BOOLEAN", "FALSE"),
