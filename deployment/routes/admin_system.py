@@ -213,20 +213,33 @@ def admin_rollen():
     with MaschinenDBContext(db_path) as db:
         cursor = db.connection.cursor()
 
-        sql = convert_sql("""
-            SELECT b.*, GROUP_CONCAT(g.name) as gemeinschaften_admin
-            FROM benutzer b
-            LEFT JOIN gemeinschafts_admin ga ON b.id = ga.benutzer_id
-            LEFT JOIN gemeinschaften g ON ga.gemeinschaft_id = g.id
-            WHERE b.aktiv = true
-            GROUP BY b.id
-            ORDER BY b.admin_level DESC, b.name
-        """)
+        # PostgreSQL verwendet STRING_AGG statt GROUP_CONCAT
+        from utils.sql_helpers import USING_POSTGRESQL
+        if USING_POSTGRESQL:
+            sql = """
+                SELECT b.*, STRING_AGG(g.name, ', ') as gemeinschaften_admin
+                FROM benutzer b
+                LEFT JOIN gemeinschafts_admin ga ON b.id = ga.benutzer_id
+                LEFT JOIN gemeinschaften g ON ga.gemeinschaft_id = g.id
+                WHERE b.aktiv = true OR b.aktiv IS NULL
+                GROUP BY b.id
+                ORDER BY b.admin_level DESC, b.name
+            """
+        else:
+            sql = """
+                SELECT b.*, GROUP_CONCAT(g.name) as gemeinschaften_admin
+                FROM benutzer b
+                LEFT JOIN gemeinschafts_admin ga ON b.id = ga.benutzer_id
+                LEFT JOIN gemeinschaften g ON ga.gemeinschaft_id = g.id
+                WHERE b.aktiv = true OR b.aktiv IS NULL
+                GROUP BY b.id
+                ORDER BY b.admin_level DESC, b.name
+            """
         cursor.execute(sql)
         columns = [desc[0] for desc in cursor.description]
         benutzer = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        sql = convert_sql("SELECT * FROM gemeinschaften WHERE aktiv = true ORDER BY name")
+        sql = convert_sql("SELECT * FROM gemeinschaften WHERE aktiv = true OR aktiv IS NULL ORDER BY name")
         cursor.execute(sql)
         columns = [desc[0] for desc in cursor.description]
         gemeinschaften = [dict(zip(columns, row)) for row in cursor.fetchall()]
