@@ -117,9 +117,9 @@
             <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" style="height: 70px; margin-bottom: 10px;">
             <h1 style="margin-top: 0; color: #0066cc;">{{ abrechnung.gemeinschaft_name }}</h1>
             <div style="font-size: 15px; color: #444; margin-bottom: 5px;">
-                Musterstraße 1, 12345 Musterstadt<br>
-                Tel: 01234 / 567890<br>
-                E-Mail: info@gemeinschaft.de
+                {% if abrechnung.gemeinschaft_adresse %}{{ abrechnung.gemeinschaft_adresse }}<br>{% endif %}
+                {% if abrechnung.gemeinschaft_telefon %}Tel: {{ abrechnung.gemeinschaft_telefon }}<br>{% endif %}
+                {% if abrechnung.gemeinschaft_email %}E-Mail: {{ abrechnung.gemeinschaft_email }}{% endif %}
             </div>
         </div>
         <div style="text-align: right; min-width: 180px;">

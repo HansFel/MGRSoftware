@@ -94,7 +94,10 @@ def abrechnung_pdf(abrechnung_id):
                 g.bank_kontoinhaber,
                 b.name,
                 b.vorname,
-                b.email
+                b.email,
+                g.adresse,
+                g.telefon,
+                g.email as gemeinschaft_email
             FROM mitglieder_abrechnungen ma
             JOIN gemeinschaften g ON ma.gemeinschaft_id = g.id
             JOIN benutzer b ON ma.benutzer_id = b.id
@@ -122,7 +125,10 @@ def abrechnung_pdf(abrechnung_id):
             'bank_bic': row[10],
             'bank_kontoinhaber': row[11],
             'mitglied_name': f"{row[13]} {row[12]}",
-            'mitglied_email': row[14]
+            'mitglied_email': row[14],
+            'gemeinschaft_adresse': row[15],
+            'gemeinschaft_telefon': row[16],
+            'gemeinschaft_email': row[17]
         }
 
         sql = convert_sql("SELECT gemeinschaft_id FROM mitglieder_abrechnungen WHERE id = ?")
