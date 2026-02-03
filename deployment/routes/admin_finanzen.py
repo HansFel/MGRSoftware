@@ -489,15 +489,14 @@ def abrechnungen_erstellen(gemeinschaft_id):
                 if betrag_gesamt > 0:
                     sql = convert_sql("""
                         INSERT INTO mitglieder_abrechnungen
-                        (gemeinschaft_id, benutzer_id, von_datum, bis_datum, gesamtbetrag,
+                        (gemeinschaft_id, benutzer_id,
                          abrechnungszeitraum, zeitraum_von, zeitraum_bis, betrag_gesamt,
                          betrag_treibstoff, betrag_maschinen, betrag_sonstiges,
                          status, erstellt_von)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'offen', ?)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'offen', ?)
                         RETURNING id
                     """)
                     cursor.execute(sql, (gemeinschaft_id, mitglied_benutzer_id,
-                                        zeitraum_von, zeitraum_bis, betrag_gesamt,
                                         abrechnungszeitraum, zeitraum_von, zeitraum_bis, betrag_gesamt,
                                         betrag_treibstoff, betrag_maschinen, session['benutzer_id']))
 
