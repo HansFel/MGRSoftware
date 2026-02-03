@@ -286,12 +286,27 @@ def admin_rollen_set_level():
 def admin_rollen_add_gemeinschaft():
     """Gemeinschafts-Admin-Rechte hinzufügen"""
     db_path = get_current_db_path()
-    benutzer_id = int(request.form.get('benutzer_id'))
-    gemeinschaft_id = int(request.form.get('gemeinschaft_id'))
 
-    with MaschinenDBContext(db_path) as db:
-        db.add_gemeinschafts_admin(benutzer_id, gemeinschaft_id)
-        flash('Gemeinschafts-Admin-Rechte hinzugefügt!', 'success')
+    benutzer_id_str = request.form.get('benutzer_id')
+    gemeinschaft_id_str = request.form.get('gemeinschaft_id')
+
+    if not benutzer_id_str or not gemeinschaft_id_str:
+        flash(f'Fehlende Daten: benutzer_id={benutzer_id_str}, gemeinschaft_id={gemeinschaft_id_str}', 'danger')
+        return redirect(url_for('admin_system.admin_rollen'))
+
+    try:
+        benutzer_id = int(benutzer_id_str)
+        gemeinschaft_id = int(gemeinschaft_id_str)
+    except ValueError as e:
+        flash(f'Ungültige Werte: {e}', 'danger')
+        return redirect(url_for('admin_system.admin_rollen'))
+
+    try:
+        with MaschinenDBContext(db_path) as db:
+            db.add_gemeinschafts_admin(benutzer_id, gemeinschaft_id)
+            flash(f'Gemeinschafts-Admin-Rechte hinzugefügt! (Benutzer {benutzer_id} -> Gemeinschaft {gemeinschaft_id})', 'success')
+    except Exception as e:
+        flash(f'Fehler beim Speichern: {e}', 'danger')
 
     return redirect(url_for('admin_system.admin_rollen'))
 
