@@ -221,11 +221,10 @@ def mein_konto(gemeinschaft_id):
 
         # Buchungen laden
         sql = convert_sql("""
-            SELECT b.*, mk.benutzer_id
-            FROM buchungen b
-            JOIN mitglieder_konten mk ON b.konto_id = mk.id
-            WHERE mk.benutzer_id = ? AND mk.gemeinschaft_id = ?
-            ORDER BY b.datum DESC, b.id DESC
+            SELECT *
+            FROM buchungen
+            WHERE benutzer_id = ? AND gemeinschaft_id = ?
+            ORDER BY datum DESC, id DESC
             LIMIT 100
         """)
         cursor.execute(sql, (benutzer_id, gemeinschaft_id))
