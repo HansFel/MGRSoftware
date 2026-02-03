@@ -290,6 +290,8 @@ def admin_rollen_add_gemeinschaft():
     benutzer_id_str = request.form.get('benutzer_id')
     gemeinschaft_id_str = request.form.get('gemeinschaft_id')
 
+    print(f"[DEBUG] add-gemeinschaft: benutzer_id={benutzer_id_str}, gemeinschaft_id={gemeinschaft_id_str}")
+
     if not benutzer_id_str or not gemeinschaft_id_str:
         flash(f'Fehlende Daten: benutzer_id={benutzer_id_str}, gemeinschaft_id={gemeinschaft_id_str}', 'danger')
         return redirect(url_for('admin_system.admin_rollen'))
@@ -303,9 +305,48 @@ def admin_rollen_add_gemeinschaft():
 
     try:
         with MaschinenDBContext(db_path) as db:
-            db.add_gemeinschafts_admin(benutzer_id, gemeinschaft_id)
-            flash(f'Gemeinschafts-Admin-Rechte hinzugefügt! (Benutzer {benutzer_id} -> Gemeinschaft {gemeinschaft_id})', 'success')
+            cursor = db.connection.cursor()
+
+            # Direkt SQL ausführen
+            from utils.sql_helpers import USING_POSTGRESQL
+            from datetime import datetime
+
+            if USING_POSTGRESQL:
+                sql = """
+                    INSERT INTO gemeinschafts_admin (benutzer_id, gemeinschaft_id, erstellt_am)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (benutzer_id, gemeinschaft_id) DO NOTHING
+                """
+                cursor.execute(sql, (benutzer_id, gemeinschaft_id, datetime.now()))
+            else:
+                sql = """
+                    INSERT OR IGNORE INTO gemeinschafts_admin (benutzer_id, gemeinschaft_id, erstellt_am)
+                    VALUES (?, ?, ?)
+                """
+                cursor.execute(sql, (benutzer_id, gemeinschaft_id, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+
+            db.connection.commit()
+
+            # Prüfen ob eingefügt wurde
+            if USING_POSTGRESQL:
+                cursor.execute("SELECT COUNT(*) FROM gemeinschafts_admin WHERE benutzer_id = %s AND gemeinschaft_id = %s",
+                              (benutzer_id, gemeinschaft_id))
+            else:
+                cursor.execute("SELECT COUNT(*) FROM gemeinschafts_admin WHERE benutzer_id = ? AND gemeinschaft_id = ?",
+                              (benutzer_id, gemeinschaft_id))
+
+            count = cursor.fetchone()[0]
+            print(f"[DEBUG] Nach INSERT: {count} Einträge gefunden")
+
+            if count > 0:
+                flash(f'Gemeinschafts-Admin-Rechte hinzugefügt! (Benutzer {benutzer_id} -> Gemeinschaft {gemeinschaft_id})', 'success')
+            else:
+                flash(f'Eintrag existierte bereits oder konnte nicht erstellt werden.', 'warning')
+
     except Exception as e:
+        import traceback
+        print(f"[ERROR] add-gemeinschaft: {e}")
+        print(traceback.format_exc())
         flash(f'Fehler beim Speichern: {e}', 'danger')
 
     return redirect(url_for('admin_system.admin_rollen'))
