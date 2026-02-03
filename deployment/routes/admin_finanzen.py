@@ -236,6 +236,7 @@ def admin_konten_detail(gemeinschaft_id, benutzer_id):
                          mitglied=mitglied,
                          konto=konto,
                          saldo=saldo,
+                         saldo_vorjahr=0,
                          buchungen=buchungen)
 
 
