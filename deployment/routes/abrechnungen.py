@@ -222,33 +222,49 @@ def mein_konto(gemeinschaft_id):
 
         if row:
             konto = dict(zip(columns, row))
+            konto_id = konto.get('id')
+            saldo = konto.get('kontostand', 0) or 0
         else:
-            konto = {'saldo': 0, 'anfangssaldo': 0}
+            konto = {'kontostand': 0}
+            konto_id = None
+            saldo = 0
 
-        # Buchungen laden
+        # Buchungen laden (über konto_id)
+        buchungen = []
+        if konto_id:
+            sql = convert_sql("""
+                SELECT b.*,
+                       b.referenz_typ,
+                       b.referenz_id
+                FROM buchungen b
+                WHERE b.konto_id = ?
+                ORDER BY b.datum DESC, b.id DESC
+                LIMIT 100
+            """)
+            cursor.execute(sql, (konto_id,))
+            columns = [desc[0] for desc in cursor.description]
+            buchungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        # Offene Abrechnungen laden
         sql = convert_sql("""
-            SELECT *
-            FROM buchungen
-            WHERE benutzer_id = ? AND gemeinschaft_id = ?
-            ORDER BY datum DESC, id DESC
-            LIMIT 100
+            SELECT ma.id, ma.zeitraum_von, ma.zeitraum_bis,
+                   ma.betrag_maschinen, ma.betrag_treibstoff,
+                   COALESCE(ma.betrag_maschinen, 0) + COALESCE(ma.betrag_treibstoff, 0) as betrag_gesamt,
+                   ma.status, ma.erstellt_am
+            FROM mitglieder_abrechnungen ma
+            WHERE ma.benutzer_id = ? AND ma.gemeinschaft_id = ? AND ma.status = 'offen'
+            ORDER BY ma.erstellt_am DESC
         """)
         cursor.execute(sql, (benutzer_id, gemeinschaft_id))
         columns = [desc[0] for desc in cursor.description]
-        buchungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        offene_abrechnungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        # Zahlungsreferenz laden
-        sql = convert_sql("""
-            SELECT * FROM zahlungsreferenzen
-            WHERE benutzer_id = ? AND gemeinschaft_id = ? AND aktiv = true
-        """)
-        cursor.execute(sql, (benutzer_id, gemeinschaft_id))
-        columns = [desc[0] for desc in cursor.description]
-        row = cursor.fetchone()
-        zahlungsreferenz = dict(zip(columns, row)) if row else None
+        # Saldo Vorjahr (vereinfacht: 0)
+        saldo_vorjahr = 0
 
     return render_template('mein_konto.html',
                          gemeinschaft=gemeinschaft,
-                         konto=konto,
-                         buchungen=buchungen,
-                         zahlungsreferenz=zahlungsreferenz)
+                         saldo=saldo,
+                         saldo_vorjahr=saldo_vorjahr,
+                         offene_abrechnungen=offene_abrechnungen,
+                         buchungen=buchungen)
