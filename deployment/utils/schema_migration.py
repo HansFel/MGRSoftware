@@ -109,6 +109,27 @@ REQUIRED_COLUMNS = [
 # Format: (tabelle, create_statement_postgresql, create_statement_sqlite)
 REQUIRED_TABLES = [
     (
+        "benutzer_gemeinschaften",
+        """CREATE TABLE IF NOT EXISTS benutzer_gemeinschaften (
+            id SERIAL PRIMARY KEY,
+            benutzer_id INTEGER NOT NULL,
+            gemeinschaft_id INTEGER NOT NULL,
+            rolle TEXT DEFAULT 'mitglied',
+            aktiv BOOLEAN DEFAULT TRUE,
+            beigetreten_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(benutzer_id, gemeinschaft_id)
+        )""",
+        """CREATE TABLE IF NOT EXISTS benutzer_gemeinschaften (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            benutzer_id INTEGER NOT NULL,
+            gemeinschaft_id INTEGER NOT NULL,
+            rolle TEXT DEFAULT 'mitglied',
+            aktiv INTEGER DEFAULT 1,
+            beigetreten_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(benutzer_id, gemeinschaft_id)
+        )"""
+    ),
+    (
         "reservierungen_geloescht",
         """CREATE TABLE IF NOT EXISTS reservierungen_geloescht (
             id SERIAL PRIMARY KEY,
@@ -573,6 +594,42 @@ def migrate_buchungen_to_betriebe(cursor):
     return updated
 
 
+def migrate_benutzer_gemeinschaften(cursor):
+    """Füllt benutzer_gemeinschaften basierend auf Betrieb-Zuordnungen"""
+    print("  Prüfe Benutzer-Gemeinschaft-Zuordnungen...")
+
+    if USING_POSTGRESQL:
+        # Füge fehlende Zuordnungen hinzu basierend auf Betrieb
+        cursor.execute("""
+            INSERT INTO benutzer_gemeinschaften (benutzer_id, gemeinschaft_id)
+            SELECT DISTINCT b.id, bt.gemeinschaft_id
+            FROM benutzer b
+            JOIN betriebe bt ON b.betrieb_id = bt.id
+            WHERE bt.gemeinschaft_id IS NOT NULL
+            AND NOT EXISTS (
+                SELECT 1 FROM benutzer_gemeinschaften bg
+                WHERE bg.benutzer_id = b.id AND bg.gemeinschaft_id = bt.gemeinschaft_id
+            )
+        """)
+    else:
+        cursor.execute("""
+            INSERT INTO benutzer_gemeinschaften (benutzer_id, gemeinschaft_id)
+            SELECT DISTINCT b.id, bt.gemeinschaft_id
+            FROM benutzer b
+            JOIN betriebe bt ON b.betrieb_id = bt.id
+            WHERE bt.gemeinschaft_id IS NOT NULL
+            AND NOT EXISTS (
+                SELECT 1 FROM benutzer_gemeinschaften bg
+                WHERE bg.benutzer_id = b.id AND bg.gemeinschaft_id = bt.gemeinschaft_id
+            )
+        """)
+
+    inserted = cursor.rowcount
+    if inserted > 0:
+        print(f"    + {inserted} Benutzer-Gemeinschaft-Zuordnungen erstellt")
+    return inserted
+
+
 def run_migrations():
     """Führt alle notwendigen Migrationen durch"""
     print("Schema-Migration: Prüfe Datenbankstruktur...")
@@ -623,6 +680,10 @@ def run_migrations():
         # Buchungen auf Betriebe umstellen
         if table_exists(cursor, 'buchungen') and column_exists(cursor, 'buchungen', 'betrieb_id'):
             data_changes += migrate_buchungen_to_betriebe(cursor)
+
+        # Benutzer-Gemeinschaft-Zuordnungen erstellen
+        if table_exists(cursor, 'benutzer_gemeinschaften') and table_exists(cursor, 'betriebe'):
+            data_changes += migrate_benutzer_gemeinschaften(cursor)
 
         conn.commit()
 
