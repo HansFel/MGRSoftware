@@ -323,9 +323,9 @@ def betrieb_benutzer(betrieb_id):
             LEFT JOIN betriebe bt ON b.betrieb_id = bt.id
             WHERE (b.betrieb_id IS NULL OR b.betrieb_id != ?)
             AND (b.aktiv = true OR b.aktiv IS NULL)
-            AND (b.nur_training IS NOT TRUE OR b.nur_training IS NULL)
-            AND (b.is_admin IS NOT TRUE OR b.is_admin IS NULL)
-            AND (b.admin_level IS NULL OR b.admin_level = 0)
+            AND (b.nur_training = false OR b.nur_training IS NULL)
+            AND (b.is_admin = false OR b.is_admin IS NULL)
+            AND (b.admin_level = 0 OR b.admin_level IS NULL)
             ORDER BY b.name, b.vorname
         """)
         cursor.execute(sql, (betrieb_id,))
