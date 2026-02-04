@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Protokolle - Schriftführung{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="text-white">
+                <i class="bi bi-journal-text"></i> Protokolle
+            </h2>
+            <a href="{{ url_for('admin_schriftfuehrer.protokoll_neu') }}" class="btn btn-success">
+                <i class="bi bi-plus-circle"></i> Neues Protokoll
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Gemeinschaft auswählen -->
+{% if gemeinschaften|length > 1 %}
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" class="d-flex gap-2">
+                    <select name="gemeinschaft_id" class="form-select" onchange="this.form.submit()">
+                        {% for g in gemeinschaften %}
+                        <option value="{{ g.id }}" {% if g.id == gemeinschaft_id %}selected{% endif %}>
+                            {{ g.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Protokollliste -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-ul"></i> Alle Protokolle
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if protokolle %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Datum</th>
+                                <th>Titel</th>
+                                <th>Status</th>
+                                <th>Erstellt von</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in protokolle %}
+                            <tr>
+                                <td>
+                                    {% if p.datum %}
+                                    {{ p.datum.strftime('%d.%m.%Y') if p.datum.strftime is defined else p.datum }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>{{ p.titel }}</strong>
+                                </td>
+                                <td>
+                                    {% if p.status == 'entwurf' %}
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="bi bi-pencil"></i> Entwurf
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle"></i> Abgeschlossen
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ p.erstellt_von_name }}</small>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('admin_schriftfuehrer.protokoll_ansehen', protokoll_id=p.id) }}"
+                                           class="btn btn-outline-primary" title="Ansehen">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        {% if p.status == 'entwurf' %}
+                                        <a href="{{ url_for('admin_schriftfuehrer.protokoll_bearbeiten', protokoll_id=p.id) }}"
+                                           class="btn btn-outline-secondary" title="Bearbeiten">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    Noch keine Protokolle vorhanden.
+                    <a href="{{ url_for('admin_schriftfuehrer.protokoll_neu') }}">Jetzt erstes Protokoll anlegen</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -286,6 +286,33 @@ REQUIRED_TABLES = [
             UNIQUE(benutzer_id, gemeinschaft_id)
         )"""
     ),
+    (
+        "protokolle",
+        """CREATE TABLE IF NOT EXISTS protokolle (
+            id SERIAL PRIMARY KEY,
+            gemeinschaft_id INTEGER NOT NULL,
+            titel TEXT NOT NULL,
+            datum DATE NOT NULL,
+            inhalt TEXT,
+            status TEXT DEFAULT 'entwurf',
+            erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            erstellt_von INTEGER NOT NULL,
+            abgeschlossen_am TIMESTAMP,
+            abgeschlossen_von INTEGER
+        )""",
+        """CREATE TABLE IF NOT EXISTS protokolle (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            gemeinschaft_id INTEGER NOT NULL,
+            titel TEXT NOT NULL,
+            datum DATE NOT NULL,
+            inhalt TEXT,
+            status TEXT DEFAULT 'entwurf',
+            erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+            erstellt_von INTEGER NOT NULL,
+            abgeschlossen_am DATETIME,
+            abgeschlossen_von INTEGER
+        )"""
+    ),
 ]
 
 

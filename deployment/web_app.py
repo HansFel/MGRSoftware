@@ -49,6 +49,7 @@ from routes.admin_einsatzzwecke import admin_einsatzzwecke_bp
 from routes.admin_gemeinschaften import admin_gemeinschaften_bp
 from routes.admin_finanzen import admin_finanzen_bp
 from routes.admin_system import admin_system_bp
+from routes.admin_schriftfuehrer import admin_schriftfuehrer_bp
 
 # Blueprints registrieren
 app.register_blueprint(auth_bp)
@@ -64,6 +65,7 @@ app.register_blueprint(admin_einsatzzwecke_bp)
 app.register_blueprint(admin_gemeinschaften_bp)
 app.register_blueprint(admin_finanzen_bp)
 app.register_blueprint(admin_system_bp)
+app.register_blueprint(admin_schriftfuehrer_bp)
 
 
 @app.context_processor

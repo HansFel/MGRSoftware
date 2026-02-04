@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}{{ protokoll.titel }} - Protokoll{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="text-white">
+                <i class="bi bi-journal-text"></i> {{ protokoll.titel }}
+            </h2>
+            <div class="d-flex gap-2">
+                {% if protokoll.status == 'entwurf' %}
+                <a href="{{ url_for('admin_schriftfuehrer.protokoll_bearbeiten', protokoll_id=protokoll.id) }}"
+                   class="btn btn-primary">
+                    <i class="bi bi-pencil"></i> Bearbeiten
+                </a>
+                <form method="POST" action="{{ url_for('admin_schriftfuehrer.protokoll_abschliessen', protokoll_id=protokoll.id) }}"
+                      class="d-inline" onsubmit="return confirm('Protokoll wirklich abschließen? Danach ist keine Bearbeitung mehr möglich.');">
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle"></i> Abschließen
+                    </button>
+                </form>
+                {% endif %}
+                <a href="{{ url_for('admin_schriftfuehrer.protokolle_liste') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Zurück
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-9">
+        <!-- Protokollinhalt -->
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-file-text"></i> Protokollinhalt
+                </h5>
+                {% if protokoll.status == 'entwurf' %}
+                <span class="badge bg-warning text-dark">
+                    <i class="bi bi-pencil"></i> Entwurf
+                </span>
+                {% else %}
+                <span class="badge bg-success">
+                    <i class="bi bi-check-circle"></i> Abgeschlossen
+                </span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if protokoll.inhalt %}
+                <div class="protokoll-inhalt" style="white-space: pre-wrap; font-family: inherit;">{{ protokoll.inhalt }}</div>
+                {% else %}
+                <p class="text-muted">Kein Inhalt vorhanden.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3">
+        <!-- Metadaten -->
+        <div class="card">
+            <div class="card-header bg-secondary text-white">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Details</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm table-borderless mb-0">
+                    <tr>
+                        <td class="text-muted">Gemeinschaft:</td>
+                        <td><strong>{{ protokoll.gemeinschaft_name }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Datum:</td>
+                        <td>
+                            {% if protokoll.datum %}
+                            {{ protokoll.datum.strftime('%d.%m.%Y') if protokoll.datum.strftime is defined else protokoll.datum }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Erstellt von:</td>
+                        <td>{{ protokoll.erstellt_von_name }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Erstellt am:</td>
+                        <td>
+                            {% if protokoll.erstellt_am %}
+                            {{ protokoll.erstellt_am.strftime('%d.%m.%Y %H:%M') if protokoll.erstellt_am.strftime is defined else protokoll.erstellt_am[:16] }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% if protokoll.status == 'abgeschlossen' %}
+                    <tr>
+                        <td class="text-muted">Abgeschlossen:</td>
+                        <td>
+                            {% if protokoll.abgeschlossen_am %}
+                            {{ protokoll.abgeschlossen_am.strftime('%d.%m.%Y') if protokoll.abgeschlossen_am.strftime is defined else protokoll.abgeschlossen_am[:10] }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Abgeschlossen von:</td>
+                        <td>{{ protokoll.abgeschlossen_von_name }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+
+        <!-- Aktionen -->
+        <div class="card mt-3">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-gear"></i> Aktionen</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" onclick="window.print()">
+                        <i class="bi bi-printer"></i> Drucken
+                    </button>
+                    {% if protokoll.status == 'entwurf' %}
+                    <form method="POST" action="{{ url_for('admin_schriftfuehrer.protokoll_loeschen', protokoll_id=protokoll.id) }}"
+                          onsubmit="return confirm('Protokoll wirklich löschen?');">
+                        <button type="submit" class="btn btn-outline-danger w-100">
+                            <i class="bi bi-trash"></i> Löschen
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .btn, .card-header, nav, .sidebar {
+        display: none !important;
+    }
+    .card {
+        border: none !important;
+    }
+}
+</style>
+{% endblock %}
