@@ -43,14 +43,15 @@ def betriebe_liste():
         if not gemeinschaft_id and gemeinschaften:
             gemeinschaft_id = gemeinschaften[0]['id']
 
-        # Betriebe laden mit Anzahl Benutzer
+        # Betriebe laden mit Anzahl Benutzer (über Verknüpfungstabelle oder ohne Gemeinschaft)
         betriebe = []
         if gemeinschaft_id:
             sql = convert_sql("""
-                SELECT b.*,
+                SELECT DISTINCT b.*,
                        (SELECT COUNT(*) FROM benutzer WHERE betrieb_id = b.id) as anzahl_benutzer
                 FROM betriebe b
-                WHERE b.gemeinschaft_id = ?
+                LEFT JOIN betriebe_gemeinschaften bg ON b.id = bg.betrieb_id
+                WHERE bg.gemeinschaft_id = ? OR bg.betrieb_id IS NULL
                 ORDER BY b.name
             """)
             cursor.execute(sql, (gemeinschaft_id,))
