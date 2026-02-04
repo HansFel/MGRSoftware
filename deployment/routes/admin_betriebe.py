@@ -66,11 +66,62 @@ def betriebe_liste():
 @admin_betriebe_bp.route('/betriebe/neu', methods=['GET', 'POST'])
 @admin_required
 def betrieb_neu():
-    """Neuen Betrieb anlegen"""
+    """Neuen Betrieb anlegen (nur Grunddaten, keine Gemeinschaft)"""
     db_path = get_current_db_path()
 
     with MaschinenDBContext(db_path) as db:
         cursor = db.connection.cursor()
+
+        if request.method == 'POST':
+            name = request.form.get('name', '').strip()
+            adresse = request.form.get('adresse', '').strip()
+            telefon = request.form.get('telefon', '').strip()
+            email = request.form.get('email', '').strip()
+            iban = request.form.get('iban', '').strip()
+            bic = request.form.get('bic', '').strip()
+            bank_name = request.form.get('bank_name', '').strip()
+            notizen = request.form.get('notizen', '').strip()
+
+            if not name:
+                flash('Bitte geben Sie einen Namen ein.', 'danger')
+                return render_template('admin_betrieb_neu.html')
+
+            # Betrieb ohne Gemeinschaft erstellen (gemeinschaft_id = NULL)
+            sql = convert_sql("""
+                INSERT INTO betriebe (name, adresse, telefon, email, iban, bic, bank_name, notizen)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                RETURNING id
+            """)
+            cursor.execute(sql, (name, adresse, telefon, email, iban, bic, bank_name, notizen))
+            betrieb_id = cursor.fetchone()[0]
+            db.connection.commit()
+
+            flash('Betrieb wurde erstellt. Bitte weisen Sie nun eine Gemeinschaft zu.', 'success')
+            return redirect(url_for('admin_betriebe.betrieb_gemeinschaft', betrieb_id=betrieb_id))
+
+    return render_template('admin_betrieb_neu.html')
+
+
+@admin_betriebe_bp.route('/betriebe/<int:betrieb_id>/gemeinschaft', methods=['GET', 'POST'])
+@admin_required
+def betrieb_gemeinschaft(betrieb_id):
+    """Gemeinschaft einem Betrieb zuweisen"""
+    db_path = get_current_db_path()
+
+    with MaschinenDBContext(db_path) as db:
+        cursor = db.connection.cursor()
+
+        # Betrieb laden
+        sql = convert_sql("SELECT * FROM betriebe WHERE id = ?")
+        cursor.execute(sql, (betrieb_id,))
+        columns = [desc[0] for desc in cursor.description]
+        row = cursor.fetchone()
+
+        if not row:
+            flash('Betrieb nicht gefunden.', 'danger')
+            return redirect(url_for('admin_betriebe.betriebe_liste'))
+
+        betrieb = dict(zip(columns, row))
 
         # Gemeinschaften laden
         if session.get('admin_level', 0) >= 2:
@@ -83,44 +134,27 @@ def betrieb_neu():
                 sql = convert_sql(f"SELECT id, name FROM gemeinschaften WHERE id IN ({placeholders}) ORDER BY name")
                 cursor.execute(sql, gemeinschafts_ids)
             else:
-                flash('Keine Gemeinschaft zugewiesen.', 'warning')
+                flash('Keine Gemeinschaft verfügbar.', 'warning')
                 return redirect(url_for('admin_betriebe.betriebe_liste'))
 
         gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
 
         if request.method == 'POST':
             gemeinschaft_id = request.form.get('gemeinschaft_id', type=int)
-            name = request.form.get('name', '').strip()
-            adresse = request.form.get('adresse', '').strip()
-            kontaktperson = request.form.get('kontaktperson', '').strip()
-            telefon = request.form.get('telefon', '').strip()
-            email = request.form.get('email', '').strip()
-            iban = request.form.get('iban', '').strip()
-            bic = request.form.get('bic', '').strip()
-            bank_name = request.form.get('bank_name', '').strip()
-            notizen = request.form.get('notizen', '').strip()
 
-            if not name:
-                flash('Bitte geben Sie einen Namen ein.', 'danger')
-                return render_template('admin_betrieb_form.html',
-                                     gemeinschaften=gemeinschaften,
-                                     betrieb=None)
+            if not gemeinschaft_id:
+                flash('Bitte wählen Sie eine Gemeinschaft.', 'danger')
+            else:
+                sql = convert_sql("UPDATE betriebe SET gemeinschaft_id = ? WHERE id = ?")
+                cursor.execute(sql, (gemeinschaft_id, betrieb_id))
+                db.connection.commit()
 
-            sql = convert_sql("""
-                INSERT INTO betriebe (gemeinschaft_id, name, adresse, kontaktperson, telefon, email, iban, bic, bank_name, notizen)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                RETURNING id
-            """)
-            cursor.execute(sql, (gemeinschaft_id, name, adresse, kontaktperson, telefon, email, iban, bic, bank_name, notizen))
-            betrieb_id = cursor.fetchone()[0]
-            db.connection.commit()
+                flash('Gemeinschaft wurde zugewiesen.', 'success')
+                return redirect(url_for('admin_betriebe.betrieb_bearbeiten', betrieb_id=betrieb_id))
 
-            flash('Betrieb wurde erstellt.', 'success')
-            return redirect(url_for('admin_betriebe.betrieb_bearbeiten', betrieb_id=betrieb_id))
-
-    return render_template('admin_betrieb_form.html',
-                         gemeinschaften=gemeinschaften,
-                         betrieb=None)
+    return render_template('admin_betrieb_gemeinschaft.html',
+                         betrieb=betrieb,
+                         gemeinschaften=gemeinschaften)
 
 
 @admin_betriebe_bp.route('/betriebe/<int:betrieb_id>/bearbeiten', methods=['GET', 'POST'])
@@ -144,12 +178,17 @@ def betrieb_bearbeiten(betrieb_id):
 
         betrieb = dict(zip(columns, row))
 
+        # Prüfen ob Gemeinschaft zugewiesen
+        if not betrieb.get('gemeinschaft_id'):
+            flash('Bitte weisen Sie zuerst eine Gemeinschaft zu.', 'warning')
+            return redirect(url_for('admin_betriebe.betrieb_gemeinschaft', betrieb_id=betrieb_id))
+
         # Gemeinschaften laden
         sql = convert_sql("SELECT id, name FROM gemeinschaften WHERE aktiv = true OR aktiv IS NULL ORDER BY name")
         cursor.execute(sql)
         gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
 
-        # Benutzer des Betriebs laden
+        # Benutzer des Betriebs laden (für Kontaktperson-Auswahl)
         sql = convert_sql("""
             SELECT id, vorname, name, email
             FROM benutzer
@@ -162,7 +201,7 @@ def betrieb_bearbeiten(betrieb_id):
         if request.method == 'POST':
             name = request.form.get('name', '').strip()
             adresse = request.form.get('adresse', '').strip()
-            kontaktperson = request.form.get('kontaktperson', '').strip()
+            kontaktperson_id = request.form.get('kontaktperson_id', type=int)
             telefon = request.form.get('telefon', '').strip()
             email = request.form.get('email', '').strip()
             iban = request.form.get('iban', '').strip()
@@ -177,6 +216,14 @@ def betrieb_bearbeiten(betrieb_id):
                                      gemeinschaften=gemeinschaften,
                                      betrieb=betrieb,
                                      benutzer=benutzer)
+
+            # Kontaktperson-Name ermitteln
+            kontaktperson = ''
+            if kontaktperson_id:
+                for b in benutzer:
+                    if b['id'] == kontaktperson_id:
+                        kontaktperson = f"{b['vorname']} {b['name']}".strip()
+                        break
 
             sql = convert_sql("""
                 UPDATE betriebe

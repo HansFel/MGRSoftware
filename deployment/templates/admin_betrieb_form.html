@@ -51,10 +51,23 @@
                                    placeholder="z.B. Hof Müller" required>
                         </div>
                         <div class="col-md-6">
-                            <label for="kontaktperson" class="form-label">Kontaktperson</label>
-                            <input type="text" class="form-control" id="kontaktperson" name="kontaktperson"
-                                   value="{{ betrieb.kontaktperson if betrieb else '' }}"
-                                   placeholder="Hauptansprechpartner">
+                            <label for="kontaktperson_id" class="form-label">Kontaktperson</label>
+                            {% if benutzer %}
+                            <select name="kontaktperson_id" id="kontaktperson_id" class="form-select">
+                                <option value="">-- Keine Kontaktperson --</option>
+                                {% for b in benutzer %}
+                                <option value="{{ b.id }}" {% if betrieb and betrieb.kontaktperson == (b.vorname ~ ' ' ~ b.name)|trim %}selected{% endif %}>
+                                    {{ b.vorname }} {{ b.name }}{% if b.email %} ({{ b.email }}){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Wählen Sie einen Benutzer als Hauptansprechpartner</div>
+                            {% else %}
+                            <input type="text" class="form-control" disabled
+                                   value="Keine Benutzer vorhanden"
+                                   placeholder="Erst Benutzer zuordnen">
+                            <div class="form-text">Ordnen Sie zuerst Benutzer diesem Betrieb zu</div>
+                            {% endif %}
                         </div>
                     </div>
 

@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Neuer Betrieb - Verwaltung{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="text-white">
+                <i class="bi bi-building"></i> Neuen Betrieb anlegen
+            </h2>
+            <a href="{{ url_for('admin_betriebe.betriebe_liste') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Zurück
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-pencil"></i> Grunddaten des Betriebs
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <!-- Grunddaten -->
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label for="name" class="form-label">Betriebsname *</label>
+                            <input type="text" class="form-control" id="name" name="name"
+                                   placeholder="z.B. Hof Müller" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="adresse" class="form-label">Adresse</label>
+                        <textarea class="form-control" id="adresse" name="adresse" rows="2"
+                                  placeholder="Straße, PLZ Ort"></textarea>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="telefon" class="form-label">Telefon</label>
+                            <input type="tel" class="form-control" id="telefon" name="telefon"
+                                   placeholder="+43 ...">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="email" class="form-label">E-Mail</label>
+                            <input type="email" class="form-control" id="email" name="email"
+                                   placeholder="betrieb@example.at">
+                        </div>
+                    </div>
+
+                    <!-- Bankverbindung -->
+                    <h6 class="border-bottom pb-2 mb-3 mt-4">Bankverbindung</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="iban" class="form-label">IBAN</label>
+                            <input type="text" class="form-control" id="iban" name="iban"
+                                   placeholder="AT...">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="bic" class="form-label">BIC</label>
+                            <input type="text" class="form-control" id="bic" name="bic"
+                                   placeholder="...">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="bank_name" class="form-label">Bank</label>
+                        <input type="text" class="form-control" id="bank_name" name="bank_name"
+                               placeholder="Name der Bank">
+                    </div>
+
+                    <!-- Notizen -->
+                    <h6 class="border-bottom pb-2 mb-3 mt-4">Sonstiges</h6>
+                    <div class="mb-3">
+                        <label for="notizen" class="form-label">Notizen</label>
+                        <textarea class="form-control" id="notizen" name="notizen" rows="3"
+                                  placeholder="Interne Notizen..."></textarea>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ url_for('admin_betriebe.betriebe_liste') }}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Abbrechen
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-arrow-right"></i> Weiter zur Gemeinschaftszuweisung
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Seitenleiste -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Hinweis</h6>
+            </div>
+            <div class="card-body">
+                <p class="small mb-2">
+                    <strong>Schritt 1 von 2:</strong> Grunddaten eingeben
+                </p>
+                <p class="small mb-0">
+                    Nach dem Speichern können Sie im nächsten Schritt die Gemeinschaft zuweisen und Benutzer hinzufügen.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
