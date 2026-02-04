@@ -1,0 +1,27 @@
+name: Deploy to MGS2
+
+on:
+  workflow_dispatch:  # Manueller Trigger über GitHub UI
+  push:
+    branches:
+      - main
+    paths:
+      - 'deployment/**'
+      - 'database.py'
+      - 'web_app.py'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to MGS2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.MGS2_HOST }}
+          username: ${{ secrets.MGS2_USER }}
+          key: ${{ secrets.MGS2_SSH_KEY }}
+          script: |
+            cd /opt/mgr
+            git pull origin main
+            docker-compose restart web
+            echo "Deployment complete!"
