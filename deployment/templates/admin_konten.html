@@ -22,58 +22,47 @@
 
         <!-- Statistik-Karten -->
         <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white">
+            <div class="col-md-4">
+                <div class="card bg-success text-white">
                     <div class="card-body">
-                        <h5 class="card-title">Gesamt Guthaben</h5>
-                        <h3>{{ "%.2f"|format(statistik.guthaben) }} €</h3>
-                        <small>{{ statistik.anzahl_guthaben }} Mitglieder</small>
+                        <h5 class="card-title">Guthaben gesamt</h5>
+                        <h3>{{ "%.2f"|format(statistik.guthaben or 0) }} €</h3>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card bg-danger text-white">
                     <div class="card-body">
                         <h5 class="card-title">Offene Forderungen</h5>
-                        <h3>{{ "%.2f"|format(-statistik.schulden) }} €</h3>
-                        <small>{{ statistik.anzahl_schulden }} Mitglieder</small>
+                        <h3>{{ "%.2f"|format(-(statistik.schulden or 0)) }} €</h3>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card bg-success text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Ausgeglichen</h5>
-                        <h3>{{ statistik.anzahl_ausgeglichen }}</h3>
-                        <small>Mitglieder</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card bg-info text-white">
                     <div class="card-body">
-                        <h5 class="card-title">Saldo</h5>
-                        <h3>{{ "%.2f"|format(statistik.saldo_gesamt) }} €</h3>
-                        <small>Gemeinschaftskasse</small>
+                        <h5 class="card-title">Saldo gesamt</h5>
+                        <h3>{{ "%.2f"|format(statistik.saldo_gesamt or 0) }} €</h3>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Kontenübersicht -->
+        <!-- Kontenübersicht nach Betrieben -->
         <div class="card">
             <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-list-ul"></i> Kontenübersicht</h5>
+                <h5 class="mb-0"><i class="bi bi-building"></i> Konten nach Betrieben</h5>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-hover">
                         <thead>
                             <tr>
-                                <th>Mitglied</th>
+                                <th>Betrieb</th>
+                                <th class="text-center">Benutzer</th>
                                 <th class="text-end">Saldo</th>
-                                <th class="text-end">Offene Abrechnungen</th>
-                                <th class="text-end">Anzahl Buchungen</th>
+                                <th class="text-center">Offene Abrechnungen</th>
+                                <th class="text-center">Buchungen</th>
                                 <th>Letzte Aktivität</th>
                                 <th>Aktionen</th>
                             </tr>
@@ -82,8 +71,13 @@
                             {% for konto in konten %}
                             <tr>
                                 <td>
-                                    <strong>{{ konto.mitglied_name }}</strong><br>
-                                    <small class="text-muted">{{ konto.email }}</small>
+                                    <strong>{{ konto.betrieb_name }}</strong>
+                                    {% if konto.kontaktperson %}
+                                    <br><small class="text-muted">{{ konto.kontaktperson }}</small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-secondary">{{ konto.anzahl_benutzer }}</span>
                                 </td>
                                 <td class="text-end">
                                     {% if konto.saldo < -0.01 %}
@@ -94,28 +88,28 @@
                                     <span class="badge bg-secondary">0.00 €</span>
                                     {% endif %}
                                 </td>
-                                <td class="text-end">
+                                <td class="text-center">
                                     {% if konto.offene_abrechnungen > 0 %}
                                     <span class="badge bg-warning text-dark">{{ konto.offene_abrechnungen }}</span>
                                     {% else %}
                                     <span class="badge bg-light text-dark">0</span>
                                     {% endif %}
                                 </td>
-                                <td class="text-end">{{ konto.anzahl_buchungen }}</td>
+                                <td class="text-center">{{ konto.anzahl_buchungen }}</td>
                                 <td>
                                     {% if konto.letzte_buchung %}
-                                    {{ konto.letzte_buchung.strftime('%Y-%m-%d') if konto.letzte_buchung.strftime is defined else konto.letzte_buchung[:10] }}
+                                    {{ konto.letzte_buchung.strftime('%d.%m.%Y') if konto.letzte_buchung.strftime is defined else konto.letzte_buchung[:10] }}
                                     {% else %}
                                     <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
                                 <td>
                                     <div class="btn-group btn-group-sm" role="group">
-                                        <a href="{{ url_for('admin_finanzen.admin_konten_detail', gemeinschaft_id=gemeinschaft.id, benutzer_id=konto.benutzer_id) }}" 
+                                        <a href="{{ url_for('admin_finanzen.admin_konten_detail', gemeinschaft_id=gemeinschaft.id, betrieb_id=konto.betrieb_id) }}"
                                            class="btn btn-outline-primary" title="Kontoverlauf">
                                             <i class="bi bi-card-list"></i>
                                         </a>
-                                        <a href="{{ url_for('admin_finanzen.admin_konten_zahlung', gemeinschaft_id=gemeinschaft.id, benutzer_id=konto.benutzer_id) }}" 
+                                        <a href="{{ url_for('admin_finanzen.admin_konten_zahlung', gemeinschaft_id=gemeinschaft.id, betrieb_id=konto.betrieb_id) }}"
                                            class="btn btn-outline-success" title="Zahlung verbuchen">
                                             <i class="bi bi-cash"></i>
                                         </a>
@@ -140,17 +134,20 @@
                         <thead>
                             <tr>
                                 <th>Datum</th>
-                                <th>Mitglied</th>
+                                <th>Betrieb</th>
                                 <th>Typ</th>
                                 <th>Beschreibung</th>
                                 <th class="text-end">Betrag</th>
-                                <th>Erstellt von</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for buchung in letzte_buchungen %}
                             <tr>
-                                <td>{{ buchung.datum }}</td>
+                                <td>
+                                    {% if buchung.datum %}
+                                    {{ buchung.datum.strftime('%d.%m.%Y') if buchung.datum.strftime is defined else buchung.datum[:10] }}
+                                    {% endif %}
+                                </td>
                                 <td>{{ buchung.mitglied_name }}</td>
                                 <td>
                                     {% if buchung.typ == 'abrechnung' %}
@@ -173,7 +170,6 @@
                                     <span class="text-success">{{ "%.2f"|format(buchung.betrag) }} €</span>
                                     {% endif %}
                                 </td>
-                                <td><small>{{ buchung.erstellt_von }}</small></td>
                             </tr>
                             {% endfor %}
                         </tbody>

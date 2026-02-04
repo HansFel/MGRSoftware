@@ -93,6 +93,7 @@ REQUIRED_COLUMNS = [
 
     # buchungen
     ("buchungen", "benutzer_id", "INTEGER", "INTEGER", None),
+    ("buchungen", "betrieb_id", "INTEGER", "INTEGER", None),
     ("buchungen", "gemeinschaft_id", "INTEGER", "INTEGER", None),
     ("buchungen", "typ", "TEXT", "TEXT", None),
     ("buchungen", "datum", "DATE", "DATE", None),
@@ -543,6 +544,35 @@ def migrate_abrechnungen_to_betriebe(cursor):
     return updated
 
 
+def migrate_buchungen_to_betriebe(cursor):
+    """Aktualisiert buchungen mit betrieb_id basierend auf benutzer_id"""
+    print("  Prüfe Buchungen ohne Betrieb-Zuordnung...")
+
+    if USING_POSTGRESQL:
+        cursor.execute("""
+            UPDATE buchungen bu
+            SET betrieb_id = b.betrieb_id
+            FROM benutzer b
+            WHERE bu.benutzer_id = b.id
+            AND bu.betrieb_id IS NULL
+            AND b.betrieb_id IS NOT NULL
+        """)
+    else:
+        cursor.execute("""
+            UPDATE buchungen
+            SET betrieb_id = (
+                SELECT betrieb_id FROM benutzer WHERE benutzer.id = buchungen.benutzer_id
+            )
+            WHERE betrieb_id IS NULL
+            AND EXISTS (SELECT 1 FROM benutzer WHERE benutzer.id = buchungen.benutzer_id AND benutzer.betrieb_id IS NOT NULL)
+        """)
+
+    updated = cursor.rowcount
+    if updated > 0:
+        print(f"    + {updated} Buchungen aktualisiert")
+    return updated
+
+
 def run_migrations():
     """Führt alle notwendigen Migrationen durch"""
     print("Schema-Migration: Prüfe Datenbankstruktur...")
@@ -589,6 +619,10 @@ def run_migrations():
         # Abrechnungen auf Betriebe umstellen
         if table_exists(cursor, 'mitglieder_abrechnungen') and column_exists(cursor, 'mitglieder_abrechnungen', 'betrieb_id'):
             data_changes += migrate_abrechnungen_to_betriebe(cursor)
+
+        # Buchungen auf Betriebe umstellen
+        if table_exists(cursor, 'buchungen') and column_exists(cursor, 'buchungen', 'betrieb_id'):
+            data_changes += migrate_buchungen_to_betriebe(cursor)
 
         conn.commit()
 
