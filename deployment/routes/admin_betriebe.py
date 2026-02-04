@@ -189,8 +189,10 @@ def betrieb_bearbeiten(betrieb_id):
 
         betrieb = dict(zip(columns, row))
 
-        # Prüfen ob Gemeinschaft zugewiesen
-        if not betrieb.get('gemeinschaft_id'):
+        # Prüfen ob Gemeinschaft zugewiesen (über Verknüpfungstabelle)
+        sql = convert_sql("SELECT COUNT(*) FROM betriebe_gemeinschaften WHERE betrieb_id = ?")
+        cursor.execute(sql, (betrieb_id,))
+        if cursor.fetchone()[0] == 0:
             flash('Bitte weisen Sie zuerst eine Gemeinschaft zu.', 'warning')
             return redirect(url_for('admin_betriebe.betrieb_gemeinschaften', betrieb_id=betrieb_id))
 
