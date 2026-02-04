@@ -110,7 +110,7 @@ def admin_gemeinschaften_edit(gemeinschaft_id):
 @admin_gemeinschaften_bp.route('/gemeinschaften/<int:gemeinschaft_id>/mitglieder', methods=['GET', 'POST'])
 @admin_required
 def admin_gemeinschaften_mitglieder(gemeinschaft_id):
-    """Mitglieder einer Gemeinschaft verwalten"""
+    """Betriebe einer Gemeinschaft verwalten"""
     db_path = get_current_db_path()
     with MaschinenDBContext(db_path) as db:
         cursor = db.connection.cursor()
@@ -124,67 +124,70 @@ def admin_gemeinschaften_mitglieder(gemeinschaft_id):
             action = request.form.get('action')
 
             if action == 'hinzufuegen':
-                mitglieder_ids = request.form.getlist('mitglieder')
-                if not mitglieder_ids:
-                    flash('Bitte mindestens einen Benutzer auswählen!', 'error')
+                betrieb_ids = request.form.getlist('betriebe')
+                if not betrieb_ids:
+                    flash('Bitte mindestens einen Betrieb auswählen!', 'error')
                 else:
-                    for benutzer_id in mitglieder_ids:
+                    for betrieb_id in betrieb_ids:
                         sql = convert_sql("""
-                            INSERT INTO mitglied_gemeinschaft (mitglied_id, gemeinschaft_id)
+                            INSERT INTO betriebe_gemeinschaften (betrieb_id, gemeinschaft_id)
                             VALUES (?, ?)
                             ON CONFLICT DO NOTHING
                         """)
-                        cursor.execute(sql, (int(benutzer_id), gemeinschaft_id))
+                        cursor.execute(sql, (int(betrieb_id), gemeinschaft_id))
                     db.connection.commit()
-                    flash(f'{len(mitglieder_ids)} Mitglied(er) hinzugefügt!', 'success')
+                    flash(f'{len(betrieb_ids)} Betrieb(e) hinzugefügt!', 'success')
 
             elif action == 'entfernen':
                 entfernen_ids = request.form.getlist('entfernen')
                 if not entfernen_ids:
-                    flash('Bitte mindestens ein Mitglied auswählen!', 'error')
+                    flash('Bitte mindestens einen Betrieb auswählen!', 'error')
                 else:
-                    for benutzer_id in entfernen_ids:
+                    for betrieb_id in entfernen_ids:
                         sql = convert_sql("""
-                            DELETE FROM mitglied_gemeinschaft
-                            WHERE mitglied_id = ? AND gemeinschaft_id = ?
+                            DELETE FROM betriebe_gemeinschaften
+                            WHERE betrieb_id = ? AND gemeinschaft_id = ?
                         """)
-                        cursor.execute(sql, (int(benutzer_id), gemeinschaft_id))
+                        cursor.execute(sql, (int(betrieb_id), gemeinschaft_id))
                     db.connection.commit()
-                    flash(f'{len(entfernen_ids)} Mitglied(er) entfernt!', 'success')
+                    flash(f'{len(entfernen_ids)} Betrieb(e) entfernt!', 'success')
 
             return redirect(url_for('admin_gemeinschaften.admin_gemeinschaften_mitglieder',
                                    gemeinschaft_id=gemeinschaft_id))
 
-        # Mitglieder laden
+        # Zugewiesene Betriebe laden
         sql = convert_sql("""
-            SELECT b.*, mg.beigetreten_am
-            FROM benutzer b
-            JOIN mitglied_gemeinschaft mg ON b.id = mg.mitglied_id
-            WHERE mg.gemeinschaft_id = ?
+            SELECT b.*, bg.beigetreten_am,
+                   (SELECT COUNT(*) FROM benutzer WHERE betrieb_id = b.id) as anzahl_benutzer
+            FROM betriebe b
+            JOIN betriebe_gemeinschaften bg ON b.id = bg.betrieb_id
+            WHERE bg.gemeinschaft_id = ?
             ORDER BY b.name
         """)
         cursor.execute(sql, (gemeinschaft_id,))
         columns = [desc[0] for desc in cursor.description]
-        mitglieder = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        aktuelle_betriebe = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        # Alle Benutzer (für Hinzufügen)
+        # Verfügbare Betriebe (noch nicht zugewiesen)
         sql = convert_sql("""
-            SELECT b.* FROM benutzer b
+            SELECT b.*,
+                   (SELECT COUNT(*) FROM benutzer WHERE betrieb_id = b.id) as anzahl_benutzer
+            FROM betriebe b
             WHERE b.aktiv = true
             AND b.id NOT IN (
-                SELECT mitglied_id FROM mitglied_gemeinschaft
+                SELECT betrieb_id FROM betriebe_gemeinschaften
                 WHERE gemeinschaft_id = ?
             )
             ORDER BY b.name
         """)
         cursor.execute(sql, (gemeinschaft_id,))
         columns = [desc[0] for desc in cursor.description]
-        verfuegbare_benutzer = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        verfuegbare_betriebe = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     return render_template('admin_gemeinschaften_mitglieder.html',
                          gemeinschaft=gemeinschaft,
-                         aktuelle_mitglieder=mitglieder,
-                         verfuegbare_benutzer=verfuegbare_benutzer)
+                         aktuelle_betriebe=aktuelle_betriebe,
+                         verfuegbare_betriebe=verfuegbare_betriebe)
 
 
 @admin_gemeinschaften_bp.route('/gemeinschaften/<int:gemeinschaft_id>/abrechnung')
