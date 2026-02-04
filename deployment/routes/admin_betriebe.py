@@ -97,15 +97,15 @@ def betrieb_neu():
             db.connection.commit()
 
             flash('Betrieb wurde erstellt. Bitte weisen Sie nun eine Gemeinschaft zu.', 'success')
-            return redirect(url_for('admin_betriebe.betrieb_gemeinschaft', betrieb_id=betrieb_id))
+            return redirect(url_for('admin_betriebe.betrieb_gemeinschaften', betrieb_id=betrieb_id))
 
     return render_template('admin_betrieb_neu.html')
 
 
-@admin_betriebe_bp.route('/betriebe/<int:betrieb_id>/gemeinschaft', methods=['GET', 'POST'])
+@admin_betriebe_bp.route('/betriebe/<int:betrieb_id>/gemeinschaften', methods=['GET', 'POST'])
 @admin_required
-def betrieb_gemeinschaft(betrieb_id):
-    """Gemeinschaft einem Betrieb zuweisen"""
+def betrieb_gemeinschaftenen(betrieb_id):
+    """Gemeinschaften einem Betrieb zuweisen (mehrere möglich)"""
     db_path = get_current_db_path()
 
     with MaschinenDBContext(db_path) as db:
@@ -123,7 +123,7 @@ def betrieb_gemeinschaft(betrieb_id):
 
         betrieb = dict(zip(columns, row))
 
-        # Gemeinschaften laden
+        # Alle Gemeinschaften laden
         if session.get('admin_level', 0) >= 2:
             sql = convert_sql("SELECT id, name FROM gemeinschaften WHERE aktiv = true OR aktiv IS NULL ORDER BY name")
             cursor.execute(sql)
@@ -139,22 +139,33 @@ def betrieb_gemeinschaft(betrieb_id):
 
         gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
 
+        # Bereits zugewiesene Gemeinschaften laden
+        sql = convert_sql("SELECT gemeinschaft_id FROM betriebe_gemeinschaften WHERE betrieb_id = ?")
+        cursor.execute(sql, (betrieb_id,))
+        zugewiesene_ids = [row[0] for row in cursor.fetchall()]
+
         if request.method == 'POST':
-            gemeinschaft_id = request.form.get('gemeinschaft_id', type=int)
+            # Ausgewählte Gemeinschaften aus Form holen
+            neue_ids = request.form.getlist('gemeinschaft_ids', type=int)
 
-            if not gemeinschaft_id:
-                flash('Bitte wählen Sie eine Gemeinschaft.', 'danger')
-            else:
-                sql = convert_sql("UPDATE betriebe SET gemeinschaft_id = ? WHERE id = ?")
-                cursor.execute(sql, (gemeinschaft_id, betrieb_id))
-                db.connection.commit()
+            # Alte Zuweisungen löschen
+            sql = convert_sql("DELETE FROM betriebe_gemeinschaften WHERE betrieb_id = ?")
+            cursor.execute(sql, (betrieb_id,))
 
-                flash('Gemeinschaft wurde zugewiesen.', 'success')
-                return redirect(url_for('admin_betriebe.betrieb_bearbeiten', betrieb_id=betrieb_id))
+            # Neue Zuweisungen einfügen
+            for gid in neue_ids:
+                sql = convert_sql("INSERT INTO betriebe_gemeinschaften (betrieb_id, gemeinschaft_id) VALUES (?, ?)")
+                cursor.execute(sql, (betrieb_id, gid))
 
-    return render_template('admin_betrieb_gemeinschaft.html',
+            db.connection.commit()
+
+            flash(f'{len(neue_ids)} Gemeinschaft(en) zugewiesen.', 'success')
+            return redirect(url_for('admin_betriebe.betrieb_bearbeiten', betrieb_id=betrieb_id))
+
+    return render_template('admin_betrieb_gemeinschaften.html',
                          betrieb=betrieb,
-                         gemeinschaften=gemeinschaften)
+                         gemeinschaften=gemeinschaften,
+                         zugewiesene_ids=zugewiesene_ids)
 
 
 @admin_betriebe_bp.route('/betriebe/<int:betrieb_id>/bearbeiten', methods=['GET', 'POST'])
@@ -181,7 +192,7 @@ def betrieb_bearbeiten(betrieb_id):
         # Prüfen ob Gemeinschaft zugewiesen
         if not betrieb.get('gemeinschaft_id'):
             flash('Bitte weisen Sie zuerst eine Gemeinschaft zu.', 'warning')
-            return redirect(url_for('admin_betriebe.betrieb_gemeinschaft', betrieb_id=betrieb_id))
+            return redirect(url_for('admin_betriebe.betrieb_gemeinschaften', betrieb_id=betrieb_id))
 
         # Gemeinschaften laden
         sql = convert_sql("SELECT id, name FROM gemeinschaften WHERE aktiv = true OR aktiv IS NULL ORDER BY name")

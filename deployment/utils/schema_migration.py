@@ -130,6 +130,23 @@ REQUIRED_TABLES = [
         )"""
     ),
     (
+        "betriebe_gemeinschaften",
+        """CREATE TABLE IF NOT EXISTS betriebe_gemeinschaften (
+            id SERIAL PRIMARY KEY,
+            betrieb_id INTEGER NOT NULL,
+            gemeinschaft_id INTEGER NOT NULL,
+            beigetreten_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(betrieb_id, gemeinschaft_id)
+        )""",
+        """CREATE TABLE IF NOT EXISTS betriebe_gemeinschaften (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            betrieb_id INTEGER NOT NULL,
+            gemeinschaft_id INTEGER NOT NULL,
+            beigetreten_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(betrieb_id, gemeinschaft_id)
+        )"""
+    ),
+    (
         "reservierungen_geloescht",
         """CREATE TABLE IF NOT EXISTS reservierungen_geloescht (
             id SERIAL PRIMARY KEY,

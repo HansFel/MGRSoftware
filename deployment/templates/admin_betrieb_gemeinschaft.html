@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Gemeinschaft zuweisen - {{ betrieb.name }} - Verwaltung{% endblock %}
+{% block title %}Gemeinschaften zuweisen - {{ betrieb.name }} - Verwaltung{% endblock %}
 
 {% block content %}
 <div class="row mt-4">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 class="text-white">
-                <i class="bi bi-diagram-3"></i> Gemeinschaft zuweisen
+                <i class="bi bi-diagram-3"></i> Gemeinschaften zuweisen
             </h2>
             <a href="{{ url_for('admin_betriebe.betriebe_liste') }}" class="btn btn-secondary">
                 <i class="bi bi-arrow-left"></i> Zurück
@@ -27,24 +27,24 @@
             <div class="card-body">
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle"></i>
-                    <strong>Schritt 2:</strong> Weisen Sie diesem Betrieb eine Gemeinschaft zu.
-                    Der Betrieb kann dann für Abrechnungen in dieser Gemeinschaft verwendet werden.
+                    Wählen Sie die Gemeinschaften aus, denen dieser Betrieb angehören soll.
+                    Ein Betrieb kann mehreren Gemeinschaften angehören.
                 </div>
 
                 <form method="POST">
                     <div class="mb-4">
-                        <label for="gemeinschaft_id" class="form-label">Gemeinschaft auswählen *</label>
-                        <select name="gemeinschaft_id" id="gemeinschaft_id" class="form-select form-select-lg" required>
-                            <option value="">-- Bitte wählen --</option>
-                            {% for g in gemeinschaften %}
-                            <option value="{{ g.id }}" {% if betrieb.gemeinschaft_id == g.id %}selected{% endif %}>
+                        <label class="form-label"><strong>Gemeinschaften</strong></label>
+                        {% for g in gemeinschaften %}
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox"
+                                   name="gemeinschaft_ids" value="{{ g.id }}"
+                                   id="gem_{{ g.id }}"
+                                   {% if g.id in zugewiesene_ids %}checked{% endif %}>
+                            <label class="form-check-label" for="gem_{{ g.id }}">
                                 {{ g.name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                        <div class="form-text">
-                            Der Betrieb wird Mitglied dieser Gemeinschaft und erhält ein eigenes Konto für Abrechnungen.
+                            </label>
                         </div>
+                        {% endfor %}
                     </div>
 
                     <div class="d-flex justify-content-end gap-2">
@@ -52,7 +52,7 @@
                             <i class="bi bi-x-circle"></i> Abbrechen
                         </a>
                         <button type="submit" class="btn btn-success">
-                            <i class="bi bi-check-circle"></i> Gemeinschaft zuweisen
+                            <i class="bi bi-check-circle"></i> Speichern
                         </button>
                     </div>
                 </form>
@@ -62,7 +62,6 @@
 
     <!-- Seitenleiste -->
     <div class="col-lg-4">
-        <!-- Betriebsinfo -->
         <div class="card mb-3">
             <div class="card-header bg-secondary text-white">
                 <h6 class="mb-0"><i class="bi bi-info-circle"></i> Betriebsdaten</h6>
@@ -79,10 +78,6 @@
                     <dt>Telefon</dt>
                     <dd>{{ betrieb.telefon }}</dd>
                     {% endif %}
-                    {% if betrieb.email %}
-                    <dt>E-Mail</dt>
-                    <dd>{{ betrieb.email }}</dd>
-                    {% endif %}
                 </dl>
             </div>
         </div>
@@ -93,9 +88,9 @@
             </div>
             <div class="card-body">
                 <ul class="small mb-0">
-                    <li>Ein Betrieb kann nur einer Gemeinschaft angehören</li>
-                    <li>Nach der Zuweisung können Benutzer dem Betrieb zugeordnet werden</li>
-                    <li>Alle Abrechnungen laufen über den Betrieb</li>
+                    <li>Ein Betrieb kann mehreren Gemeinschaften angehören</li>
+                    <li>Abrechnungen werden pro Gemeinschaft erstellt</li>
+                    <li>Das Mitgliederkonto gilt pro Betrieb und Gemeinschaft</li>
                 </ul>
             </div>
         </div>
