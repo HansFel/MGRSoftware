@@ -305,18 +305,17 @@ def betrieb_benutzer(betrieb_id):
         cursor.execute(sql, (betrieb_id,))
         benutzer_im_betrieb = [{'id': row[0], 'vorname': row[1], 'name': row[2], 'email': row[3]} for row in cursor.fetchall()]
 
-        # Verfügbare Benutzer (ohne Betrieb oder in anderen Betrieben der gleichen Gemeinschaft)
+        # Verfügbare Benutzer (alle aktiven Benutzer, die nicht im aktuellen Betrieb sind)
         sql = convert_sql("""
             SELECT DISTINCT b.id, b.vorname, b.name, b.email, bt.name as betrieb_name
             FROM benutzer b
-            JOIN benutzer_gemeinschaften bg ON b.id = bg.benutzer_id
             LEFT JOIN betriebe bt ON b.betrieb_id = bt.id
-            WHERE bg.gemeinschaft_id = ?
-            AND (b.betrieb_id IS NULL OR b.betrieb_id != ?)
+            WHERE (b.betrieb_id IS NULL OR b.betrieb_id != ?)
             AND (b.aktiv = true OR b.aktiv IS NULL)
+            AND (b.nur_training IS NOT TRUE OR b.nur_training IS NULL)
             ORDER BY b.name, b.vorname
         """)
-        cursor.execute(sql, (betrieb['gemeinschaft_id'], betrieb_id))
+        cursor.execute(sql, (betrieb_id,))
         verfuegbare_benutzer = [{'id': row[0], 'vorname': row[1], 'name': row[2], 'email': row[3], 'betrieb_name': row[4]} for row in cursor.fetchall()]
 
     return render_template('admin_betrieb_benutzer.html',
