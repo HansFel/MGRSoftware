@@ -6,6 +6,78 @@ Erweiterung des Administrator-Systems um zusätzliche Rollen mit spezifischen Be
 
 ---
 
+## 0. Betriebe-Konzept (NEU - Priorität hoch)
+
+### 0.1 Grundkonzept
+
+**Betriebe** sind die zentrale Abrechnungseinheit:
+- Ein Betrieb kann mehrere Benutzer haben (z.B. Hofbesitzer + Familienmitglieder)
+- Abrechnungen werden pro Betrieb erstellt, nicht pro Benutzer
+- Das Mitgliederkonto (Saldo) läuft pro Betrieb
+- Jeder Benutzer gehört zu genau einem Betrieb
+
+### 0.2 Betrieb-Daten
+
+```sql
+betriebe (
+    id SERIAL PRIMARY KEY,
+    gemeinschaft_id INTEGER NOT NULL,
+    name TEXT NOT NULL,                    -- z.B. "Hof Müller"
+    adresse TEXT,                          -- Straße, PLZ, Ort
+    kontaktperson TEXT,                    -- Hauptansprechpartner
+    telefon TEXT,
+    email TEXT,
+    iban TEXT,                             -- Bankverbindung
+    bic TEXT,
+    bank_name TEXT,
+    notizen TEXT,
+    aktiv BOOLEAN DEFAULT true,
+    erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+```
+
+### 0.3 Änderungen an bestehenden Tabellen
+
+```sql
+-- Benutzer erhält Betrieb-Zuordnung
+ALTER TABLE benutzer ADD COLUMN betrieb_id INTEGER REFERENCES betriebe(id);
+
+-- Mitgliederkonten laufen pro Betrieb statt pro Benutzer
+-- mitglieder_konten.benutzer_id -> mitglieder_konten.betrieb_id
+ALTER TABLE mitglieder_konten ADD COLUMN betrieb_id INTEGER REFERENCES betriebe(id);
+
+-- Abrechnungen pro Betrieb
+-- abrechnungen.benutzer_id -> abrechnungen.betrieb_id (oder zusätzlich)
+ALTER TABLE abrechnungen ADD COLUMN betrieb_id INTEGER REFERENCES betriebe(id);
+```
+
+### 0.4 Migration bestehender Daten
+
+Bei der Migration:
+1. Für jeden bestehenden Benutzer wird ein Betrieb erstellt
+2. Betrieb-Name = Benutzer-Name (kann später geändert werden)
+3. Benutzer wird dem neuen Betrieb zugeordnet
+4. Bestehende Konten/Abrechnungen werden auf Betrieb umgestellt
+
+### 0.5 Neue Routen
+
+- `/admin/betriebe` - Betriebe-Übersicht
+- `/admin/betriebe/neu` - Neuen Betrieb anlegen
+- `/admin/betriebe/<id>/bearbeiten` - Betrieb bearbeiten
+- `/admin/betriebe/<id>/benutzer` - Benutzer zuordnen
+
+### 0.6 Auswirkungen
+
+| Bereich | Änderung |
+|---------|----------|
+| Einsätze | Bleiben beim Benutzer (wer hat gearbeitet) |
+| Abrechnungen | Pro Betrieb (alle Einsätze der Betrieb-Benutzer) |
+| Mitgliederkonto | Pro Betrieb |
+| Zahlungen | Pro Betrieb |
+| PDF-Rechnungen | Betrieb-Adresse im Kopf |
+
+---
+
 ## 1. Erweiterung der Buchhaltung
 
 ### 1.1 Jahresabschluss
@@ -225,7 +297,8 @@ anlagen_konten (
 
 ## 7. Priorisierung (Vorschlag)
 
-1. **Phase 1:** Protokolle (einfachste Funktion)
-2. **Phase 2:** Abstimmungen + Anträge
-3. **Phase 3:** Wahlen
-4. **Phase 4:** Buchhaltungs-Erweiterung (Kunden/Lieferanten, Anlagen)
+1. **Phase 1:** Protokolle (einfachste Funktion) ✅ FERTIG
+2. **Phase 1b:** Betriebe-Konzept (Grundlage für Abrechnungen) ⬅️ AKTUELL
+3. **Phase 2:** Abstimmungen + Anträge
+4. **Phase 3:** Wahlen
+5. **Phase 4:** Buchhaltungs-Erweiterung (Kunden/Lieferanten, Anlagen)
