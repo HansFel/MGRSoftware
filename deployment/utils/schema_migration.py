@@ -450,76 +450,8 @@ def create_table(cursor, table: str, create_sql: str):
     print(f"  + Tabelle erstellt: {table}")
 
 
-def migrate_users_to_betriebe(cursor):
-    """Erstellt für jeden Benutzer ohne Betrieb einen neuen Betrieb"""
-    print("  Prüfe Benutzer ohne Betrieb-Zuordnung...")
-
-    # Hole Standard-Gemeinschaft (erste aktive)
-    if USING_POSTGRESQL:
-        cursor.execute("SELECT id FROM gemeinschaften WHERE aktiv = true OR aktiv IS NULL ORDER BY id LIMIT 1")
-    else:
-        cursor.execute("SELECT id FROM gemeinschaften WHERE aktiv = 1 OR aktiv IS NULL ORDER BY id LIMIT 1")
-
-    default_gem = cursor.fetchone()
-    default_gemeinschaft_id = default_gem[0] if default_gem else None
-
-    # Finde alle Benutzer ohne betrieb_id (keine Admins, keine Training-User)
-    # Versuche zuerst über benutzer_gemeinschaften, dann Fallback auf Default-Gemeinschaft
-    if USING_POSTGRESQL:
-        cursor.execute("""
-            SELECT b.id, b.vorname, b.name, COALESCE(bg.gemeinschaft_id, %s) as gemeinschaft_id
-            FROM benutzer b
-            LEFT JOIN benutzer_gemeinschaften bg ON b.id = bg.benutzer_id
-            WHERE b.betrieb_id IS NULL
-            AND b.nur_training IS NOT TRUE
-            AND (b.is_admin IS NOT TRUE AND COALESCE(b.admin_level, 0) = 0)
-        """, (default_gemeinschaft_id,))
-    else:
-        cursor.execute("""
-            SELECT b.id, b.vorname, b.name, COALESCE(bg.gemeinschaft_id, ?) as gemeinschaft_id
-            FROM benutzer b
-            LEFT JOIN benutzer_gemeinschaften bg ON b.id = bg.benutzer_id
-            WHERE b.betrieb_id IS NULL
-            AND (b.nur_training IS NULL OR b.nur_training = 0)
-            AND (b.is_admin IS NULL OR b.is_admin = 0)
-            AND (b.admin_level IS NULL OR b.admin_level = 0)
-        """, (default_gemeinschaft_id,))
-
-    users_without_betrieb = cursor.fetchall()
-
-    if not users_without_betrieb:
-        print("  Alle Benutzer haben bereits einen Betrieb.")
-        return 0
-
-    created = 0
-    for user_id, vorname, name, gemeinschaft_id in users_without_betrieb:
-        betrieb_name = f"{vorname} {name}".strip() if vorname else name
-
-        # Betrieb erstellen
-        if USING_POSTGRESQL:
-            cursor.execute("""
-                INSERT INTO betriebe (gemeinschaft_id, name, kontaktperson)
-                VALUES (%s, %s, %s)
-                RETURNING id
-            """, (gemeinschaft_id, betrieb_name, betrieb_name))
-            betrieb_id = cursor.fetchone()[0]
-        else:
-            cursor.execute("""
-                INSERT INTO betriebe (gemeinschaft_id, name, kontaktperson)
-                VALUES (?, ?, ?)
-            """, (gemeinschaft_id, betrieb_name, betrieb_name))
-            betrieb_id = cursor.lastrowid
-
-        # Benutzer dem Betrieb zuordnen
-        if USING_POSTGRESQL:
-            cursor.execute("UPDATE benutzer SET betrieb_id = %s WHERE id = %s", (betrieb_id, user_id))
-        else:
-            cursor.execute("UPDATE benutzer SET betrieb_id = ? WHERE id = ?", (betrieb_id, user_id))
-
-        print(f"    + Betrieb '{betrieb_name}' erstellt für Benutzer {user_id}")
-        created += 1
-
-    return created
+# Automatische Betrieb-Erstellung wurde entfernt.
+# Betriebe werden nur manuell über die Admin-Oberfläche angelegt.
 
 
 def migrate_konten_to_betriebe(cursor):
@@ -680,9 +612,7 @@ def run_migrations():
         print("Schema-Migration: Prüfe Daten-Migrationen...")
         data_changes = 0
 
-        # Betriebe für Benutzer erstellen
-        if table_exists(cursor, 'betriebe') and table_exists(cursor, 'benutzer'):
-            data_changes += migrate_users_to_betriebe(cursor)
+        # Betriebe werden manuell angelegt - keine automatische Migration
 
         # Konten auf Betriebe umstellen
         if table_exists(cursor, 'mitglieder_konten') and column_exists(cursor, 'mitglieder_konten', 'betrieb_id'):
