@@ -305,7 +305,7 @@ def betrieb_benutzer(betrieb_id):
         cursor.execute(sql, (betrieb_id,))
         benutzer_im_betrieb = [{'id': row[0], 'vorname': row[1], 'name': row[2], 'email': row[3]} for row in cursor.fetchall()]
 
-        # Verfügbare Benutzer (alle aktiven Benutzer, die nicht im aktuellen Betrieb sind)
+        # Verfügbare Benutzer (alle aktiven Benutzer, keine Admins, nicht im aktuellen Betrieb)
         sql = convert_sql("""
             SELECT DISTINCT b.id, b.vorname, b.name, b.email, bt.name as betrieb_name
             FROM benutzer b
@@ -313,6 +313,8 @@ def betrieb_benutzer(betrieb_id):
             WHERE (b.betrieb_id IS NULL OR b.betrieb_id != ?)
             AND (b.aktiv = true OR b.aktiv IS NULL)
             AND (b.nur_training IS NOT TRUE OR b.nur_training IS NULL)
+            AND (b.is_admin IS NOT TRUE OR b.is_admin IS NULL)
+            AND (b.admin_level IS NULL OR b.admin_level = 0)
             ORDER BY b.name, b.vorname
         """)
         cursor.execute(sql, (betrieb_id,))
