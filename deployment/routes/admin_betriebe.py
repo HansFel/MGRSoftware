@@ -329,7 +329,7 @@ def betrieb_benutzer(betrieb_id):
 @admin_betriebe_bp.route('/betriebe/<int:betrieb_id>/loeschen', methods=['POST'])
 @admin_required
 def betrieb_loeschen(betrieb_id):
-    """Betrieb löschen (nur wenn keine Benutzer zugeordnet)"""
+    """Betrieb löschen (nur wenn keine Abhängigkeiten)"""
     db_path = get_current_db_path()
 
     with MaschinenDBContext(db_path) as db:
@@ -338,10 +338,29 @@ def betrieb_loeschen(betrieb_id):
         # Prüfen ob Benutzer zugeordnet sind
         sql = convert_sql("SELECT COUNT(*) FROM benutzer WHERE betrieb_id = ?")
         cursor.execute(sql, (betrieb_id,))
-        count = cursor.fetchone()[0]
+        if cursor.fetchone()[0] > 0:
+            flash('Betrieb kann nicht gelöscht werden - Benutzer zugeordnet.', 'danger')
+            return redirect(url_for('admin_betriebe.betrieb_bearbeiten', betrieb_id=betrieb_id))
 
-        if count > 0:
-            flash(f'Betrieb kann nicht gelöscht werden - {count} Benutzer zugeordnet.', 'danger')
+        # Prüfen ob Mitgliederkonten existieren
+        sql = convert_sql("SELECT COUNT(*) FROM mitglieder_konten WHERE betrieb_id = ?")
+        cursor.execute(sql, (betrieb_id,))
+        if cursor.fetchone()[0] > 0:
+            flash('Betrieb kann nicht gelöscht werden - Mitgliederkonto vorhanden.', 'danger')
+            return redirect(url_for('admin_betriebe.betrieb_bearbeiten', betrieb_id=betrieb_id))
+
+        # Prüfen ob Abrechnungen existieren
+        sql = convert_sql("SELECT COUNT(*) FROM mitglieder_abrechnungen WHERE betrieb_id = ?")
+        cursor.execute(sql, (betrieb_id,))
+        if cursor.fetchone()[0] > 0:
+            flash('Betrieb kann nicht gelöscht werden - Abrechnungen vorhanden.', 'danger')
+            return redirect(url_for('admin_betriebe.betrieb_bearbeiten', betrieb_id=betrieb_id))
+
+        # Prüfen ob Buchungen existieren
+        sql = convert_sql("SELECT COUNT(*) FROM buchungen WHERE betrieb_id = ?")
+        cursor.execute(sql, (betrieb_id,))
+        if cursor.fetchone()[0] > 0:
+            flash('Betrieb kann nicht gelöscht werden - Buchungen vorhanden.', 'danger')
             return redirect(url_for('admin_betriebe.betrieb_bearbeiten', betrieb_id=betrieb_id))
 
         # Betrieb löschen
