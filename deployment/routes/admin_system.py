@@ -99,10 +99,31 @@ def admin_dashboard():
 @admin_system_bp.route('/alle-einsaetze')
 @admin_required
 def admin_alle_einsaetze():
-    """Alle Einsätze aller Benutzer"""
+    """Alle Einsätze aller Betriebe"""
     db_path = get_current_db_path()
     with MaschinenDBContext(db_path) as db:
-        einsaetze = db.get_all_einsaetze()
+        cursor = db.connection.cursor()
+        sql = convert_sql("""
+            SELECT e.id, e.datum,
+                   bt.name as betrieb,
+                   b.name || ', ' || COALESCE(b.vorname, '') AS benutzer,
+                   m.bezeichnung AS maschine,
+                   m.abrechnungsart,
+                   m.preis_pro_einheit,
+                   ez.bezeichnung AS einsatzzweck,
+                   e.anfangstand, e.endstand, e.betriebsstunden,
+                   e.treibstoffverbrauch, e.treibstoffkosten,
+                   e.flaeche_menge, e.kosten_berechnet, e.anmerkungen
+            FROM maschineneinsaetze e
+            JOIN benutzer b ON e.benutzer_id = b.id
+            LEFT JOIN betriebe bt ON b.betrieb_id = bt.id
+            JOIN maschinen m ON e.maschine_id = m.id
+            JOIN einsatzzwecke ez ON e.einsatzzweck_id = ez.id
+            ORDER BY e.datum DESC, e.id DESC
+        """)
+        cursor.execute(sql)
+        columns = [desc[0] for desc in cursor.description]
+        einsaetze = [dict(zip(columns, row)) for row in cursor.fetchall()]
     return render_template('admin_alle_einsaetze.html', einsaetze=einsaetze)
 
 
