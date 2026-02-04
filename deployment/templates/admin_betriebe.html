@@ -16,26 +16,6 @@
     </div>
 </div>
 
-<!-- Gemeinschaft auswählen -->
-{% if gemeinschaften|length > 1 %}
-<div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-body">
-                <form method="GET" class="d-flex gap-2">
-                    <select name="gemeinschaft_id" class="form-select" onchange="this.form.submit()">
-                        {% for g in gemeinschaften %}
-                        <option value="{{ g.id }}" {% if g.id == gemeinschaft_id %}selected{% endif %}>
-                            {{ g.name }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
 
 <!-- Betriebe-Liste -->
 <div class="row">
@@ -53,8 +33,8 @@
                         <thead class="table-dark">
                             <tr>
                                 <th>Name</th>
+                                <th>Gemeinschaften</th>
                                 <th>Kontaktperson</th>
-                                <th>Telefon</th>
                                 <th>Benutzer</th>
                                 <th>Status</th>
                                 <th>Aktionen</th>
@@ -69,8 +49,14 @@
                                     <br><small class="text-muted">{{ b.adresse }}</small>
                                     {% endif %}
                                 </td>
+                                <td>
+                                    {% if b.gemeinschaften_namen %}
+                                    {{ b.gemeinschaften_namen }}
+                                    {% else %}
+                                    <span class="text-warning">Keine</span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ b.kontaktperson or '-' }}</td>
-                                <td>{{ b.telefon or '-' }}</td>
                                 <td>
                                     <span class="badge bg-info">{{ b.anzahl_benutzer }} Benutzer</span>
                                 </td>

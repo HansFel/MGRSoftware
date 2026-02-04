@@ -23,45 +23,21 @@ def betriebe_liste():
     with MaschinenDBContext(db_path) as db:
         cursor = db.connection.cursor()
 
-        # Gemeinschaften laden (je nach Admin-Level)
-        if session.get('admin_level', 0) >= 2:
-            sql = convert_sql("SELECT id, name FROM gemeinschaften WHERE aktiv = true OR aktiv IS NULL ORDER BY name")
-            cursor.execute(sql)
-        else:
-            gemeinschafts_ids = session.get('gemeinschafts_admin_ids', [])
-            if gemeinschafts_ids:
-                placeholders = ','.join(['?' for _ in gemeinschafts_ids])
-                sql = convert_sql(f"SELECT id, name FROM gemeinschaften WHERE id IN ({placeholders}) ORDER BY name")
-                cursor.execute(sql, gemeinschafts_ids)
-            else:
-                return render_template('admin_betriebe.html', gemeinschaften=[], betriebe=[])
+        # Alle Betriebe laden mit Anzahl Benutzer und zugewiesenen Gemeinschaften
+        sql = convert_sql("""
+            SELECT b.*,
+                   (SELECT COUNT(*) FROM benutzer WHERE betrieb_id = b.id) as anzahl_benutzer,
+                   (SELECT string_agg(g.name, ', ') FROM betriebe_gemeinschaften bg
+                    JOIN gemeinschaften g ON bg.gemeinschaft_id = g.id
+                    WHERE bg.betrieb_id = b.id) as gemeinschaften_namen
+            FROM betriebe b
+            ORDER BY b.name
+        """)
+        cursor.execute(sql)
+        columns = [desc[0] for desc in cursor.description]
+        betriebe = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
-
-        # Ausgewählte Gemeinschaft
-        gemeinschaft_id = request.args.get('gemeinschaft_id', type=int)
-        if not gemeinschaft_id and gemeinschaften:
-            gemeinschaft_id = gemeinschaften[0]['id']
-
-        # Betriebe laden mit Anzahl Benutzer (über Verknüpfungstabelle oder ohne Gemeinschaft)
-        betriebe = []
-        if gemeinschaft_id:
-            sql = convert_sql("""
-                SELECT DISTINCT b.*,
-                       (SELECT COUNT(*) FROM benutzer WHERE betrieb_id = b.id) as anzahl_benutzer
-                FROM betriebe b
-                LEFT JOIN betriebe_gemeinschaften bg ON b.id = bg.betrieb_id
-                WHERE bg.gemeinschaft_id = ? OR bg.betrieb_id IS NULL
-                ORDER BY b.name
-            """)
-            cursor.execute(sql, (gemeinschaft_id,))
-            columns = [desc[0] for desc in cursor.description]
-            betriebe = [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-    return render_template('admin_betriebe.html',
-                         gemeinschaften=gemeinschaften,
-                         gemeinschaft_id=gemeinschaft_id,
-                         betriebe=betriebe)
+    return render_template('admin_betriebe.html', betriebe=betriebe)
 
 
 @admin_betriebe_bp.route('/betriebe/neu', methods=['GET', 'POST'])
