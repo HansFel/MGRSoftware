@@ -91,6 +91,15 @@
                                            class="btn btn-outline-secondary" title="Benutzer verwalten">
                                             <i class="bi bi-people"></i>
                                         </a>
+                                        {% if b.anzahl_benutzer == 0 %}
+                                        <form method="POST" action="{{ url_for('admin_betriebe.betrieb_loeschen', betrieb_id=b.id) }}"
+                                              style="display: inline;"
+                                              onsubmit="return confirm('Betrieb \"{{ b.name }}\" wirklich löschen?');">
+                                            <button type="submit" class="btn btn-outline-danger" title="Löschen">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
                                     </div>
                                 </td>
                             </tr>

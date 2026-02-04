@@ -463,7 +463,7 @@ def migrate_users_to_betriebe(cursor):
     default_gem = cursor.fetchone()
     default_gemeinschaft_id = default_gem[0] if default_gem else None
 
-    # Finde alle Benutzer ohne betrieb_id
+    # Finde alle Benutzer ohne betrieb_id (keine Admins, keine Training-User)
     # Versuche zuerst über benutzer_gemeinschaften, dann Fallback auf Default-Gemeinschaft
     if USING_POSTGRESQL:
         cursor.execute("""
@@ -472,6 +472,7 @@ def migrate_users_to_betriebe(cursor):
             LEFT JOIN benutzer_gemeinschaften bg ON b.id = bg.benutzer_id
             WHERE b.betrieb_id IS NULL
             AND b.nur_training IS NOT TRUE
+            AND (b.is_admin IS NOT TRUE AND COALESCE(b.admin_level, 0) = 0)
         """, (default_gemeinschaft_id,))
     else:
         cursor.execute("""
@@ -480,6 +481,8 @@ def migrate_users_to_betriebe(cursor):
             LEFT JOIN benutzer_gemeinschaften bg ON b.id = bg.benutzer_id
             WHERE b.betrieb_id IS NULL
             AND (b.nur_training IS NULL OR b.nur_training = 0)
+            AND (b.is_admin IS NULL OR b.is_admin = 0)
+            AND (b.admin_level IS NULL OR b.admin_level = 0)
         """, (default_gemeinschaft_id,))
 
     users_without_betrieb = cursor.fetchall()
