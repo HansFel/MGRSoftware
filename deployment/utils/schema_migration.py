@@ -454,21 +454,33 @@ def migrate_users_to_betriebe(cursor):
     """Erstellt für jeden Benutzer ohne Betrieb einen neuen Betrieb"""
     print("  Prüfe Benutzer ohne Betrieb-Zuordnung...")
 
+    # Hole Standard-Gemeinschaft (erste aktive)
+    if USING_POSTGRESQL:
+        cursor.execute("SELECT id FROM gemeinschaften WHERE aktiv = true OR aktiv IS NULL ORDER BY id LIMIT 1")
+    else:
+        cursor.execute("SELECT id FROM gemeinschaften WHERE aktiv = 1 OR aktiv IS NULL ORDER BY id LIMIT 1")
+
+    default_gem = cursor.fetchone()
+    default_gemeinschaft_id = default_gem[0] if default_gem else None
+
     # Finde alle Benutzer ohne betrieb_id
+    # Versuche zuerst über benutzer_gemeinschaften, dann Fallback auf Default-Gemeinschaft
     if USING_POSTGRESQL:
         cursor.execute("""
-            SELECT b.id, b.vorname, b.name, bg.gemeinschaft_id
+            SELECT b.id, b.vorname, b.name, COALESCE(bg.gemeinschaft_id, %s) as gemeinschaft_id
             FROM benutzer b
-            JOIN benutzer_gemeinschaften bg ON b.id = bg.benutzer_id
+            LEFT JOIN benutzer_gemeinschaften bg ON b.id = bg.benutzer_id
             WHERE b.betrieb_id IS NULL
-        """)
+            AND b.nur_training IS NOT TRUE
+        """, (default_gemeinschaft_id,))
     else:
         cursor.execute("""
-            SELECT b.id, b.vorname, b.name, bg.gemeinschaft_id
+            SELECT b.id, b.vorname, b.name, COALESCE(bg.gemeinschaft_id, ?) as gemeinschaft_id
             FROM benutzer b
-            JOIN benutzer_gemeinschaften bg ON b.id = bg.benutzer_id
+            LEFT JOIN benutzer_gemeinschaften bg ON b.id = bg.benutzer_id
             WHERE b.betrieb_id IS NULL
-        """)
+            AND (b.nur_training IS NULL OR b.nur_training = 0)
+        """, (default_gemeinschaft_id,))
 
     users_without_betrieb = cursor.fetchall()
 
