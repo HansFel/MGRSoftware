@@ -21,6 +21,7 @@
                         <thead class="table-light">
                             <tr>
                                 <th>Datum</th>
+                                <th>Betrieb</th>
                                 <th>Benutzer</th>
                                 <th>Maschine</th>
                                 <th>Einsatzzweck</th>
@@ -37,6 +38,7 @@
                             {% for einsatz in einsaetze %}
                             <tr>
                                 <td>{{ einsatz.datum }}</td>
+                                <td>{{ einsatz.betrieb or '-' }}</td>
                                 <td>{{ einsatz.benutzer }}</td>
                                 <td><strong>{{ einsatz.maschine }}</strong></td>
                                 <td><span class="badge bg-info">{{ einsatz.einsatzzweck }}</span></td>
@@ -86,7 +88,7 @@
                         </tbody>
                         <tfoot class="table-light">
                             <tr>
-                                <td colspan="6" class="text-end"><strong>Gesamt:</strong></td>
+                                <td colspan="7" class="text-end"><strong>Gesamt:</strong></td>
                                 <td><strong>{{ "%.1f"|format(einsaetze|sum(attribute='betriebsstunden')) }} h</strong></td>
                                 <td>
                                     {% set treibstoff_gesamt = einsaetze|selectattr('treibstoffverbrauch')|sum(attribute='treibstoffverbrauch') %}
