@@ -104,7 +104,7 @@ def betrieb_neu():
 
 @admin_betriebe_bp.route('/betriebe/<int:betrieb_id>/gemeinschaften', methods=['GET', 'POST'])
 @admin_required
-def betrieb_gemeinschaftenen(betrieb_id):
+def betrieb_gemeinschaften(betrieb_id):
     """Gemeinschaften einem Betrieb zuweisen (mehrere möglich)"""
     db_path = get_current_db_path()
 
