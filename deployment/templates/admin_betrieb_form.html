@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Betrieb bearbeiten' if betrieb else 'Neuer Betrieb' }} - Verwaltung{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="text-white">
+                <i class="bi bi-building"></i>
+                {{ 'Betrieb bearbeiten' if betrieb else 'Neuen Betrieb anlegen' }}
+            </h2>
+            <a href="{{ url_for('admin_betriebe.betriebe_liste') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Zurück
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-pencil"></i> Betriebsdaten
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <!-- Gemeinschaft (nur bei Neuanlage) -->
+                    {% if not betrieb %}
+                    <div class="mb-3">
+                        <label for="gemeinschaft_id" class="form-label">Gemeinschaft *</label>
+                        <select name="gemeinschaft_id" id="gemeinschaft_id" class="form-select" required>
+                            {% for g in gemeinschaften %}
+                            <option value="{{ g.id }}" {% if loop.first %}selected{% endif %}>
+                                {{ g.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+
+                    <!-- Grunddaten -->
+                    <h6 class="border-bottom pb-2 mb-3">Grunddaten</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="name" class="form-label">Betriebsname *</label>
+                            <input type="text" class="form-control" id="name" name="name"
+                                   value="{{ betrieb.name if betrieb else '' }}"
+                                   placeholder="z.B. Hof Müller" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="kontaktperson" class="form-label">Kontaktperson</label>
+                            <input type="text" class="form-control" id="kontaktperson" name="kontaktperson"
+                                   value="{{ betrieb.kontaktperson if betrieb else '' }}"
+                                   placeholder="Hauptansprechpartner">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="adresse" class="form-label">Adresse</label>
+                        <textarea class="form-control" id="adresse" name="adresse" rows="2"
+                                  placeholder="Straße, PLZ Ort">{{ betrieb.adresse if betrieb else '' }}</textarea>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="telefon" class="form-label">Telefon</label>
+                            <input type="tel" class="form-control" id="telefon" name="telefon"
+                                   value="{{ betrieb.telefon if betrieb else '' }}"
+                                   placeholder="+43 ...">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="email" class="form-label">E-Mail</label>
+                            <input type="email" class="form-control" id="email" name="email"
+                                   value="{{ betrieb.email if betrieb else '' }}"
+                                   placeholder="betrieb@example.at">
+                        </div>
+                    </div>
+
+                    <!-- Bankverbindung -->
+                    <h6 class="border-bottom pb-2 mb-3 mt-4">Bankverbindung</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="iban" class="form-label">IBAN</label>
+                            <input type="text" class="form-control" id="iban" name="iban"
+                                   value="{{ betrieb.iban if betrieb else '' }}"
+                                   placeholder="AT...">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="bic" class="form-label">BIC</label>
+                            <input type="text" class="form-control" id="bic" name="bic"
+                                   value="{{ betrieb.bic if betrieb else '' }}"
+                                   placeholder="...">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="bank_name" class="form-label">Bank</label>
+                        <input type="text" class="form-control" id="bank_name" name="bank_name"
+                               value="{{ betrieb.bank_name if betrieb else '' }}"
+                               placeholder="Name der Bank">
+                    </div>
+
+                    <!-- Notizen -->
+                    <h6 class="border-bottom pb-2 mb-3 mt-4">Sonstiges</h6>
+                    <div class="mb-3">
+                        <label for="notizen" class="form-label">Notizen</label>
+                        <textarea class="form-control" id="notizen" name="notizen" rows="3"
+                                  placeholder="Interne Notizen...">{{ betrieb.notizen if betrieb else '' }}</textarea>
+                    </div>
+
+                    {% if betrieb %}
+                    <div class="mb-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="aktiv" name="aktiv"
+                                   {% if betrieb.aktiv %}checked{% endif %}>
+                            <label class="form-check-label" for="aktiv">
+                                Betrieb ist aktiv
+                            </label>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            {% if betrieb %}
+                            <a href="#" class="btn btn-outline-danger"
+                               onclick="if(confirm('Betrieb wirklich löschen?')) document.getElementById('delete-form').submit(); return false;">
+                                <i class="bi bi-trash"></i> Löschen
+                            </a>
+                            {% endif %}
+                        </div>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('admin_betriebe.betriebe_liste') }}" class="btn btn-secondary">
+                                <i class="bi bi-x-circle"></i> Abbrechen
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> Speichern
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                {% if betrieb %}
+                <form id="delete-form" method="POST" action="{{ url_for('admin_betriebe.betrieb_loeschen', betrieb_id=betrieb.id) }}" style="display: none;"></form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Seitenleiste -->
+    <div class="col-lg-4">
+        {% if betrieb %}
+        <!-- Zugeordnete Benutzer -->
+        <div class="card mb-3">
+            <div class="card-header bg-secondary text-white">
+                <h6 class="mb-0"><i class="bi bi-people"></i> Zugeordnete Benutzer</h6>
+            </div>
+            <div class="card-body">
+                {% if benutzer %}
+                <ul class="list-group list-group-flush">
+                    {% for b in benutzer %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ b.vorname }} {{ b.name }}</strong>
+                            {% if b.email %}
+                            <br><small class="text-muted">{{ b.email }}</small>
+                            {% endif %}
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted mb-0">Keine Benutzer zugeordnet.</p>
+                {% endif %}
+                <a href="{{ url_for('admin_betriebe.betrieb_benutzer', betrieb_id=betrieb.id) }}" class="btn btn-outline-primary btn-sm mt-3 w-100">
+                    <i class="bi bi-people"></i> Benutzer verwalten
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Tipps -->
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="bi bi-lightbulb"></i> Tipps</h6>
+            </div>
+            <div class="card-body">
+                <ul class="small mb-0">
+                    <li>Der Betriebsname erscheint auf Abrechnungen</li>
+                    <li>Die Adresse wird für Rechnungen verwendet</li>
+                    <li>Die Bankverbindung kann für Zahlungen genutzt werden</li>
+                    <li>Mehrere Benutzer können einem Betrieb zugeordnet werden</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

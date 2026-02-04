@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Betriebe - Verwaltung{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="text-white">
+                <i class="bi bi-building"></i> Betriebe
+            </h2>
+            <a href="{{ url_for('admin_betriebe.betrieb_neu') }}" class="btn btn-success">
+                <i class="bi bi-plus-circle"></i> Neuer Betrieb
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Gemeinschaft auswählen -->
+{% if gemeinschaften|length > 1 %}
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" class="d-flex gap-2">
+                    <select name="gemeinschaft_id" class="form-select" onchange="this.form.submit()">
+                        {% for g in gemeinschaften %}
+                        <option value="{{ g.id }}" {% if g.id == gemeinschaft_id %}selected{% endif %}>
+                            {{ g.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Betriebe-Liste -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-ul"></i> Alle Betriebe
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if betriebe %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Name</th>
+                                <th>Kontaktperson</th>
+                                <th>Telefon</th>
+                                <th>Benutzer</th>
+                                <th>Status</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for b in betriebe %}
+                            <tr>
+                                <td>
+                                    <strong>{{ b.name }}</strong>
+                                    {% if b.adresse %}
+                                    <br><small class="text-muted">{{ b.adresse }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>{{ b.kontaktperson or '-' }}</td>
+                                <td>{{ b.telefon or '-' }}</td>
+                                <td>
+                                    <span class="badge bg-info">{{ b.anzahl_benutzer }} Benutzer</span>
+                                </td>
+                                <td>
+                                    {% if b.aktiv %}
+                                    <span class="badge bg-success">Aktiv</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Inaktiv</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('admin_betriebe.betrieb_bearbeiten', betrieb_id=b.id) }}"
+                                           class="btn btn-outline-primary" title="Bearbeiten">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <a href="{{ url_for('admin_betriebe.betrieb_benutzer', betrieb_id=b.id) }}"
+                                           class="btn btn-outline-secondary" title="Benutzer verwalten">
+                                            <i class="bi bi-people"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    Noch keine Betriebe vorhanden.
+                    <a href="{{ url_for('admin_betriebe.betrieb_neu') }}">Jetzt ersten Betrieb anlegen</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Info-Box -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Info: Betriebe</h6>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li>Ein Betrieb kann mehrere Benutzer haben (z.B. Familie)</li>
+                    <li>Abrechnungen werden pro Betrieb erstellt</li>
+                    <li>Das Mitgliederkonto (Saldo) gilt pro Betrieb</li>
+                    <li>Einsätze werden weiterhin pro Benutzer erfasst</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

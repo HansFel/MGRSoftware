@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Benutzer - {{ betrieb.name }}{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="text-white">
+                <i class="bi bi-people"></i> Benutzer verwalten
+            </h2>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('admin_betriebe.betrieb_bearbeiten', betrieb_id=betrieb.id) }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Zurück zum Betrieb
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Betrieb-Info -->
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-building"></i> {{ betrieb.name }}</h5>
+            </div>
+            <div class="card-body">
+                {% if betrieb.adresse %}
+                <p class="mb-2"><i class="bi bi-geo-alt"></i> {{ betrieb.adresse }}</p>
+                {% endif %}
+                {% if betrieb.kontaktperson %}
+                <p class="mb-2"><i class="bi bi-person"></i> {{ betrieb.kontaktperson }}</p>
+                {% endif %}
+                {% if betrieb.telefon %}
+                <p class="mb-0"><i class="bi bi-telephone"></i> {{ betrieb.telefon }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Benutzer hinzufügen -->
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0"><i class="bi bi-person-plus"></i> Benutzer hinzufügen</h6>
+            </div>
+            <div class="card-body">
+                {% if verfuegbare_benutzer %}
+                <form method="POST">
+                    <input type="hidden" name="action" value="add">
+                    <div class="mb-3">
+                        <label for="benutzer_id" class="form-label">Benutzer auswählen</label>
+                        <select name="benutzer_id" id="benutzer_id" class="form-select" required>
+                            <option value="">-- Bitte wählen --</option>
+                            {% for b in verfuegbare_benutzer %}
+                            <option value="{{ b.id }}">
+                                {{ b.vorname }} {{ b.name }}
+                                {% if b.betrieb_name %} ({{ b.betrieb_name }}){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">
+                            Hinweis: Benutzer in anderen Betrieben werden diesem Betrieb zugeordnet.
+                        </small>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="bi bi-plus-circle"></i> Hinzufügen
+                    </button>
+                </form>
+                {% else %}
+                <p class="text-muted mb-0">
+                    Alle Benutzer der Gemeinschaft sind bereits diesem Betrieb zugeordnet.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Aktuelle Benutzer -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-people-fill"></i> Benutzer im Betrieb
+                    <span class="badge bg-light text-dark ms-2">{{ benutzer_im_betrieb|length }}</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if benutzer_im_betrieb %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>E-Mail</th>
+                                <th>Aktion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for b in benutzer_im_betrieb %}
+                            <tr>
+                                <td>
+                                    <strong>{{ b.vorname }} {{ b.name }}</strong>
+                                </td>
+                                <td>{{ b.email or '-' }}</td>
+                                <td>
+                                    {% if benutzer_im_betrieb|length > 1 %}
+                                    <form method="POST" class="d-inline"
+                                          onsubmit="return confirm('Benutzer wirklich aus diesem Betrieb entfernen? Es wird ein neuer eigener Betrieb erstellt.');">
+                                        <input type="hidden" name="action" value="remove">
+                                        <input type="hidden" name="benutzer_id" value="{{ b.id }}">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm" title="Entfernen">
+                                            <i class="bi bi-person-dash"></i>
+                                        </button>
+                                    </form>
+                                    {% else %}
+                                    <span class="text-muted" title="Letzter Benutzer kann nicht entfernt werden">
+                                        <i class="bi bi-lock"></i>
+                                    </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Diesem Betrieb sind keine Benutzer zugeordnet.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Info-Box -->
+        <div class="card mt-4">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Hinweise</h6>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li>Alle Benutzer eines Betriebs teilen sich ein Mitgliederkonto</li>
+                    <li>Abrechnungen werden für den gesamten Betrieb erstellt</li>
+                    <li>Einsätze werden weiterhin dem einzelnen Benutzer zugeordnet</li>
+                    <li>Beim Entfernen wird automatisch ein neuer Betrieb für den Benutzer erstellt</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

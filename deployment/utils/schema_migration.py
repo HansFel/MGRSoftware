@@ -39,6 +39,7 @@ REQUIRED_COLUMNS = [
     # benutzer
     ("benutzer", "letzter_treibstoffpreis", "REAL", "REAL", None),
     ("benutzer", "aktiv", "BOOLEAN", "BOOLEAN", "TRUE"),
+    ("benutzer", "betrieb_id", "INTEGER", "INTEGER", None),
 
     # mitglieder_abrechnungen
     ("mitglieder_abrechnungen", "gemeinschaft_id", "INTEGER", "INTEGER", None),
@@ -54,9 +55,11 @@ REQUIRED_COLUMNS = [
     ("mitglieder_abrechnungen", "erstellt_am", "TIMESTAMP", "DATETIME", None),
     ("mitglieder_abrechnungen", "erstellt_von", "INTEGER", "INTEGER", None),
     ("mitglieder_abrechnungen", "bezahlt_am", "TIMESTAMP", "DATETIME", None),
+    ("mitglieder_abrechnungen", "betrieb_id", "INTEGER", "INTEGER", None),
 
     # mitglieder_konten
     ("mitglieder_konten", "saldo", "REAL", "REAL", "0.0"),
+    ("mitglieder_konten", "betrieb_id", "INTEGER", "INTEGER", None),
 
     # zahlungsreferenzen
     ("zahlungsreferenzen", "gemeinschaft_id", "INTEGER", "INTEGER", None),
@@ -313,6 +316,39 @@ REQUIRED_TABLES = [
             abgeschlossen_von INTEGER
         )"""
     ),
+    (
+        "betriebe",
+        """CREATE TABLE IF NOT EXISTS betriebe (
+            id SERIAL PRIMARY KEY,
+            gemeinschaft_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            adresse TEXT,
+            kontaktperson TEXT,
+            telefon TEXT,
+            email TEXT,
+            iban TEXT,
+            bic TEXT,
+            bank_name TEXT,
+            notizen TEXT,
+            aktiv BOOLEAN DEFAULT TRUE,
+            erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS betriebe (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            gemeinschaft_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            adresse TEXT,
+            kontaktperson TEXT,
+            telefon TEXT,
+            email TEXT,
+            iban TEXT,
+            bic TEXT,
+            bank_name TEXT,
+            notizen TEXT,
+            aktiv BOOLEAN DEFAULT 1,
+            erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP
+        )"""
+    ),
 ]
 
 
@@ -392,6 +428,121 @@ def create_table(cursor, table: str, create_sql: str):
     print(f"  + Tabelle erstellt: {table}")
 
 
+def migrate_users_to_betriebe(cursor):
+    """Erstellt für jeden Benutzer ohne Betrieb einen neuen Betrieb"""
+    print("  Prüfe Benutzer ohne Betrieb-Zuordnung...")
+
+    # Finde alle Benutzer ohne betrieb_id
+    if USING_POSTGRESQL:
+        cursor.execute("""
+            SELECT b.id, b.vorname, b.name, bg.gemeinschaft_id
+            FROM benutzer b
+            JOIN benutzer_gemeinschaften bg ON b.id = bg.benutzer_id
+            WHERE b.betrieb_id IS NULL
+        """)
+    else:
+        cursor.execute("""
+            SELECT b.id, b.vorname, b.name, bg.gemeinschaft_id
+            FROM benutzer b
+            JOIN benutzer_gemeinschaften bg ON b.id = bg.benutzer_id
+            WHERE b.betrieb_id IS NULL
+        """)
+
+    users_without_betrieb = cursor.fetchall()
+
+    if not users_without_betrieb:
+        print("  Alle Benutzer haben bereits einen Betrieb.")
+        return 0
+
+    created = 0
+    for user_id, vorname, name, gemeinschaft_id in users_without_betrieb:
+        betrieb_name = f"{vorname} {name}".strip() if vorname else name
+
+        # Betrieb erstellen
+        if USING_POSTGRESQL:
+            cursor.execute("""
+                INSERT INTO betriebe (gemeinschaft_id, name, kontaktperson)
+                VALUES (%s, %s, %s)
+                RETURNING id
+            """, (gemeinschaft_id, betrieb_name, betrieb_name))
+            betrieb_id = cursor.fetchone()[0]
+        else:
+            cursor.execute("""
+                INSERT INTO betriebe (gemeinschaft_id, name, kontaktperson)
+                VALUES (?, ?, ?)
+            """, (gemeinschaft_id, betrieb_name, betrieb_name))
+            betrieb_id = cursor.lastrowid
+
+        # Benutzer dem Betrieb zuordnen
+        if USING_POSTGRESQL:
+            cursor.execute("UPDATE benutzer SET betrieb_id = %s WHERE id = %s", (betrieb_id, user_id))
+        else:
+            cursor.execute("UPDATE benutzer SET betrieb_id = ? WHERE id = ?", (betrieb_id, user_id))
+
+        print(f"    + Betrieb '{betrieb_name}' erstellt für Benutzer {user_id}")
+        created += 1
+
+    return created
+
+
+def migrate_konten_to_betriebe(cursor):
+    """Aktualisiert mitglieder_konten mit betrieb_id basierend auf benutzer_id"""
+    print("  Prüfe Mitgliederkonten ohne Betrieb-Zuordnung...")
+
+    if USING_POSTGRESQL:
+        cursor.execute("""
+            UPDATE mitglieder_konten mk
+            SET betrieb_id = b.betrieb_id
+            FROM benutzer b
+            WHERE mk.benutzer_id = b.id
+            AND mk.betrieb_id IS NULL
+            AND b.betrieb_id IS NOT NULL
+        """)
+    else:
+        cursor.execute("""
+            UPDATE mitglieder_konten
+            SET betrieb_id = (
+                SELECT betrieb_id FROM benutzer WHERE benutzer.id = mitglieder_konten.benutzer_id
+            )
+            WHERE betrieb_id IS NULL
+            AND EXISTS (SELECT 1 FROM benutzer WHERE benutzer.id = mitglieder_konten.benutzer_id AND benutzer.betrieb_id IS NOT NULL)
+        """)
+
+    updated = cursor.rowcount
+    if updated > 0:
+        print(f"    + {updated} Mitgliederkonten aktualisiert")
+    return updated
+
+
+def migrate_abrechnungen_to_betriebe(cursor):
+    """Aktualisiert mitglieder_abrechnungen mit betrieb_id basierend auf benutzer_id"""
+    print("  Prüfe Abrechnungen ohne Betrieb-Zuordnung...")
+
+    if USING_POSTGRESQL:
+        cursor.execute("""
+            UPDATE mitglieder_abrechnungen ma
+            SET betrieb_id = b.betrieb_id
+            FROM benutzer b
+            WHERE ma.benutzer_id = b.id
+            AND ma.betrieb_id IS NULL
+            AND b.betrieb_id IS NOT NULL
+        """)
+    else:
+        cursor.execute("""
+            UPDATE mitglieder_abrechnungen
+            SET betrieb_id = (
+                SELECT betrieb_id FROM benutzer WHERE benutzer.id = mitglieder_abrechnungen.benutzer_id
+            )
+            WHERE betrieb_id IS NULL
+            AND EXISTS (SELECT 1 FROM benutzer WHERE benutzer.id = mitglieder_abrechnungen.benutzer_id AND benutzer.betrieb_id IS NOT NULL)
+        """)
+
+    updated = cursor.rowcount
+    if updated > 0:
+        print(f"    + {updated} Abrechnungen aktualisiert")
+    return updated
+
+
 def run_migrations():
     """Führt alle notwendigen Migrationen durch"""
     print("Schema-Migration: Prüfe Datenbankstruktur...")
@@ -419,9 +570,30 @@ def run_migrations():
         conn.commit()
 
         if changes_made > 0:
-            print(f"Schema-Migration: {changes_made} Änderungen durchgeführt.")
+            print(f"Schema-Migration: {changes_made} Schema-Änderungen durchgeführt.")
         else:
-            print("Schema-Migration: Keine Änderungen notwendig.")
+            print("Schema-Migration: Keine Schema-Änderungen notwendig.")
+
+        # Daten-Migrationen ausführen
+        print("Schema-Migration: Prüfe Daten-Migrationen...")
+        data_changes = 0
+
+        # Betriebe für Benutzer erstellen
+        if table_exists(cursor, 'betriebe') and table_exists(cursor, 'benutzer'):
+            data_changes += migrate_users_to_betriebe(cursor)
+
+        # Konten auf Betriebe umstellen
+        if table_exists(cursor, 'mitglieder_konten') and column_exists(cursor, 'mitglieder_konten', 'betrieb_id'):
+            data_changes += migrate_konten_to_betriebe(cursor)
+
+        # Abrechnungen auf Betriebe umstellen
+        if table_exists(cursor, 'mitglieder_abrechnungen') and column_exists(cursor, 'mitglieder_abrechnungen', 'betrieb_id'):
+            data_changes += migrate_abrechnungen_to_betriebe(cursor)
+
+        conn.commit()
+
+        if data_changes > 0:
+            print(f"Schema-Migration: {data_changes} Daten-Migrationen durchgeführt.")
 
         cursor.close()
         conn.close()
