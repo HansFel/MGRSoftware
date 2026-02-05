@@ -49,7 +49,7 @@ def admin_benutzer_neu():
     # Gemeinschaften laden für Formular
     with MaschinenDBContext(db_path) as db:
         cursor = db.connection.cursor()
-        sql = convert_sql("SELECT id, name FROM gemeinschaften WHERE aktiv = 1 ORDER BY name")
+        sql = convert_sql("SELECT id, name FROM gemeinschaften WHERE aktiv = true ORDER BY name")
         cursor.execute(sql)
         columns = [desc[0] for desc in cursor.description]
         gemeinschaften = [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -88,7 +88,7 @@ def admin_benutzer_edit(benutzer_id):
 
         # Gemeinschaften laden
         cursor = db.connection.cursor()
-        sql = convert_sql("SELECT id, name FROM gemeinschaften WHERE aktiv = 1 ORDER BY name")
+        sql = convert_sql("SELECT id, name FROM gemeinschaften WHERE aktiv = true ORDER BY name")
         cursor.execute(sql)
         columns = [desc[0] for desc in cursor.description]
         gemeinschaften = [dict(zip(columns, row)) for row in cursor.fetchall()]
