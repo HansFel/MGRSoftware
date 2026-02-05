@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Anträge - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h1 class="text-white mb-4">
+            <i class="bi bi-file-earmark-text"></i> Anträge verwalten
+        </h1>
+    </div>
+</div>
+
+<!-- Statistik-Karten -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-center {% if status_filter == 'eingereicht' %}border-primary{% endif %}">
+            <div class="card-body">
+                <h3 class="text-warning">{{ statistik.eingereicht }}</h3>
+                <p class="mb-0">
+                    <a href="{{ url_for('admin_antraege.antraege_liste', status='eingereicht') }}"
+                       class="text-decoration-none">
+                        <i class="bi bi-hourglass-split"></i> Eingereicht
+                    </a>
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center {% if status_filter == 'angenommen' %}border-success{% endif %}">
+            <div class="card-body">
+                <h3 class="text-success">{{ statistik.angenommen }}</h3>
+                <p class="mb-0">
+                    <a href="{{ url_for('admin_antraege.antraege_liste', status='angenommen') }}"
+                       class="text-decoration-none">
+                        <i class="bi bi-check-circle"></i> Angenommen
+                    </a>
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center {% if status_filter == 'abgelehnt' %}border-danger{% endif %}">
+            <div class="card-body">
+                <h3 class="text-danger">{{ statistik.abgelehnt }}</h3>
+                <p class="mb-0">
+                    <a href="{{ url_for('admin_antraege.antraege_liste', status='abgelehnt') }}"
+                       class="text-decoration-none">
+                        <i class="bi bi-x-circle"></i> Abgelehnt
+                    </a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-12">
+        <a href="{{ url_for('admin_antraege.antraege_liste') }}" class="btn btn-outline-light">
+            <i class="bi bi-list"></i> Alle anzeigen
+        </a>
+        <a href="{{ url_for('admin_system.admin_dashboard') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-check"></i>
+                    {% if status_filter %}
+                        Anträge: {{ status_filter|capitalize }}
+                    {% else %}
+                        Alle Anträge
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if antraege %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Datum</th>
+                                <th>Titel</th>
+                                <th>Antragsteller</th>
+                                <th>Gemeinschaft</th>
+                                <th>Status</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for a in antraege %}
+                            <tr>
+                                <td>{{ a.erstellt_am[:10] if a.erstellt_am else '-' }}</td>
+                                <td><strong>{{ a.titel }}</strong></td>
+                                <td>{{ a.antragsteller }}</td>
+                                <td>{{ a.gemeinschaft_name }}</td>
+                                <td>
+                                    {% if a.status == 'eingereicht' %}
+                                    <span class="badge bg-warning"><i class="bi bi-hourglass-split"></i> Eingereicht</span>
+                                    {% elif a.status == 'angenommen' %}
+                                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Angenommen</span>
+                                    {% else %}
+                                    <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Abgelehnt</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('admin_antraege.antrag_detail', id=a.id) }}"
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> Details
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    {% if status_filter %}
+                        Keine Anträge mit Status "{{ status_filter }}" vorhanden.
+                    {% else %}
+                        Noch keine Anträge vorhanden.
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

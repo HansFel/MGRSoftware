@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Antrag stellen - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h1 class="text-white mb-4">
+            <i class="bi bi-file-earmark-plus"></i> Antrag stellen
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-pencil"></i> Neuer Antrag
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="gemeinschaft_id" class="form-label">Gemeinschaft *</label>
+                        <select name="gemeinschaft_id" id="gemeinschaft_id" class="form-select" required>
+                            <option value="">-- Bitte wählen --</option>
+                            {% for g in gemeinschaften %}
+                            <option value="{{ g.id }}">{{ g.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="titel" class="form-label">Titel *</label>
+                        <input type="text" name="titel" id="titel" class="form-control" required
+                               placeholder="z.B. Antrag auf Anschaffung einer neuen Maschine">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="beschreibung" class="form-label">Beschreibung</label>
+                        <textarea name="beschreibung" id="beschreibung" class="form-control" rows="6"
+                                  placeholder="Beschreiben Sie Ihren Antrag ausführlich..."></textarea>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-send"></i> Antrag einreichen
+                        </button>
+                        <a href="{{ url_for('abstimmungen.meine_antraege') }}" class="btn btn-secondary">
+                            <i class="bi bi-x-lg"></i> Abbrechen
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Hinweise</h6>
+            </div>
+            <div class="card-body">
+                <p class="small">
+                    <strong>Anträge</strong> werden an den Vorstand der Gemeinschaft übermittelt und dort bearbeitet.
+                </p>
+                <p class="small">
+                    Sie werden per Nachricht informiert, sobald Ihr Antrag bearbeitet wurde.
+                </p>
+                <p class="small mb-0">
+                    <i class="bi bi-clock"></i> Unter <strong>"Meine Anträge"</strong> können Sie den Status Ihrer Anträge verfolgen.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

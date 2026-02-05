@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Meine Anträge - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h1 class="text-white mb-4">
+            <i class="bi bi-file-earmark-text"></i> Meine Anträge
+        </h1>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-12">
+        <a href="{{ url_for('abstimmungen.antrag_stellen') }}" class="btn btn-success">
+            <i class="bi bi-plus-circle"></i> Neuen Antrag stellen
+        </a>
+        <a href="{{ url_for('dashboard.dashboard') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-check"></i> Eingereichte Anträge
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if antraege %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Datum</th>
+                                <th>Titel</th>
+                                <th>Gemeinschaft</th>
+                                <th>Status</th>
+                                <th>Bemerkung</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for a in antraege %}
+                            <tr>
+                                <td>{{ a.erstellt_am[:10] if a.erstellt_am else '-' }}</td>
+                                <td>
+                                    <strong>{{ a.titel }}</strong>
+                                    {% if a.beschreibung %}
+                                    <br><small class="text-muted">{{ a.beschreibung[:100] }}{% if a.beschreibung|length > 100 %}...{% endif %}</small>
+                                    {% endif %}
+                                </td>
+                                <td>{{ a.gemeinschaft_name }}</td>
+                                <td>
+                                    {% if a.status == 'eingereicht' %}
+                                    <span class="badge bg-warning">
+                                        <i class="bi bi-hourglass-split"></i> Eingereicht
+                                    </span>
+                                    {% elif a.status == 'angenommen' %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle"></i> Angenommen
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-x-circle"></i> Abgelehnt
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if a.bemerkung %}
+                                    <small>{{ a.bemerkung }}</small>
+                                    {% elif a.status == 'eingereicht' %}
+                                    <small class="text-muted">Noch nicht bearbeitet</small>
+                                    {% else %}
+                                    <small class="text-muted">-</small>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                    <p class="mb-0 mt-2">Sie haben noch keine Anträge gestellt</p>
+                    <a href="{{ url_for('abstimmungen.antrag_stellen') }}" class="btn btn-primary mt-3">
+                        <i class="bi bi-plus-circle"></i> Ersten Antrag stellen
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

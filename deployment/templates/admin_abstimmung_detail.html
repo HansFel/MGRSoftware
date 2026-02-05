@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}{{ abstimmung.titel }} - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h1 class="text-white mb-4">
+            <i class="bi bi-check2-square"></i> {{ abstimmung.titel }}
+        </h1>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-12">
+        <a href="{{ url_for('admin_abstimmungen.abstimmungen_liste') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück zur Liste
+        </a>
+        {% if abstimmung.status == 'offen' %}
+        <a href="{{ url_for('admin_abstimmungen.abstimmung_bearbeiten', id=abstimmung.id) }}"
+           class="btn btn-warning">
+            <i class="bi bi-pencil"></i> Bearbeiten
+        </a>
+        <form method="POST" action="{{ url_for('admin_abstimmungen.abstimmung_abschliessen', id=abstimmung.id) }}"
+              class="d-inline" onsubmit="return confirm('Abstimmung wirklich abschließen? Danach können keine weiteren Stimmen abgegeben werden.');">
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-check-circle"></i> Abschließen
+            </button>
+        </form>
+        {% endif %}
+        <form method="POST" action="{{ url_for('admin_abstimmungen.abstimmung_loeschen', id=abstimmung.id) }}"
+              class="d-inline" onsubmit="return confirm('Abstimmung wirklich löschen? Alle Stimmen werden ebenfalls gelöscht!');">
+            <button type="submit" class="btn btn-danger">
+                <i class="bi bi-trash"></i> Löschen
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Abstimmungs-Details -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-info-circle"></i> Details
+                </h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">Gemeinschaft</dt>
+                    <dd class="col-sm-9">{{ abstimmung.gemeinschaft_name }}</dd>
+
+                    <dt class="col-sm-3">Status</dt>
+                    <dd class="col-sm-9">
+                        {% if abstimmung.status == 'offen' %}
+                        <span class="badge bg-success"><i class="bi bi-unlock"></i> Offen</span>
+                        {% else %}
+                        <span class="badge bg-secondary"><i class="bi bi-lock"></i> Abgeschlossen</span>
+                        {% endif %}
+                        {% if abstimmung.geheim %}
+                        <span class="badge bg-secondary"><i class="bi bi-eye-slash"></i> Geheim</span>
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-3">Ablaufdatum</dt>
+                    <dd class="col-sm-9">{{ abstimmung.ablauf_datum[:16] if abstimmung.ablauf_datum else '-' }}</dd>
+
+                    <dt class="col-sm-3">Erstellt von</dt>
+                    <dd class="col-sm-9">{{ abstimmung.erstellt_von_name }}</dd>
+
+                    <dt class="col-sm-3">Erstellt am</dt>
+                    <dd class="col-sm-9">{{ abstimmung.erstellt_am[:16] if abstimmung.erstellt_am else '-' }}</dd>
+                </dl>
+
+                {% if abstimmung.beschreibung %}
+                <hr>
+                <h6>Beschreibung</h6>
+                <p class="mb-0">{{ abstimmung.beschreibung }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Stimmen-Übersicht -->
+        {% if stimmen and (not abstimmung.geheim or abstimmung.status == 'abgeschlossen') %}
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-people"></i> Abgegebene Stimmen ({{ stimmen|length }})
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Mitglied</th>
+                                <th>Stimme</th>
+                                <th>Abgegeben am</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in stimmen %}
+                            <tr>
+                                <td>{{ s.benutzer_name }}</td>
+                                <td>
+                                    {% if s.stimme == 'ja' %}
+                                    <span class="badge bg-success"><i class="bi bi-hand-thumbs-up"></i> Ja</span>
+                                    {% elif s.stimme == 'nein' %}
+                                    <span class="badge bg-danger"><i class="bi bi-hand-thumbs-down"></i> Nein</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary"><i class="bi bi-dash"></i> Enthaltung</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ s.abgegeben_am[:16] if s.abgegeben_am else '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% elif abstimmung.geheim and abstimmung.status == 'offen' %}
+        <div class="alert alert-info">
+            <i class="bi bi-eye-slash"></i> Bei geheimer Abstimmung werden die einzelnen Stimmen nicht angezeigt.
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-md-4">
+        <!-- Ergebnis -->
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-bar-chart"></i> Ergebnis
+                </h5>
+            </div>
+            <div class="card-body">
+                {% set total = statistik.ja + statistik.nein + statistik.enthaltung %}
+                {% if total > 0 %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-success"><i class="bi bi-hand-thumbs-up"></i> Ja</span>
+                        <strong>{{ statistik.ja }}</strong>
+                    </div>
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar bg-success" style="width: {{ (statistik.ja / total * 100)|round(1) }}%">
+                            {{ (statistik.ja / total * 100)|round(1) }}%
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-danger"><i class="bi bi-hand-thumbs-down"></i> Nein</span>
+                        <strong>{{ statistik.nein }}</strong>
+                    </div>
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar bg-danger" style="width: {{ (statistik.nein / total * 100)|round(1) }}%">
+                            {{ (statistik.nein / total * 100)|round(1) }}%
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted"><i class="bi bi-dash"></i> Enthaltung</span>
+                        <strong>{{ statistik.enthaltung }}</strong>
+                    </div>
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar bg-secondary" style="width: {{ (statistik.enthaltung / total * 100)|round(1) }}%">
+                            {{ (statistik.enthaltung / total * 100)|round(1) }}%
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+                <div class="text-center">
+                    <strong>Gesamt: {{ total }} Stimmen</strong>
+                </div>
+                {% else %}
+                <div class="text-center text-muted">
+                    <i class="bi bi-inbox"></i>
+                    <p class="mb-0">Noch keine Stimmen abgegeben</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

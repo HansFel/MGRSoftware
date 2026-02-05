@@ -388,6 +388,48 @@ def admin_rollen_remove_gemeinschaft():
     return redirect(url_for('admin_system.admin_rollen'))
 
 
+@admin_system_bp.route('/rollen/set-rolle', methods=['POST'])
+@hauptadmin_required
+def admin_rollen_set_rolle():
+    """Vorstandsrolle setzen (Obmann, Kassier, Schriftführer, Kassaprüfer)"""
+    db_path = get_current_db_path()
+
+    benutzer_id = request.form.get('benutzer_id')
+    rolle = request.form.get('rolle')
+
+    if not benutzer_id:
+        flash('Fehlende Formulardaten.', 'danger')
+        return redirect(url_for('admin_system.admin_rollen'))
+
+    benutzer_id = int(benutzer_id)
+
+    # Leere Rolle als NULL speichern
+    if rolle == '' or rolle == 'keine':
+        rolle = None
+
+    with MaschinenDBContext(db_path) as db:
+        cursor = db.connection.cursor()
+
+        sql = convert_sql("""
+            UPDATE benutzer
+            SET rolle = ?
+            WHERE id = ?
+        """)
+        cursor.execute(sql, (rolle, benutzer_id))
+        db.connection.commit()
+
+    rollen_namen = {
+        'obmann': 'Obmann',
+        'kassier': 'Kassier',
+        'schriftfuehrer': 'Schriftführer',
+        'kassaprufer1': 'Kassaprüfer 1',
+        'kassaprufer2': 'Kassaprüfer 2',
+        None: 'Keine Rolle'
+    }
+    flash(f'Rolle wurde auf "{rollen_namen.get(rolle, rolle)}" gesetzt.', 'success')
+    return redirect(url_for('admin_system.admin_rollen'))
+
+
 @admin_system_bp.route('/export/json')
 @admin_required
 def admin_export_json():

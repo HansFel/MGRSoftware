@@ -28,6 +28,7 @@ def login():
                 session['benutzer_name'] = f"{benutzer['name']}, {benutzer['vorname']}"
                 session['is_admin'] = bool(benutzer.get('is_admin', False))
                 session['admin_level'] = benutzer.get('admin_level', 0)
+                session['rolle'] = benutzer.get('rolle')  # Vorstandsrolle
 
                 # Trainings-Modus Einstellung laden
                 nur_training = benutzer.get('nur_training', 0)

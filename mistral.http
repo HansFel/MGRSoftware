@@ -1,0 +1,10 @@
+POST https://api.mistral.ai/v1/chat/completions
+Content-Type: application/json
+Authorization: Bearer Pt8VvmoGmab09ydMfJJgmlQArD5h9XpM
+
+{
+  "model": "mistral-large-latest",
+  "messages": [
+    { "role": "user", "content": "Hallo Mistral! Erkläre mir Docker in einfachen Worten." }
+  ]
+}

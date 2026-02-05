@@ -21,11 +21,18 @@
             </div>
             <div class="card-body">
                 <div class="alert alert-info">
-                    <h6><i class="bi bi-info-circle"></i> Rollenbeschreibung:</h6>
-                    <ul class="mb-0">
+                    <h6><i class="bi bi-info-circle"></i> Admin-Level:</h6>
+                    <ul class="mb-2">
                         <li><strong>Kein Admin:</strong> Normaler Benutzer ohne Admin-Rechte</li>
                         <li><strong>Gemeinschafts-Administrator:</strong> Kann nur seine zugewiesenen Gemeinschaften verwalten</li>
                         <li><strong>Haupt-Administrator:</strong> Volle Rechte, kann alle Gemeinschaften verwalten, Rollen vergeben und Backups bestätigen</li>
+                    </ul>
+                    <h6><i class="bi bi-people-fill"></i> Vorstandsrollen:</h6>
+                    <ul class="mb-2">
+                        <li><strong>Obmann:</strong> Volle Vorstandsrechte</li>
+                        <li><strong>Kassier:</strong> Finanzverwaltung</li>
+                        <li><strong>Schriftführer:</strong> Protokolle, Abstimmungen, Anträge</li>
+                        <li><strong>Kassaprüfer 1/2:</strong> Prüfung der Finanzen</li>
                     </ul>
                     <hr>
                     <p class="mb-0">
@@ -41,6 +48,7 @@
                                 <th>Name</th>
                                 <th>Benutzername</th>
                                 <th>Admin-Level</th>
+                                <th>Vorstandsrolle</th>
                                 <th>Gemeinschafts-Admin für</th>
                                 <th>Aktionen</th>
                             </tr>
@@ -66,6 +74,21 @@
                                     {% endif %}
                                 </td>
                                 <td>
+                                    {% if user.rolle == 'obmann' %}
+                                        <span class="badge bg-primary"><i class="bi bi-star-fill"></i> Obmann</span>
+                                    {% elif user.rolle == 'kassier' %}
+                                        <span class="badge bg-success"><i class="bi bi-cash-coin"></i> Kassier</span>
+                                    {% elif user.rolle == 'schriftfuehrer' %}
+                                        <span class="badge bg-info"><i class="bi bi-journal-text"></i> Schriftführer</span>
+                                    {% elif user.rolle == 'kassaprufer1' %}
+                                        <span class="badge bg-secondary"><i class="bi bi-search"></i> Kassaprüfer 1</span>
+                                    {% elif user.rolle == 'kassaprufer2' %}
+                                        <span class="badge bg-secondary"><i class="bi bi-search"></i> Kassaprüfer 2</span>
+                                    {% else %}
+                                        <small class="text-muted">—</small>
+                                    {% endif %}
+                                </td>
+                                <td>
                                     {% if user.gemeinschaften %}
                                         <small class="text-muted">{{ user.gemeinschaften }}</small>
                                     {% else %}
@@ -75,7 +98,7 @@
                                 <td>
                                     <!-- Admin-Level ändern -->
                                     <div class="btn-group btn-group-sm" role="group">
-                                        <button type="button" class="btn btn-outline-secondary dropdown-toggle" 
+                                        <button type="button" class="btn btn-outline-secondary dropdown-toggle"
                                                 data-bs-toggle="dropdown" aria-expanded="false">
                                             <i class="bi bi-gear"></i> Level
                                         </button>
@@ -84,7 +107,7 @@
                                                 <form method="POST" action="{{ url_for('admin_system.admin_rollen_set_level') }}" class="d-inline">
                                                     <input type="hidden" name="benutzer_id" value="{{ user.id }}">
                                                     <input type="hidden" name="level" value="0">
-                                                    <button type="submit" class="dropdown-item" 
+                                                    <button type="submit" class="dropdown-item"
                                                             {% if user.admin_level == 0 %}disabled{% endif %}>
                                                         <i class="bi bi-person"></i> Kein Admin
                                                     </button>
@@ -113,10 +136,75 @@
                                         </ul>
                                     </div>
 
+                                    <!-- Vorstandsrolle ändern -->
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-outline-primary dropdown-toggle"
+                                                data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="bi bi-people"></i> Rolle
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li>
+                                                <form method="POST" action="{{ url_for('admin_system.admin_rollen_set_rolle') }}" class="d-inline">
+                                                    <input type="hidden" name="benutzer_id" value="{{ user.id }}">
+                                                    <input type="hidden" name="rolle" value="keine">
+                                                    <button type="submit" class="dropdown-item" {% if not user.rolle %}disabled{% endif %}>
+                                                        <i class="bi bi-dash"></i> Keine Rolle
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <form method="POST" action="{{ url_for('admin_system.admin_rollen_set_rolle') }}" class="d-inline">
+                                                    <input type="hidden" name="benutzer_id" value="{{ user.id }}">
+                                                    <input type="hidden" name="rolle" value="obmann">
+                                                    <button type="submit" class="dropdown-item" {% if user.rolle == 'obmann' %}disabled{% endif %}>
+                                                        <i class="bi bi-star-fill"></i> Obmann
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="POST" action="{{ url_for('admin_system.admin_rollen_set_rolle') }}" class="d-inline">
+                                                    <input type="hidden" name="benutzer_id" value="{{ user.id }}">
+                                                    <input type="hidden" name="rolle" value="kassier">
+                                                    <button type="submit" class="dropdown-item" {% if user.rolle == 'kassier' %}disabled{% endif %}>
+                                                        <i class="bi bi-cash-coin"></i> Kassier
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="POST" action="{{ url_for('admin_system.admin_rollen_set_rolle') }}" class="d-inline">
+                                                    <input type="hidden" name="benutzer_id" value="{{ user.id }}">
+                                                    <input type="hidden" name="rolle" value="schriftfuehrer">
+                                                    <button type="submit" class="dropdown-item" {% if user.rolle == 'schriftfuehrer' %}disabled{% endif %}>
+                                                        <i class="bi bi-journal-text"></i> Schriftführer
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="POST" action="{{ url_for('admin_system.admin_rollen_set_rolle') }}" class="d-inline">
+                                                    <input type="hidden" name="benutzer_id" value="{{ user.id }}">
+                                                    <input type="hidden" name="rolle" value="kassaprufer1">
+                                                    <button type="submit" class="dropdown-item" {% if user.rolle == 'kassaprufer1' %}disabled{% endif %}>
+                                                        <i class="bi bi-search"></i> Kassaprüfer 1
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="POST" action="{{ url_for('admin_system.admin_rollen_set_rolle') }}" class="d-inline">
+                                                    <input type="hidden" name="benutzer_id" value="{{ user.id }}">
+                                                    <input type="hidden" name="rolle" value="kassaprufer2">
+                                                    <button type="submit" class="dropdown-item" {% if user.rolle == 'kassaprufer2' %}disabled{% endif %}>
+                                                        <i class="bi bi-search"></i> Kassaprüfer 2
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        </ul>
+                                    </div>
+
                                     <!-- Gemeinschaft zuweisen (nur für Gemeinschafts-Admins) -->
                                     {% if user.admin_level == 1 %}
-                                    <button type="button" class="btn btn-sm btn-outline-primary" 
-                                            data-bs-toggle="modal" 
+                                    <button type="button" class="btn btn-sm btn-outline-success"
+                                            data-bs-toggle="modal"
                                             data-bs-target="#gemeinschaftModal{{ user.id }}">
                                         <i class="bi bi-plus-circle"></i> Gemeinschaft
                                     </button>

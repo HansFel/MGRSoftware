@@ -103,6 +103,9 @@ REQUIRED_COLUMNS = [
     ("buchungen", "referenz_id", "INTEGER", "INTEGER", None),
     ("buchungen", "erstellt_von", "INTEGER", "INTEGER", None),
     ("buchungen", "erstellt_am", "TIMESTAMP", "DATETIME", None),
+
+    # benutzer - Rolle für Vorstandsmitglieder
+    ("benutzer", "rolle", "VARCHAR(50)", "TEXT", None),
 ]
 
 # Liste aller erforderlichen Tabellen
@@ -386,6 +389,83 @@ REQUIRED_TABLES = [
             notizen TEXT,
             aktiv BOOLEAN DEFAULT 1,
             erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP
+        )"""
+    ),
+    (
+        "abstimmungen",
+        """CREATE TABLE IF NOT EXISTS abstimmungen (
+            id SERIAL PRIMARY KEY,
+            gemeinschaft_id INTEGER NOT NULL,
+            titel TEXT NOT NULL,
+            beschreibung TEXT,
+            ablauf_datum TIMESTAMP NOT NULL,
+            erstellt_von INTEGER NOT NULL,
+            erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            status VARCHAR(20) DEFAULT 'offen',
+            geheim BOOLEAN DEFAULT FALSE,
+            ergebnis_ja INTEGER DEFAULT 0,
+            ergebnis_nein INTEGER DEFAULT 0,
+            ergebnis_enthaltung INTEGER DEFAULT 0
+        )""",
+        """CREATE TABLE IF NOT EXISTS abstimmungen (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            gemeinschaft_id INTEGER NOT NULL,
+            titel TEXT NOT NULL,
+            beschreibung TEXT,
+            ablauf_datum DATETIME NOT NULL,
+            erstellt_von INTEGER NOT NULL,
+            erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+            status TEXT DEFAULT 'offen',
+            geheim INTEGER DEFAULT 0,
+            ergebnis_ja INTEGER DEFAULT 0,
+            ergebnis_nein INTEGER DEFAULT 0,
+            ergebnis_enthaltung INTEGER DEFAULT 0
+        )"""
+    ),
+    (
+        "abstimmung_stimmen",
+        """CREATE TABLE IF NOT EXISTS abstimmung_stimmen (
+            id SERIAL PRIMARY KEY,
+            abstimmung_id INTEGER NOT NULL,
+            benutzer_id INTEGER NOT NULL,
+            stimme VARCHAR(20) NOT NULL,
+            abgegeben_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(abstimmung_id, benutzer_id)
+        )""",
+        """CREATE TABLE IF NOT EXISTS abstimmung_stimmen (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            abstimmung_id INTEGER NOT NULL,
+            benutzer_id INTEGER NOT NULL,
+            stimme TEXT NOT NULL,
+            abgegeben_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(abstimmung_id, benutzer_id)
+        )"""
+    ),
+    (
+        "antraege",
+        """CREATE TABLE IF NOT EXISTS antraege (
+            id SERIAL PRIMARY KEY,
+            gemeinschaft_id INTEGER NOT NULL,
+            titel TEXT NOT NULL,
+            beschreibung TEXT,
+            benutzer_id INTEGER NOT NULL,
+            erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            status VARCHAR(20) DEFAULT 'eingereicht',
+            bearbeitet_am TIMESTAMP,
+            bearbeitet_von INTEGER,
+            bemerkung TEXT
+        )""",
+        """CREATE TABLE IF NOT EXISTS antraege (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            gemeinschaft_id INTEGER NOT NULL,
+            titel TEXT NOT NULL,
+            beschreibung TEXT,
+            benutzer_id INTEGER NOT NULL,
+            erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+            status TEXT DEFAULT 'eingereicht',
+            bearbeitet_am DATETIME,
+            bearbeitet_von INTEGER,
+            bemerkung TEXT
         )"""
     ),
 ]

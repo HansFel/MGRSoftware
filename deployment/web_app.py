@@ -51,6 +51,9 @@ from routes.admin_finanzen import admin_finanzen_bp
 from routes.admin_system import admin_system_bp
 from routes.admin_schriftfuehrer import admin_schriftfuehrer_bp
 from routes.admin_betriebe import admin_betriebe_bp
+from routes.admin_abstimmungen import admin_abstimmungen_bp
+from routes.admin_antraege import admin_antraege_bp
+from routes.abstimmungen import abstimmungen_bp
 
 # Blueprints registrieren
 app.register_blueprint(auth_bp)
@@ -68,6 +71,9 @@ app.register_blueprint(admin_finanzen_bp)
 app.register_blueprint(admin_system_bp)
 app.register_blueprint(admin_schriftfuehrer_bp)
 app.register_blueprint(admin_betriebe_bp)
+app.register_blueprint(admin_abstimmungen_bp)
+app.register_blueprint(admin_antraege_bp)
+app.register_blueprint(abstimmungen_bp)
 
 
 @app.context_processor

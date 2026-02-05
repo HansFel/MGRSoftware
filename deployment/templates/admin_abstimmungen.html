@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Abstimmungen - Maschinengemeinschaft{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h1 class="text-white mb-4">
+            <i class="bi bi-check2-square"></i> Abstimmungen verwalten
+        </h1>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-12">
+        <a href="{{ url_for('admin_abstimmungen.abstimmung_neu') }}" class="btn btn-success">
+            <i class="bi bi-plus-circle"></i> Neue Abstimmung
+        </a>
+        <a href="{{ url_for('admin_system.admin_dashboard') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-check"></i> Alle Abstimmungen
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if abstimmungen %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Titel</th>
+                                <th>Gemeinschaft</th>
+                                <th>Ablaufdatum</th>
+                                <th>Status</th>
+                                <th>Ergebnis</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for a in abstimmungen %}
+                            <tr>
+                                <td>
+                                    <strong>{{ a.titel }}</strong>
+                                    {% if a.geheim %}
+                                    <span class="badge bg-secondary ms-1"><i class="bi bi-eye-slash"></i> geheim</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ a.gemeinschaft_name }}</td>
+                                <td>{{ a.ablauf_datum[:10] if a.ablauf_datum else '-' }}</td>
+                                <td>
+                                    {% if a.status == 'offen' %}
+                                    <span class="badge bg-success"><i class="bi bi-unlock"></i> Offen</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary"><i class="bi bi-lock"></i> Abgeschlossen</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if a.status == 'abgeschlossen' %}
+                                    <span class="text-success">{{ a.ergebnis_ja }} Ja</span> /
+                                    <span class="text-danger">{{ a.ergebnis_nein }} Nein</span> /
+                                    <span class="text-muted">{{ a.ergebnis_enthaltung }} Enth.</span>
+                                    {% else %}
+                                    <small class="text-muted">-</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('admin_abstimmungen.abstimmung_detail', id=a.id) }}"
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> Details
+                                    </a>
+                                    {% if a.status == 'offen' %}
+                                    <a href="{{ url_for('admin_abstimmungen.abstimmung_bearbeiten', id=a.id) }}"
+                                       class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Noch keine Abstimmungen vorhanden.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
