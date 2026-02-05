@@ -180,10 +180,10 @@ SELECT
     g.beschreibung,
     g.aktiv,
     COUNT(DISTINCT m.id) as anzahl_maschinen,
-    COUNT(DISTINCT mg.mitglied_id) as anzahl_mitglieder
+    COUNT(DISTINCT bg.betrieb_id) as anzahl_mitglieder
 FROM gemeinschaften g
 LEFT JOIN maschinen m ON g.id = m.gemeinschaft_id AND m.aktiv = TRUE
-LEFT JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
+LEFT JOIN betriebe_gemeinschaften bg ON g.id = bg.gemeinschaft_id
 GROUP BY g.id, g.name, g.beschreibung, g.aktiv;
 
 -- Tabelle für Gemeinschafts-Administratoren
