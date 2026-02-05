@@ -96,7 +96,7 @@ def nachricht_neu():
             if cursor.fetchone()[0] > 0:
                 sql = convert_sql("""
                     INSERT INTO gemeinschafts_nachrichten
-                    (gemeinschaft_id, absender_id, betreff, nachricht, erstellt_am)
+                    (gemeinschaft_id, absender_id, betreff, inhalt, erstellt_am)
                     VALUES (?, ?, ?, ?, ?)
                 """)
                 cursor.execute(sql, (gemeinschaft_id, session['benutzer_id'], betreff, nachricht,
