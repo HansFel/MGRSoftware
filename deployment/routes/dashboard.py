@@ -151,12 +151,13 @@ def dashboard():
         columns = [desc[0] for desc in cursor.description]
         reservierungen = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        # Ungelesene Nachrichten zählen
+        # Ungelesene Nachrichten zählen (über Betrieb des Benutzers)
         sql = convert_sql("""
-            SELECT COUNT(*) FROM gemeinschafts_nachrichten n
-            JOIN mitglied_gemeinschaft mg ON n.gemeinschaft_id = mg.gemeinschaft_id
+            SELECT COUNT(DISTINCT n.id) FROM gemeinschafts_nachrichten n
+            JOIN betriebe_gemeinschaften bg ON n.gemeinschaft_id = bg.gemeinschaft_id
+            JOIN benutzer u ON u.betrieb_id = bg.betrieb_id
             LEFT JOIN nachricht_gelesen ng ON n.id = ng.nachricht_id AND ng.benutzer_id = ?
-            WHERE mg.mitglied_id = ? AND ng.nachricht_id IS NULL
+            WHERE u.id = ? AND ng.nachricht_id IS NULL
         """)
         cursor.execute(sql, (benutzer_id, benutzer_id))
 
