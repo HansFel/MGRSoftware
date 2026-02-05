@@ -203,11 +203,11 @@ def admin_gemeinschaften_abrechnung(gemeinschaft_id):
         columns = [desc[0] for desc in cursor.description]
         gemeinschaft = dict(zip(columns, cursor.fetchone()))
 
-        # Einsätze nach Mitglied
+        # Einsätze nach Betrieb (über benutzer.betrieb_id)
         sql = convert_sql("""
             SELECT
-                b.id,
-                b.vorname || ' ' || b.name as mitglied_name,
+                bt.id,
+                bt.name,
                 COUNT(e.id) as anzahl_einsaetze,
                 SUM(e.endstand - e.anfangstand) as betriebsstunden,
                 SUM(
@@ -220,30 +220,44 @@ def admin_gemeinschaften_abrechnung(gemeinschaft_id):
             FROM maschineneinsaetze e
             JOIN maschinen m ON e.maschine_id = m.id
             JOIN benutzer b ON e.benutzer_id = b.id
+            JOIN betriebe bt ON b.betrieb_id = bt.id
+            JOIN betriebe_gemeinschaften bg ON bt.id = bg.betrieb_id AND bg.gemeinschaft_id = ?
             WHERE m.gemeinschaft_id = ?
-            GROUP BY b.id, b.vorname, b.name
+            GROUP BY bt.id, bt.name
             ORDER BY maschinenkosten DESC
         """)
-        cursor.execute(sql, (gemeinschaft_id,))
+        cursor.execute(sql, (gemeinschaft_id, gemeinschaft_id))
         columns = [desc[0] for desc in cursor.description]
-        mitglieder_kosten = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        betriebe_abrechnung = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        for m in mitglieder_kosten:
-            m['gesamt'] = (m['maschinenkosten'] or 0) + (m['treibstoffkosten'] or 0)
+        for b in betriebe_abrechnung:
+            b['gesamtkosten'] = (b['maschinenkosten'] or 0)
 
         # Gesamtsummen berechnen
         gesamtsummen = {
-            'anzahl_einsaetze': sum(m.get('anzahl_einsaetze', 0) or 0 for m in mitglieder_kosten),
-            'betriebsstunden': sum(m.get('betriebsstunden', 0) or 0 for m in mitglieder_kosten),
-            'maschinenkosten': sum(m.get('maschinenkosten', 0) or 0 for m in mitglieder_kosten),
-            'treibstoffkosten': sum(m.get('treibstoffkosten', 0) or 0 for m in mitglieder_kosten),
-            'gesamtkosten': sum(m.get('gesamt', 0) or 0 for m in mitglieder_kosten)
+            'anzahl_einsaetze': sum(b.get('anzahl_einsaetze', 0) or 0 for b in betriebe_abrechnung),
+            'betriebsstunden': sum(b.get('betriebsstunden', 0) or 0 for b in betriebe_abrechnung),
+            'maschinenkosten': sum(b.get('maschinenkosten', 0) or 0 for b in betriebe_abrechnung),
+            'treibstoffkosten': sum(b.get('treibstoffkosten', 0) or 0 for b in betriebe_abrechnung),
+            'gesamtkosten': sum(b.get('gesamtkosten', 0) or 0 for b in betriebe_abrechnung)
         }
+
+        # Admins der Gemeinschaft laden
+        sql = convert_sql("""
+            SELECT b.id, b.name, b.vorname, b.email
+            FROM benutzer b
+            JOIN gemeinschafts_admin ga ON b.id = ga.benutzer_id
+            WHERE ga.gemeinschaft_id = ?
+        """)
+        cursor.execute(sql, (gemeinschaft_id,))
+        columns = [desc[0] for desc in cursor.description]
+        admins = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     return render_template('admin_gemeinschaften_abrechnung.html',
                          gemeinschaft=gemeinschaft,
-                         mitglieder_kosten=mitglieder_kosten,
-                         gesamtsummen=gesamtsummen)
+                         betriebe_abrechnung=betriebe_abrechnung,
+                         gesamtsummen=gesamtsummen,
+                         admins=admins)
 
 
 @admin_gemeinschaften_bp.route('/gemeinschaften/<int:gemeinschaft_id>/abrechnung/csv')
