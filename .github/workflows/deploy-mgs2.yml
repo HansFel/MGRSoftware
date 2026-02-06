@@ -21,7 +21,8 @@ jobs:
           username: ${{ secrets.MGS2_USER }}
           key: ${{ secrets.MGS2_SSH_KEY }}
           script: |
-            cd /opt/mgr
+            cd /home/mgserver/mgserver
             git pull origin main
+            cd deployment
             docker-compose restart web
             echo "Deployment complete!"
