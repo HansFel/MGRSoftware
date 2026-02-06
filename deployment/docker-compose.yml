@@ -27,6 +27,7 @@ services:
       PG_PASSWORD: ${DB_PASSWORD:-changeme}
       FLASK_ENV: production
       SECRET_KEY: ${SECRET_KEY:-changeme}
+      SETUP_TOKEN: ${SETUP_TOKEN:-}
     ports:
       - "5000:5000"
 
