@@ -172,6 +172,15 @@ CREATE INDEX IF NOT EXISTS idx_maschinen_gemeinschaft ON maschinen(gemeinschaft_
 CREATE INDEX IF NOT EXISTS idx_mitglied_gemeinschaft_mitglied ON mitglied_gemeinschaft(mitglied_id);
 CREATE INDEX IF NOT EXISTS idx_mitglied_gemeinschaft_gemeinschaft ON mitglied_gemeinschaft(gemeinschaft_id);
 
+-- Betriebe-Gemeinschaften Verknüpfung
+CREATE TABLE IF NOT EXISTS betriebe_gemeinschaften (
+    id SERIAL PRIMARY KEY,
+    betrieb_id INTEGER NOT NULL,
+    gemeinschaft_id INTEGER NOT NULL,
+    beigetreten_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(betrieb_id, gemeinschaft_id)
+);
+
 -- View für Gemeinschafts-Übersicht
 CREATE OR REPLACE VIEW gemeinschaften_uebersicht AS
 SELECT

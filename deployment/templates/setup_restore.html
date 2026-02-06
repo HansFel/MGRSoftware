@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backup wiederherstellen - Setup</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; }
+        .setup-card { background: rgba(255,255,255,0.95); border-radius: 15px; }
+    </style>
+</head>
+<body class="py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-6">
+                <div class="setup-card p-4 shadow-lg">
+                    <h2 class="text-center mb-4">
+                        <i class="bi bi-cloud-upload text-success"></i>
+                        Backup wiederherstellen
+                    </h2>
+
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Achtung:</strong> Bestehende Daten werden überschrieben!
+                    </div>
+
+                    <form method="post" enctype="multipart/form-data">
+                        <input type="hidden" name="token" value="{{ token }}">
+
+                        <div class="mb-4">
+                            <label for="backup_file" class="form-label">
+                                Backup-Datei ({{ file_extension }})
+                            </label>
+                            <input type="file"
+                                   class="form-control form-control-lg"
+                                   id="backup_file"
+                                   name="backup_file"
+                                   accept="{{ file_extension }}"
+                                   required>
+                            <div class="form-text">
+                                Nur {{ file_extension }} Dateien werden akzeptiert.
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-cloud-upload"></i> Backup wiederherstellen
+                            </button>
+                            <a href="{{ url_for('setup.setup_index', token=token) }}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Zurück
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
