@@ -46,7 +46,7 @@
                         <tbody>
                             {% for a in antraege %}
                             <tr>
-                                <td>{{ a.erstellt_am[:10] if a.erstellt_am else '-' }}</td>
+                                <td>{{ a.erstellt_am.strftime('%Y-%m-%d') if a.erstellt_am else '-' }}</td>
                                 <td>
                                     <strong>{{ a.titel }}</strong>
                                     {% if a.beschreibung %}
