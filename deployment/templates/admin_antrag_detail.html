@@ -43,7 +43,7 @@
                     <dd class="col-sm-9">{{ antrag.gemeinschaft_name }}</dd>
 
                     <dt class="col-sm-3">Eingereicht am</dt>
-                    <dd class="col-sm-9">{{ antrag.erstellt_am[:16] if antrag.erstellt_am else '-' }}</dd>
+                    <dd class="col-sm-9">{{ antrag.erstellt_am.strftime('%Y-%m-%d %H:%M') if antrag.erstellt_am else '-' }}</dd>
 
                     <dt class="col-sm-3">Status</dt>
                     <dd class="col-sm-9">
@@ -58,7 +58,7 @@
 
                     {% if antrag.bearbeitet_am %}
                     <dt class="col-sm-3">Bearbeitet am</dt>
-                    <dd class="col-sm-9">{{ antrag.bearbeitet_am[:16] }}</dd>
+                    <dd class="col-sm-9">{{ antrag.bearbeitet_am.strftime('%Y-%m-%d %H:%M') if antrag.bearbeitet_am else '-' }}</dd>
 
                     <dt class="col-sm-3">Bearbeitet von</dt>
                     <dd class="col-sm-9">{{ antrag.bearbeiter_name }}</dd>

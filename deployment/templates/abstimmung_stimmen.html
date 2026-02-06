@@ -23,7 +23,7 @@
             <div class="card-body">
                 <p class="text-muted">
                     <i class="bi bi-people"></i> {{ abstimmung.gemeinschaft_name }} |
-                    <i class="bi bi-calendar"></i> Ablauf: {{ abstimmung.ablauf_datum[:16] if abstimmung.ablauf_datum else '-' }}
+                    <i class="bi bi-calendar"></i> Ablauf: {{ abstimmung.ablauf_datum.strftime('%Y-%m-%d %H:%M') if abstimmung.ablauf_datum else '-' }}
                     {% if abstimmung.geheim %}
                     | <span class="badge bg-secondary"><i class="bi bi-eye-slash"></i> Geheime Abstimmung</span>
                     {% endif %}
