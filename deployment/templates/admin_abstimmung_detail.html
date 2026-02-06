@@ -64,13 +64,13 @@
                     </dd>
 
                     <dt class="col-sm-3">Ablaufdatum</dt>
-                    <dd class="col-sm-9">{{ abstimmung.ablauf_datum[:16] if abstimmung.ablauf_datum else '-' }}</dd>
+                    <dd class="col-sm-9">{{ abstimmung.ablauf_datum.strftime('%Y-%m-%d %H:%M') if abstimmung.ablauf_datum else '-' }}</dd>
 
                     <dt class="col-sm-3">Erstellt von</dt>
                     <dd class="col-sm-9">{{ abstimmung.erstellt_von_name }}</dd>
 
                     <dt class="col-sm-3">Erstellt am</dt>
-                    <dd class="col-sm-9">{{ abstimmung.erstellt_am[:16] if abstimmung.erstellt_am else '-' }}</dd>
+                    <dd class="col-sm-9">{{ abstimmung.erstellt_am.strftime('%Y-%m-%d %H:%M') if abstimmung.erstellt_am else '-' }}</dd>
                 </dl>
 
                 {% if abstimmung.beschreibung %}
@@ -112,7 +112,7 @@
                                     <span class="badge bg-secondary"><i class="bi bi-dash"></i> Enthaltung</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ s.abgegeben_am[:16] if s.abgegeben_am else '-' }}</td>
+                                <td>{{ s.abgegeben_am.strftime('%Y-%m-%d %H:%M') if s.abgegeben_am else '-' }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
