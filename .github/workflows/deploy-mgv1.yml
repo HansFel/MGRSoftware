@@ -1,0 +1,27 @@
+name: Deploy to MGV1 (Dev)
+
+on:
+  workflow_dispatch:  # Manueller Trigger über GitHub UI
+  push:
+    branches:
+      - main
+    paths:
+      - 'deployment/**'
+      - 'database.py'
+      - 'web_app.py'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to MGV1
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.MGV1_HOST }}
+          username: mgserver
+          key: ${{ secrets.MGV1_SSH_KEY }}
+          script: |
+            cd /opt/mgr
+            git pull origin main
+            docker-compose restart web
+            echo "Deployment complete!"
