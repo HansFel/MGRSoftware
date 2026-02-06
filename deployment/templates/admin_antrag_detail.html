@@ -130,7 +130,7 @@
                 </div>
                 {% endif %}
                 <p class="text-muted mb-0">
-                    {{ antrag.bearbeitet_am[:10] if antrag.bearbeitet_am else '' }}
+                    {{ antrag.bearbeitet_am.strftime('%Y-%m-%d') if antrag.bearbeitet_am else '' }}
                 </p>
             </div>
         </div>

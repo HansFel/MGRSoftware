@@ -54,7 +54,7 @@
                                     {% endif %}
                                 </td>
                                 <td>{{ a.gemeinschaft_name }}</td>
-                                <td>{{ a.ablauf_datum[:10] if a.ablauf_datum else '-' }}</td>
+                                <td>{{ a.ablauf_datum.strftime('%Y-%m-%d') if a.ablauf_datum else '-' }}</td>
                                 <td>
                                     {% if a.status == 'offen' %}
                                     <span class="badge bg-success"><i class="bi bi-unlock"></i> Offen</span>

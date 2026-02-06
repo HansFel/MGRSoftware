@@ -30,7 +30,7 @@
                                 <h5 class="card-title">{{ a.titel }}</h5>
                                 <p class="card-text text-muted small">
                                     <i class="bi bi-people"></i> {{ a.gemeinschaft_name }}<br>
-                                    <i class="bi bi-calendar"></i> Ablauf: {{ a.ablauf_datum[:10] if a.ablauf_datum else '-' }}
+                                    <i class="bi bi-calendar"></i> Ablauf: {{ a.ablauf_datum.strftime('%Y-%m-%d') if a.ablauf_datum else '-' }}
                                 </p>
                                 {% if a.geheim %}
                                 <span class="badge bg-secondary mb-2">
