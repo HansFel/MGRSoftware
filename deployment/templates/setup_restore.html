@@ -37,6 +37,15 @@
                         <strong>Achtung:</strong> Bestehende Daten werden überschrieben!
                     </div>
 
+                    {% if two_person_mode %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-shield-lock"></i>
+                        <strong>Zwei-Personen-Regel aktiv:</strong>
+                        Sie sind Administrator {{ admin_role }}.
+                        Nach dem Hochladen muss der andere Administrator die Wiederherstellung bestätigen.
+                    </div>
+                    {% endif %}
+
                     <form method="post" enctype="multipart/form-data">
                         <input type="hidden" name="token" value="{{ token }}">
 
@@ -57,7 +66,12 @@
 
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-success btn-lg">
-                                <i class="bi bi-cloud-upload"></i> Backup wiederherstellen
+                                <i class="bi bi-cloud-upload"></i>
+                                {% if two_person_mode %}
+                                Backup hochladen (Bestätigung erforderlich)
+                                {% else %}
+                                Backup wiederherstellen
+                                {% endif %}
                             </button>
                             <a href="{{ url_for('setup.setup_index', token=token) }}" class="btn btn-secondary">
                                 <i class="bi bi-arrow-left"></i> Zurück

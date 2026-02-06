@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restore bestätigen - Setup</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; }
+        .setup-card { background: rgba(255,255,255,0.95); border-radius: 15px; }
+    </style>
+</head>
+<body class="py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-6">
+                <div class="setup-card p-4 shadow-lg">
+                    <h2 class="text-center mb-4">
+                        <i class="bi bi-shield-check text-warning"></i>
+                        Zwei-Personen-Bestätigung
+                    </h2>
+
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Achtung:</strong> Sie sind dabei, ein Backup wiederherzustellen.
+                        Bestehende Daten werden überschrieben!
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header bg-dark text-white">
+                            <i class="bi bi-info-circle"></i> Anfrage-Details
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-borderless mb-0">
+                                <tr>
+                                    <td><strong>Aktion:</strong></td>
+                                    <td>{{ request_info.action|capitalize }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Datei:</strong></td>
+                                    <td><code>{{ request_info.filename }}</code></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Erstellt von:</strong></td>
+                                    <td>Administrator {{ request_info.admin1 }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Erstellt um:</strong></td>
+                                    <td>{{ request_info.created.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Code:</strong></td>
+                                    <td><code>{{ code }}</code></td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="bi bi-person-check"></i>
+                        Sie bestätigen als <strong>Administrator {{ admin_role }}</strong>.
+                    </div>
+
+                    <form method="post">
+                        <input type="hidden" name="token" value="{{ token }}">
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg"
+                                    onclick="return confirm('Sind Sie sicher? Diese Aktion kann nicht rückgängig gemacht werden!');">
+                                <i class="bi bi-check-circle"></i> Restore bestätigen und ausführen
+                            </button>
+                            <a href="{{ url_for('setup.setup_index', token=token) }}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Zurück (nicht bestätigen)
+                            </a>
+                        </div>
+                    </form>
+
+                    <hr class="my-4">
+
+                    <div class="text-center text-muted small">
+                        <i class="bi bi-shield-lock"></i>
+                        Zwei-Personen-Regel: Diese Aktion erfordert die Bestätigung
+                        durch einen zweiten Administrator.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

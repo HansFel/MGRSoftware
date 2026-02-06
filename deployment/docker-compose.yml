@@ -28,6 +28,8 @@ services:
       FLASK_ENV: production
       SECRET_KEY: ${SECRET_KEY:-changeme}
       SETUP_TOKEN: ${SETUP_TOKEN:-}
+      SETUP_TOKEN_ADMIN1: ${SETUP_TOKEN_ADMIN1:-}
+      SETUP_TOKEN_ADMIN2: ${SETUP_TOKEN_ADMIN2:-}
     ports:
       - "5000:5000"
 
