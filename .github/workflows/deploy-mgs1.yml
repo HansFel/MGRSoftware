@@ -1,0 +1,28 @@
+name: Deploy to MGS1
+
+on:
+  workflow_dispatch:  # Manueller Trigger über GitHub UI
+  push:
+    branches:
+      - main
+    paths:
+      - 'deployment/**'
+      - 'database.py'
+      - 'web_app.py'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to MGS1
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.MGS1_HOST }}
+          username: mgserver
+          key: ${{ secrets.MGS1_SSH_KEY }}
+          script: |
+            cd /home/mgserver/mgserver
+            git pull origin main
+            cd deployment
+            docker-compose restart web
+            echo "Deployment complete!"
