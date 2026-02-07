@@ -25,11 +25,22 @@ Das System unterstützt drei verschiedene Berechtigungsstufen:
 - Kann Administrator-Rollen vergeben und ändern
 - Kann Gemeinschafts-Administratoren Gemeinschaften zuweisen
 - **Kann Datenbank-Backups bestätigen** (mit Zwei-Personen-Regel)
+- **Kann Notfall-Setup nutzen** (Backup-Restore mit Zwei-Personen-Regel)
 
-## Zwei-Personen-Regel für Backups
+---
+
+## Zwei-Personen-Regel
+
+Die Zwei-Personen-Regel gilt für alle kritischen Datenbankoperationen:
+- Backup-Bestätigungen im Dashboard
+- **Notfall-Wiederherstellung über /setup**
 
 ### Zweck
-Aus Sicherheitsgründen müssen **immer zwei Haupt-Administratoren** unabhängig voneinander die Durchführung einer Datenbank-Sicherung bestätigen.
+Aus Sicherheitsgründen müssen **immer zwei Haupt-Administratoren** unabhängig voneinander kritische Aktionen bestätigen. Dies verhindert versehentliche oder unautorisierte Änderungen.
+
+---
+
+## Zwei-Personen-Regel für Backup-Bestätigungen (Dashboard)
 
 ### Ablauf
 
@@ -58,11 +69,74 @@ Aus Sicherheitsgründen müssen **immer zwei Haupt-Administratoren** unabhängig
 - Wenn innerhalb von 24 Stunden keine zweite Bestätigung erfolgt, verfällt die erste Bestätigung
 - Ein neuer Backup-Prozess muss gestartet werden
 
-### Wichtige Regeln
-- **Mindestens 2 Haupt-Administratoren** müssen im System vorhanden sein
-- Derselbe Admin kann **nicht zweimal** hintereinander bestätigen
-- Nur **Haupt-Administratoren (Level 2)** können Backups bestätigen
-- Gemeinschafts-Admins sehen zwar die Warnung, können aber nicht bestätigen
+---
+
+## Zwei-Personen-Regel für Notfall-Setup (/setup)
+
+### Zugriff
+Das Notfall-Setup ermöglicht kritische Operationen ohne normalen Login:
+- **URL:** `http://server:5000/setup?token=IHR_TOKEN`
+- Erfordert spezielle Tokens in der Server-Konfiguration
+
+### Konfiguration (.env auf Server)
+
+**Einfacher Modus (NICHT empfohlen für Produktion):**
+```
+SETUP_TOKEN=geheimer-token
+```
+- Ein Token für alle Operationen
+- Keine Zwei-Personen-Regel aktiv
+
+**Zwei-Personen-Modus (EMPFOHLEN):**
+```
+SETUP_TOKEN_ADMIN1=geheimer-token-admin1
+SETUP_TOKEN_ADMIN2=geheimer-token-admin2
+```
+- Jeder Haupt-Administrator erhält seinen eigenen Token
+- Zwei-Personen-Regel ist automatisch aktiv
+- `SETUP_TOKEN` wird ignoriert wenn beide Admin-Tokens gesetzt sind
+
+### Ablauf Backup-Wiederherstellung
+
+1. **Admin 1 startet Anfrage:**
+   - Öffnet: `http://server:5000/setup?token=geheimer-token-admin1`
+   - Klickt "Backup hochladen"
+   - Wählt die .sql Backup-Datei aus
+   - Lädt die Datei hoch
+   - Erhält einen **Bestätigungs-Code** (z.B. `A1B2C3D4E5F6`)
+
+2. **Admin 1 informiert Admin 2:**
+   - Teilt den Bestätigungs-Code mit (Telefon, Chat, persönlich)
+   - Teilt mit, welche Datei hochgeladen wurde
+
+3. **Admin 2 bestätigt:**
+   - Öffnet: `http://server:5000/setup?token=geheimer-token-admin2`
+   - Sieht die ausstehende Anfrage mit Details
+   - Klickt "Bestätigen"
+   - Bestätigt die Warnung
+   - Backup wird eingespielt
+
+### Zeitfenster
+- Anfragen sind **30 Minuten gültig**
+- Danach verfällt die Anfrage automatisch
+- Ein neuer Versuch muss gestartet werden
+
+### Sicherheitsregeln
+- **Eigene Anfragen können nicht bestätigt werden**
+- Jeder Admin kann nur mit seinem eigenen Token zugreifen
+- Temporäre Backup-Dateien werden nach 30 Minuten gelöscht
+- Anfragen können jederzeit abgebrochen werden
+
+### Verfügbare Aktionen im Setup
+
+| Aktion | Beschreibung | Zwei-Personen-Regel |
+|--------|--------------|---------------------|
+| Schema initialisieren | Erstellt leere Datenbanktabellen | Nein |
+| Backup herunterladen | Lädt aktuelles Backup herunter | Nein |
+| Backup wiederherstellen | Spielt Backup-Datei ein | **JA** |
+| Administrator erstellen | Erstellt ersten Admin (nur wenn keine Benutzer existieren) | Nein |
+
+---
 
 ## Administrator-Rollen verwalten
 
@@ -106,13 +180,16 @@ Aus Sicherheitsgründen müssen **immer zwei Haupt-Administratoren** unabhängig
 - Funktion wird angezeigt, wenn Gemeinschaft bereits zugewiesen ist
 - In der Gemeinschafts-Verwaltung kann die Zuweisung entfernt werden
 
+---
+
 ## Best Practices
 
 ### Haupt-Administratoren
 - **Empfehlung:** 2-3 Haupt-Administratoren
-- Mindestens 2 erforderlich für Backup-Regel
+- Mindestens 2 erforderlich für Zwei-Personen-Regel
 - Vertrauenswürdige Personen mit guter Verfügbarkeit
 - Idealerweise verschiedene Personen für Vier-Augen-Prinzip
+- **Jeder Haupt-Admin erhält eigenen Setup-Token**
 
 ### Gemeinschafts-Administratoren
 - Für größere Gemeinschaften sinnvoll
@@ -120,20 +197,30 @@ Aus Sicherheitsgründen müssen **immer zwei Haupt-Administratoren** unabhängig
 - Kann lokale Benutzer/Maschinen selbst verwalten
 - Muss mindestens einer Gemeinschaft zugewiesen sein
 
+### Token-Verwaltung
+1. **Geheimhaltung:** Tokens niemals teilen oder öffentlich speichern
+2. **Verschiedene Tokens:** Jeder Admin bekommt einen eigenen Token
+3. **Sichere Aufbewahrung:** Tokens sicher aufbewahren (Passwort-Manager)
+4. **Regelmäßig ändern:** Tokens bei Bedarf in .env aktualisieren
+
 ### Berechtigungen vergeben
 1. **Vorsicht:** Haupt-Admin-Rechte nur an vertrauenswürdige Personen
 2. **Prüfen:** Vor Level-Änderung Benutzer-Profil prüfen
 3. **Dokumentieren:** Bemerkungsfeld bei Backup-Bestätigungen nutzen
 4. **Regelmäßig:** Admin-Rollen überprüfen und ggf. anpassen
 
+---
+
 ## Sicherheit
 
 ### Schutzmaßnahmen
-- ✓ Zwei-Personen-Regel verhindert einseitige Backup-Bestätigungen
+- ✓ Zwei-Personen-Regel verhindert einseitige kritische Aktionen
 - ✓ Mindestens 2 Haupt-Admins müssen erhalten bleiben (System verhindert Downgrade)
-- ✓ 24-Stunden-Zeitfenster für Bestätigungen
+- ✓ 24-Stunden-Zeitfenster für Dashboard-Bestätigungen
+- ✓ 30-Minuten-Zeitfenster für Setup-Anfragen
 - ✓ Gemeinschafts-Admins können nur ihre Gemeinschaften verwalten
 - ✓ Alle Admin-Aktionen werden protokolliert
+- ✓ Separate Tokens für jeden Haupt-Administrator
 
 ### Was tun bei...
 
@@ -147,10 +234,22 @@ Aus Sicherheitsgründen müssen **immer zwei Haupt-Administratoren** unabhängig
 - Backup-Warnung bleibt bestehen
 - Neuer Versuch kann gestartet werden
 
+**...Setup-Anfrage verfällt:**
+- Nach 30 Minuten wird Anfrage automatisch gelöscht
+- Temporäre Backup-Datei wird entfernt
+- Admin 1 muss erneut Backup hochladen
+
 **...Gemeinschafts-Admin hat keine Rechte:**
 - Prüfen: Ist mindestens eine Gemeinschaft zugewiesen?
 - Prüfen: Ist admin_level auf 1 gesetzt?
 - Prüfen: Ist is_admin auf 1 gesetzt?
+
+**...Token vergessen/verloren:**
+- Tokens sind in `.env` auf dem Server gespeichert
+- Server-Administrator kann Tokens einsehen/ändern
+- Nach Änderung: `docker-compose restart web`
+
+---
 
 ## Technische Details
 
@@ -171,6 +270,16 @@ Aus Sicherheitsgründen müssen **immer zwei Haupt-Administratoren** unabhängig
 - `bemerkung`: Optionale Notiz
 - `status`: 'wartend' oder 'abgeschlossen'
 
+### Umgebungsvariablen für Setup
+
+| Variable | Beschreibung |
+|----------|--------------|
+| `SETUP_TOKEN` | Einfacher Modus: Ein Token für alle |
+| `SETUP_TOKEN_ADMIN1` | Token für Haupt-Administrator 1 |
+| `SETUP_TOKEN_ADMIN2` | Token für Haupt-Administrator 2 |
+
+**Hinweis:** Wenn `SETUP_TOKEN_ADMIN1` und `SETUP_TOKEN_ADMIN2` gesetzt sind, wird `SETUP_TOKEN` ignoriert und die Zwei-Personen-Regel ist automatisch aktiv.
+
 ### Migration
 ```bash
 python migrate_admin_rollen.py
@@ -179,13 +288,15 @@ python migrate_admin_rollen.py
 - Migriert bestehende Admins zu Haupt-Admins
 - Erstellt neue Tabellen für Rollen und Backup-Bestätigungen
 
+---
+
 ## Häufige Fragen
 
 **F: Kann ich einen Benutzer direkt beim Anlegen zum Admin machen?**
 A: Nein, Benutzer müssen erst angelegt und dann in der Rollen-Verwaltung hochgestuft werden.
 
 **F: Was passiert wenn beide Haupt-Admins ausfallen?**
-A: Ein Datenbank-Administrator kann direkt in der Datenbank den admin_level setzen oder ein neues Admin-Konto erstellen.
+A: Ein Server-Administrator kann direkt in der Datenbank den admin_level setzen, oder über das Setup (wenn noch ein Token bekannt ist) einen neuen Admin erstellen.
 
 **F: Können Gemeinschafts-Admins auch Backups sehen?**
 A: Ja, sie sehen die Backup-Warnung, können aber nicht bestätigen. Nur Info-Charakter.
@@ -196,7 +307,17 @@ A: Unbegrenzt. Jeder Benutzer kann für beliebig viele Gemeinschaften Admin sein
 **F: Was passiert mit alten Backup-Bestätigungen?**
 A: Nach Ablauf (>24h) oder Abschluss bleiben sie in der Datenbank zur Dokumentation.
 
+**F: Kann ich mehr als 2 Haupt-Administratoren für das Setup haben?**
+A: Aktuell unterstützt das Setup genau 2 Admin-Tokens. Für mehr Flexibilität können mehrere Personen denselben Token kennen, aber die Zwei-Personen-Regel erfordert immer 2 verschiedene Tokens.
+
+**F: Was passiert wenn ich nur SETUP_TOKEN setze?**
+A: Das System arbeitet im einfachen Modus ohne Zwei-Personen-Regel. Jeder mit dem Token kann sofort Backups einspielen. **Nicht empfohlen für Produktion!**
+
+**F: Wie teste ich die Zwei-Personen-Regel?**
+A: Öffne zwei Browser (oder Inkognito-Fenster), melde dich mit verschiedenen Admin-Tokens an und führe den Ablauf durch.
+
 ---
 
-**Version:** 1.0 (Januar 2026)  
+**Version:** 2.0 (Februar 2026)
 **Migration:** migrate_admin_rollen.py
+**Neu:** Zwei-Personen-Regel für Notfall-Setup (/setup)
