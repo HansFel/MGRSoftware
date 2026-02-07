@@ -22,7 +22,7 @@ def nachrichten():
     with MaschinenDBContext(db_path) as db:
         cursor = db.connection.cursor()
 
-        # Gemeinschaften über Betrieb des Benutzers ermitteln
+        # Gemeinschaften über Betriebe des Benutzers ermitteln (über benutzer_betriebe)
         sql = convert_sql("""
             SELECT DISTINCT n.*,
                    g.name as gemeinschaft_name,
@@ -31,9 +31,10 @@ def nachrichten():
             FROM gemeinschafts_nachrichten n
             JOIN gemeinschaften g ON n.gemeinschaft_id = g.id
             JOIN benutzer b ON n.absender_id = b.id
-            JOIN benutzer u ON u.id = ?
-            JOIN betriebe_gemeinschaften bg ON g.id = bg.gemeinschaft_id AND bg.betrieb_id = u.betrieb_id
+            JOIN betriebe_gemeinschaften bg ON g.id = bg.gemeinschaft_id
+            JOIN benutzer_betriebe bb ON bg.betrieb_id = bb.betrieb_id
             LEFT JOIN nachricht_gelesen ng ON n.id = ng.nachricht_id AND ng.benutzer_id = ?
+            WHERE bb.benutzer_id = ?
             ORDER BY n.erstellt_am DESC
         """)
         cursor.execute(sql, (session['benutzer_id'], session['benutzer_id']))
@@ -57,12 +58,12 @@ def nachricht_lesen(nachricht_id):
     with MaschinenDBContext(db_path) as db:
         cursor = db.connection.cursor()
 
-        # Prüfen ob Benutzer über seinen Betrieb Zugriff auf diese Nachricht hat
+        # Prüfen ob Benutzer über seine Betriebe Zugriff auf diese Nachricht hat (über benutzer_betriebe)
         sql = convert_sql("""
             SELECT n.* FROM gemeinschafts_nachrichten n
-            JOIN benutzer u ON u.id = ?
-            JOIN betriebe_gemeinschaften bg ON n.gemeinschaft_id = bg.gemeinschaft_id AND bg.betrieb_id = u.betrieb_id
-            WHERE n.id = ?
+            JOIN betriebe_gemeinschaften bg ON n.gemeinschaft_id = bg.gemeinschaft_id
+            JOIN benutzer_betriebe bb ON bg.betrieb_id = bb.betrieb_id
+            WHERE bb.benutzer_id = ? AND n.id = ?
         """)
         cursor.execute(sql, (session['benutzer_id'], nachricht_id))
 
@@ -90,11 +91,11 @@ def nachricht_neu():
             betreff = request.form.get('betreff')
             nachricht = request.form.get('nachricht')
 
-            # Prüfen ob Benutzer über seinen Betrieb Mitglied dieser Gemeinschaft ist
+            # Prüfen ob Benutzer über seine Betriebe Mitglied dieser Gemeinschaft ist (über benutzer_betriebe)
             sql = convert_sql("""
                 SELECT COUNT(*) FROM betriebe_gemeinschaften bg
-                JOIN benutzer u ON u.betrieb_id = bg.betrieb_id
-                WHERE bg.gemeinschaft_id = ? AND u.id = ?
+                JOIN benutzer_betriebe bb ON bg.betrieb_id = bb.betrieb_id
+                WHERE bg.gemeinschaft_id = ? AND bb.benutzer_id = ?
             """)
             cursor.execute(sql, (gemeinschaft_id, session['benutzer_id']))
 
@@ -113,12 +114,12 @@ def nachricht_neu():
             else:
                 flash('Sie sind nicht Mitglied dieser Gemeinschaft.', 'danger')
 
-        # Gemeinschaften über Betrieb des Benutzers laden
+        # Gemeinschaften über Betriebe des Benutzers laden (über benutzer_betriebe)
         sql = convert_sql("""
             SELECT DISTINCT g.* FROM gemeinschaften g
             JOIN betriebe_gemeinschaften bg ON g.id = bg.gemeinschaft_id
-            JOIN benutzer u ON u.betrieb_id = bg.betrieb_id
-            WHERE u.id = ? AND g.aktiv = true
+            JOIN benutzer_betriebe bb ON bg.betrieb_id = bb.betrieb_id
+            WHERE bb.benutzer_id = ? AND g.aktiv = true
             ORDER BY g.name
         """)
         cursor.execute(sql, (session['benutzer_id'],))

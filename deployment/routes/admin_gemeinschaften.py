@@ -155,10 +155,10 @@ def admin_gemeinschaften_mitglieder(gemeinschaft_id):
             return redirect(url_for('admin_gemeinschaften.admin_gemeinschaften_mitglieder',
                                    gemeinschaft_id=gemeinschaft_id))
 
-        # Zugewiesene Betriebe laden
+        # Zugewiesene Betriebe laden (mit benutzer_betriebe für Benutzeranzahl)
         sql = convert_sql("""
             SELECT b.*, bg.beigetreten_am,
-                   (SELECT COUNT(*) FROM benutzer WHERE betrieb_id = b.id) as anzahl_benutzer
+                   (SELECT COUNT(*) FROM benutzer_betriebe WHERE betrieb_id = b.id) as anzahl_benutzer
             FROM betriebe b
             JOIN betriebe_gemeinschaften bg ON b.id = bg.betrieb_id
             WHERE bg.gemeinschaft_id = ?
@@ -168,10 +168,10 @@ def admin_gemeinschaften_mitglieder(gemeinschaft_id):
         columns = [desc[0] for desc in cursor.description]
         aktuelle_betriebe = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        # Verfügbare Betriebe (noch nicht zugewiesen)
+        # Verfügbare Betriebe (noch nicht zugewiesen, mit benutzer_betriebe für Benutzeranzahl)
         sql = convert_sql("""
             SELECT b.*,
-                   (SELECT COUNT(*) FROM benutzer WHERE betrieb_id = b.id) as anzahl_benutzer
+                   (SELECT COUNT(*) FROM benutzer_betriebe WHERE betrieb_id = b.id) as anzahl_benutzer
             FROM betriebe b
             WHERE b.aktiv = true
             AND b.id NOT IN (
@@ -203,7 +203,7 @@ def admin_gemeinschaften_abrechnung(gemeinschaft_id):
         columns = [desc[0] for desc in cursor.description]
         gemeinschaft = dict(zip(columns, cursor.fetchone()))
 
-        # Einsätze nach Betrieb (über benutzer.betrieb_id)
+        # Einsätze nach Betrieb (über benutzer_betriebe)
         sql = convert_sql("""
             SELECT
                 bt.id,
@@ -219,8 +219,8 @@ def admin_gemeinschaften_abrechnung(gemeinschaft_id):
                 SUM(COALESCE(e.treibstoffkosten, 0)) as treibstoffkosten
             FROM maschineneinsaetze e
             JOIN maschinen m ON e.maschine_id = m.id
-            JOIN benutzer b ON e.benutzer_id = b.id
-            JOIN betriebe bt ON b.betrieb_id = bt.id
+            JOIN benutzer_betriebe bb ON e.benutzer_id = bb.benutzer_id
+            JOIN betriebe bt ON bb.betrieb_id = bt.id
             JOIN betriebe_gemeinschaften bg ON bt.id = bg.betrieb_id AND bg.gemeinschaft_id = ?
             WHERE m.gemeinschaft_id = ?
             GROUP BY bt.id, bt.name

@@ -26,7 +26,7 @@ def admin_konten(gemeinschaft_id):
         columns = [desc[0] for desc in cursor.description]
         gemeinschaft = dict(zip(columns, cursor.fetchone()))
 
-        # Konten nach Betrieben anzeigen
+        # Konten nach Betrieben anzeigen (über betriebe_gemeinschaften)
         sql = convert_sql("""
             SELECT
                 bt.id as betrieb_id,
@@ -49,10 +49,11 @@ def admin_konten(gemeinschaft_id):
                     WHERE bu.betrieb_id = bt.id
                     AND bu.gemeinschaft_id = ?
                 ) as letzte_buchung,
-                (SELECT COUNT(*) FROM benutzer WHERE betrieb_id = bt.id) as anzahl_benutzer
+                (SELECT COUNT(*) FROM benutzer_betriebe WHERE betrieb_id = bt.id) as anzahl_benutzer
             FROM betriebe bt
+            JOIN betriebe_gemeinschaften bgem ON bt.id = bgem.betrieb_id AND bgem.gemeinschaft_id = ?
             LEFT JOIN mitglieder_konten mk ON mk.betrieb_id = bt.id AND mk.gemeinschaft_id = ?
-            WHERE bt.gemeinschaft_id = ? AND (bt.aktiv = true OR bt.aktiv IS NULL)
+            WHERE (bt.aktiv = true OR bt.aktiv IS NULL)
             ORDER BY COALESCE(mk.saldo, 0) ASC
         """)
         cursor.execute(sql, (gemeinschaft_id, gemeinschaft_id, gemeinschaft_id, gemeinschaft_id, gemeinschaft_id))
@@ -168,16 +169,17 @@ def admin_konten_buchung_neu(gemeinschaft_id):
             flash(f'Buchung erfolgreich erstellt: {betrag:,.2f} €', 'success')
             return redirect(url_for('admin_finanzen.admin_konten', gemeinschaft_id=gemeinschaft_id))
 
-        # Betriebe laden statt Benutzer
+        # Betriebe laden (über betriebe_gemeinschaften)
         sql = convert_sql("""
             SELECT
                 bt.id,
                 bt.name,
                 COALESCE(mk.saldo, 0) as saldo
             FROM betriebe bt
+            JOIN betriebe_gemeinschaften bgem ON bt.id = bgem.betrieb_id AND bgem.gemeinschaft_id = ?
             LEFT JOIN mitglieder_konten mk ON bt.id = mk.betrieb_id
                 AND mk.gemeinschaft_id = ?
-            WHERE bt.gemeinschaft_id = ? AND (bt.aktiv = true OR bt.aktiv IS NULL)
+            WHERE (bt.aktiv = true OR bt.aktiv IS NULL)
             ORDER BY bt.name
         """)
         cursor.execute(sql, (gemeinschaft_id, gemeinschaft_id))
@@ -217,8 +219,13 @@ def admin_konten_detail(gemeinschaft_id, betrieb_id):
             return redirect(url_for('admin_finanzen.admin_konten', gemeinschaft_id=gemeinschaft_id))
         betrieb = dict(zip(columns, row))
 
-        # Benutzer des Betriebs
-        sql = convert_sql("SELECT id, vorname, name FROM benutzer WHERE betrieb_id = ?")
+        # Benutzer des Betriebs (über benutzer_betriebe)
+        sql = convert_sql("""
+            SELECT u.id, u.vorname, u.name
+            FROM benutzer u
+            JOIN benutzer_betriebe bb ON u.id = bb.benutzer_id
+            WHERE bb.betrieb_id = ?
+        """)
         cursor.execute(sql, (betrieb_id,))
         benutzer_im_betrieb = [{'id': r[0], 'vorname': r[1], 'name': r[2]} for r in cursor.fetchall()]
 
@@ -453,11 +460,12 @@ def abrechnungen_erstellen(gemeinschaft_id):
             bis_obj = datetime.strptime(zeitraum_bis, '%Y-%m-%d')
             abrechnungszeitraum = f"{von_obj.strftime('%m/%Y')} - {bis_obj.strftime('%m/%Y')}"
 
-            # Abrechnungen pro Betrieb erstellen
+            # Abrechnungen pro Betrieb erstellen (über betriebe_gemeinschaften)
             sql = convert_sql("""
-                SELECT id, name FROM betriebe
-                WHERE gemeinschaft_id = ? AND (aktiv = true OR aktiv IS NULL)
-                ORDER BY name
+                SELECT bt.id, bt.name FROM betriebe bt
+                JOIN betriebe_gemeinschaften bgem ON bt.id = bgem.betrieb_id
+                WHERE bgem.gemeinschaft_id = ? AND (bt.aktiv = true OR bt.aktiv IS NULL)
+                ORDER BY bt.name
             """)
             cursor.execute(sql, (gemeinschaft_id,))
             betriebe = cursor.fetchall()
@@ -481,26 +489,26 @@ def abrechnungen_erstellen(gemeinschaft_id):
                     uebersprungen += 1
                     continue
 
-                # Maschinenkosten für alle Benutzer des Betriebs summieren
+                # Maschinenkosten für alle Benutzer des Betriebs summieren (über benutzer_betriebe)
                 sql = convert_sql("""
                     SELECT COALESCE(SUM(me.kosten_berechnet), 0)
                     FROM maschineneinsaetze me
                     JOIN maschinen m ON me.maschine_id = m.id
-                    JOIN benutzer b ON me.benutzer_id = b.id
-                    WHERE b.betrieb_id = ?
+                    JOIN benutzer_betriebe bb ON me.benutzer_id = bb.benutzer_id
+                    WHERE bb.betrieb_id = ?
                     AND me.datum BETWEEN ? AND ?
                     AND m.gemeinschaft_id = ?
                 """)
                 cursor.execute(sql, (betrieb_id, zeitraum_von, zeitraum_bis, gemeinschaft_id))
                 betrag_maschinen = cursor.fetchone()[0] or 0
 
-                # Treibstoffkosten für alle Benutzer des Betriebs summieren
+                # Treibstoffkosten für alle Benutzer des Betriebs summieren (über benutzer_betriebe)
                 sql = convert_sql("""
                     SELECT COALESCE(SUM(me.treibstoffkosten), 0)
                     FROM maschineneinsaetze me
                     JOIN maschinen m ON me.maschine_id = m.id
-                    JOIN benutzer b ON me.benutzer_id = b.id
-                    WHERE b.betrieb_id = ?
+                    JOIN benutzer_betriebe bb ON me.benutzer_id = bb.benutzer_id
+                    WHERE bb.betrieb_id = ?
                     AND me.datum BETWEEN ? AND ?
                     AND m.treibstoff_berechnen = true
                     AND m.gemeinschaft_id = ?

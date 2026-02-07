@@ -116,7 +116,8 @@ def admin_alle_einsaetze():
                    e.flaeche_menge, e.kosten_berechnet, e.anmerkungen
             FROM maschineneinsaetze e
             JOIN benutzer b ON e.benutzer_id = b.id
-            LEFT JOIN betriebe bt ON b.betrieb_id = bt.id
+            LEFT JOIN benutzer_betriebe bb ON b.id = bb.benutzer_id
+            LEFT JOIN betriebe bt ON bb.betrieb_id = bt.id
             JOIN maschinen m ON e.maschine_id = m.id
             JOIN einsatzzwecke ez ON e.einsatzzweck_id = ez.id
             ORDER BY e.datum DESC, e.id DESC
