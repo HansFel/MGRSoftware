@@ -122,19 +122,31 @@ def render_markdown(filepath):
 @login_required
 def index():
     """Dokumentations-Übersicht"""
+    from flask import flash
+
     user_level = get_user_level()
+
+    # Debug-Ausgabe
+    flash(f'DEBUG: DOCS_BASE={DOCS_BASE}, user_level={user_level}, user_id={session.get("user_id")}', 'info')
 
     # Filtere Kategorien nach Benutzer-Level
     available_categories = {}
     for key, category in DOCS_STRUCTURE.items():
         if category['level'] <= user_level:
             # Filtere auch einzelne Docs
-            available_docs = [d for d in category['docs'] if os.path.exists(os.path.join(DOCS_BASE, d['file']))]
+            available_docs = []
+            for d in category['docs']:
+                full_path = os.path.join(DOCS_BASE, d['file'])
+                exists = os.path.exists(full_path)
+                if exists:
+                    available_docs.append(d)
             if available_docs:
                 available_categories[key] = {
                     **category,
                     'docs': available_docs
                 }
+
+    flash(f'DEBUG: Kategorien gefunden: {list(available_categories.keys())}', 'info')
 
     return render_template('dokumentation_index.html',
                           categories=available_categories,
