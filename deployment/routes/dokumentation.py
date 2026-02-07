@@ -167,24 +167,15 @@ def show_doc(category, doc_path):
     if cat_info['level'] > user_level:
         abort(403)
 
-    # Finde das Dokument
-    doc_file = f"{category}/{doc_path}" if category in ['benutzer', 'admin', 'system', 'geplante-erweiterungen'] else doc_path
-
-    # Suche in der Struktur
+    # Finde das Dokument - suche nach Dateiname in allen Docs der Kategorie
     doc_info = None
+    doc_file = None
     for doc in cat_info['docs']:
-        if doc['file'] == doc_file or doc['file'].endswith(doc_path):
+        # Prüfe ob der Dateiname passt (mit oder ohne Pfad)
+        if doc['file'] == doc_path or doc['file'].endswith('/' + doc_path) or doc['file'].endswith(doc_path):
             doc_info = doc
+            doc_file = doc['file']
             break
-
-    if not doc_info:
-        # Versuche direkten Pfad
-        doc_file = doc_path
-        for doc in cat_info['docs']:
-            if doc_path in doc['file']:
-                doc_info = doc
-                doc_file = doc['file']
-                break
 
     if not doc_info:
         abort(404)
