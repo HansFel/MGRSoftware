@@ -10,13 +10,28 @@ Zeigt Dokumentation für verschiedene Benutzergruppen:
 
 import os
 import markdown
-from flask import Blueprint, render_template, abort, session, redirect, url_for
+from flask import Blueprint, render_template, abort, session, redirect, url_for, current_app
 from utils.decorators import login_required, admin_required
 
 dokumentation_bp = Blueprint('dokumentation', __name__, url_prefix='/dokumentation')
 
+
+def get_docs_base():
+    """Ermittelt den Basis-Pfad für Dokumentation"""
+    # Versuche verschiedene Pfade
+    possible_paths = [
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'docs'),
+        '/opt/maschinengemeinschaft/docs',
+        os.path.join(os.getcwd(), 'docs'),
+    ]
+    for path in possible_paths:
+        if os.path.exists(path):
+            return path
+    return possible_paths[0]  # Fallback
+
+
 # Basis-Pfad für Dokumentation
-DOCS_BASE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'docs')
+DOCS_BASE = get_docs_base()
 
 # Dokumentations-Struktur mit Zugriffsebenen
 # level: 0 = alle eingeloggten Benutzer, 1 = Admins, 2 = Haupt-Admins
