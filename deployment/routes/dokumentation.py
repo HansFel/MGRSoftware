@@ -81,7 +81,7 @@ DOCS_STRUCTURE = {
 
 def get_user_level():
     """Gibt die Berechtigungsstufe des aktuellen Benutzers zurück"""
-    if not session.get('user_id'):
+    if not session.get('benutzer_id'):
         return -1
     admin_level = session.get('admin_level', 0)
     is_admin = session.get('is_admin', False)
@@ -126,8 +126,8 @@ def index():
 
     user_level = get_user_level()
 
-    # Debug-Ausgabe
-    flash(f'DEBUG: DOCS_BASE={DOCS_BASE}, user_level={user_level}, user_id={session.get("user_id")}', 'info')
+    # Debug-Ausgabe (kann nach Test entfernt werden)
+    # flash(f'DEBUG: DOCS_BASE={DOCS_BASE}, user_level={user_level}, benutzer_id={session.get("benutzer_id")}', 'info')
 
     # Filtere Kategorien nach Benutzer-Level
     available_categories = {}
@@ -146,7 +146,7 @@ def index():
                     'docs': available_docs
                 }
 
-    flash(f'DEBUG: Kategorien gefunden: {list(available_categories.keys())}', 'info')
+    # flash(f'DEBUG: Kategorien gefunden: {list(available_categories.keys())}', 'info')
 
     return render_template('dokumentation_index.html',
                           categories=available_categories,
