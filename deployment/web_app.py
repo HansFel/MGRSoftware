@@ -55,6 +55,7 @@ from routes.admin_abstimmungen import admin_abstimmungen_bp
 from routes.admin_antraege import admin_antraege_bp
 from routes.abstimmungen import abstimmungen_bp
 from routes.setup import setup_bp
+from routes.dokumentation import dokumentation_bp
 
 # Blueprints registrieren
 app.register_blueprint(auth_bp)
@@ -76,6 +77,7 @@ app.register_blueprint(admin_abstimmungen_bp)
 app.register_blueprint(admin_antraege_bp)
 app.register_blueprint(abstimmungen_bp)
 app.register_blueprint(setup_bp)
+app.register_blueprint(dokumentation_bp)
 
 
 @app.context_processor

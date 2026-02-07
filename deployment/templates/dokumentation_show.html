@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}{{ doc.title }} - Dokumentation{% endblock %}
+
+{% block head %}
+<style>
+    .doc-content {
+        background: #fff;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .doc-content h1 {
+        color: #2c3e50;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .doc-content h2 {
+        color: #34495e;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 0.3rem;
+    }
+
+    .doc-content h3 {
+        color: #7f8c8d;
+        margin-top: 1.5rem;
+    }
+
+    .doc-content code {
+        background: #f8f9fa;
+        padding: 0.2rem 0.4rem;
+        border-radius: 3px;
+        color: #e83e8c;
+    }
+
+    .doc-content pre {
+        background: #2d2d2d;
+        color: #f8f8f2;
+        padding: 1rem;
+        border-radius: 5px;
+        overflow-x: auto;
+    }
+
+    .doc-content pre code {
+        background: none;
+        color: inherit;
+        padding: 0;
+    }
+
+    .doc-content table {
+        width: 100%;
+        margin: 1rem 0;
+        border-collapse: collapse;
+    }
+
+    .doc-content table th,
+    .doc-content table td {
+        border: 1px solid #dee2e6;
+        padding: 0.75rem;
+        text-align: left;
+    }
+
+    .doc-content table th {
+        background: #f8f9fa;
+        font-weight: 600;
+    }
+
+    .doc-content table tr:nth-child(even) {
+        background: #f8f9fa;
+    }
+
+    .doc-content blockquote {
+        border-left: 4px solid #3498db;
+        padding-left: 1rem;
+        margin: 1rem 0;
+        color: #6c757d;
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 0 5px 5px 0;
+    }
+
+    .doc-content ul, .doc-content ol {
+        margin-bottom: 1rem;
+    }
+
+    .doc-content li {
+        margin-bottom: 0.5rem;
+    }
+
+    .doc-content strong {
+        color: #2c3e50;
+    }
+
+    .doc-content hr {
+        margin: 2rem 0;
+        border: 0;
+        border-top: 1px solid #eee;
+    }
+
+    .doc-toc {
+        position: sticky;
+        top: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a href="{{ url_for('dokumentation.index') }}" class="text-white">
+                        <i class="bi bi-book"></i> Dokumentation
+                    </a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="{{ url_for('dokumentation.index') }}" class="text-white">
+                        {{ category.title }}
+                    </a>
+                </li>
+                <li class="breadcrumb-item active text-light" aria-current="page">
+                    {{ doc.title }}
+                </li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-12">
+        <a href="{{ url_for('dokumentation.index') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück zur Übersicht
+        </a>
+        {% if user_level >= 2 %}
+        <span class="badge bg-danger ms-2">
+            <i class="bi bi-shield-check"></i> Haupt-Admin
+        </span>
+        {% elif user_level >= 1 %}
+        <span class="badge bg-warning text-dark ms-2">
+            <i class="bi bi-shield"></i> Admin
+        </span>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header {% if category.level >= 2 %}bg-danger{% elif category.level >= 1 %}bg-warning{% else %}bg-success{% endif %} text-white">
+                <h4 class="mb-0">
+                    <i class="bi {{ doc.icon }}"></i> {{ doc.title }}
+                </h4>
+            </div>
+            <div class="card-body doc-content">
+                {{ content|safe }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4 mb-4">
+    <div class="col-12">
+        <a href="{{ url_for('dokumentation.index') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück zur Übersicht
+        </a>
+    </div>
+</div>
+{% endblock %}
