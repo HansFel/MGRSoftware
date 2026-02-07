@@ -26,7 +26,7 @@ def betriebe_liste():
         # Alle Betriebe laden mit Anzahl Benutzer und zugewiesenen Gemeinschaften
         sql = convert_sql("""
             SELECT b.*,
-                   (SELECT COUNT(*) FROM benutzer WHERE betrieb_id = b.id) as anzahl_benutzer,
+                   (SELECT COUNT(*) FROM benutzer_betriebe WHERE betrieb_id = b.id) as anzahl_benutzer,
                    (SELECT string_agg(g.name, ', ') FROM betriebe_gemeinschaften bg
                     JOIN gemeinschaften g ON bg.gemeinschaft_id = g.id
                     WHERE bg.betrieb_id = b.id) as gemeinschaften_namen
@@ -178,12 +178,13 @@ def betrieb_bearbeiten(betrieb_id):
         cursor.execute(sql)
         gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
 
-        # Benutzer des Betriebs laden (für Kontaktperson-Auswahl)
+        # Benutzer des Betriebs laden (über benutzer_betriebe)
         sql = convert_sql("""
-            SELECT id, vorname, name, email
-            FROM benutzer
-            WHERE betrieb_id = ?
-            ORDER BY name, vorname
+            SELECT u.id, u.vorname, u.name, u.email
+            FROM benutzer u
+            JOIN benutzer_betriebe bb ON u.id = bb.benutzer_id
+            WHERE bb.betrieb_id = ?
+            ORDER BY u.name, u.vorname
         """)
         cursor.execute(sql, (betrieb_id,))
         benutzer = [{'id': row[0], 'vorname': row[1], 'name': row[2], 'email': row[3]} for row in cursor.fetchall()]
@@ -259,58 +260,48 @@ def betrieb_benutzer(betrieb_id):
             benutzer_id = request.form.get('benutzer_id', type=int)
 
             if action == 'add' and benutzer_id:
-                sql = convert_sql("UPDATE benutzer SET betrieb_id = ? WHERE id = ?")
-                cursor.execute(sql, (betrieb_id, benutzer_id))
+                # Benutzer über benutzer_betriebe zuordnen
+                sql = convert_sql("""
+                    INSERT INTO benutzer_betriebe (benutzer_id, betrieb_id)
+                    VALUES (?, ?)
+                    ON CONFLICT (benutzer_id, betrieb_id) DO NOTHING
+                """)
+                cursor.execute(sql, (benutzer_id, betrieb_id))
                 db.connection.commit()
                 flash('Benutzer wurde dem Betrieb zugeordnet.', 'success')
 
             elif action == 'remove' and benutzer_id:
-                # Benutzer braucht einen eigenen Betrieb
-                # Erstelle neuen Betrieb für den Benutzer
-                sql = convert_sql("SELECT vorname, name FROM benutzer WHERE id = ?")
-                cursor.execute(sql, (benutzer_id,))
-                user_row = cursor.fetchone()
-                if user_row:
-                    new_name = f"{user_row[0]} {user_row[1]}".strip() if user_row[0] else user_row[1]
-                    sql = convert_sql("""
-                        INSERT INTO betriebe (gemeinschaft_id, name, kontaktperson)
-                        VALUES (?, ?, ?)
-                        RETURNING id
-                    """)
-                    cursor.execute(sql, (betrieb['gemeinschaft_id'], new_name, new_name))
-                    new_betrieb_id = cursor.fetchone()[0]
+                # Benutzer aus benutzer_betriebe entfernen
+                sql = convert_sql("DELETE FROM benutzer_betriebe WHERE benutzer_id = ? AND betrieb_id = ?")
+                cursor.execute(sql, (benutzer_id, betrieb_id))
+                db.connection.commit()
+                flash('Benutzer wurde vom Betrieb entfernt.', 'success')
 
-                    sql = convert_sql("UPDATE benutzer SET betrieb_id = ? WHERE id = ?")
-                    cursor.execute(sql, (new_betrieb_id, benutzer_id))
-                    db.connection.commit()
-                    flash(f'Benutzer wurde entfernt und neuer Betrieb "{new_name}" erstellt.', 'success')
-
-        # Benutzer des Betriebs laden
+        # Benutzer des Betriebs laden (über benutzer_betriebe)
         sql = convert_sql("""
-            SELECT id, vorname, name, email
-            FROM benutzer
-            WHERE betrieb_id = ?
-            ORDER BY name, vorname
+            SELECT u.id, u.vorname, u.name, u.email
+            FROM benutzer u
+            JOIN benutzer_betriebe bb ON u.id = bb.benutzer_id
+            WHERE bb.betrieb_id = ?
+            ORDER BY u.name, u.vorname
         """)
         cursor.execute(sql, (betrieb_id,))
         benutzer_im_betrieb = [{'id': row[0], 'vorname': row[1], 'name': row[2], 'email': row[3]} for row in cursor.fetchall()]
 
-        # Verfügbare Benutzer (alle aktiven Benutzer, KEINE Admins, nicht im aktuellen Betrieb)
-        # Strenger Filter: Ausschluss aller Benutzer mit Admin-Rechten
+        # Verfügbare Benutzer (alle aktiven Benutzer, KEINE Admins, nicht bereits im aktuellen Betrieb)
         sql = convert_sql("""
-            SELECT DISTINCT b.id, b.vorname, b.name, b.email, bt.name as betrieb_name
-            FROM benutzer b
-            LEFT JOIN betriebe bt ON b.betrieb_id = bt.id
-            WHERE (b.betrieb_id IS NULL OR b.betrieb_id != ?)
-            AND COALESCE(b.aktiv, true) = true
-            AND COALESCE(b.nur_training, false) = false
-            AND COALESCE(b.is_admin, false) = false
-            AND COALESCE(b.admin_level, 0) = 0
-            AND b.username NOT LIKE 'S-%'
-            ORDER BY b.name, b.vorname
+            SELECT DISTINCT u.id, u.vorname, u.name, u.email
+            FROM benutzer u
+            WHERE u.id NOT IN (SELECT benutzer_id FROM benutzer_betriebe WHERE betrieb_id = ?)
+            AND COALESCE(u.aktiv, true) = true
+            AND COALESCE(u.nur_training, false) = false
+            AND COALESCE(u.is_admin, false) = false
+            AND COALESCE(u.admin_level, 0) = 0
+            AND u.username NOT LIKE 'S-%'
+            ORDER BY u.name, u.vorname
         """)
         cursor.execute(sql, (betrieb_id,))
-        verfuegbare_benutzer = [{'id': row[0], 'vorname': row[1], 'name': row[2], 'email': row[3], 'betrieb_name': row[4]} for row in cursor.fetchall()]
+        verfuegbare_benutzer = [{'id': row[0], 'vorname': row[1], 'name': row[2], 'email': row[3]} for row in cursor.fetchall()]
 
     return render_template('admin_betrieb_benutzer.html',
                          betrieb=betrieb,
@@ -327,8 +318,8 @@ def betrieb_loeschen(betrieb_id):
     with MaschinenDBContext(db_path) as db:
         cursor = db.connection.cursor()
 
-        # Prüfen ob Benutzer zugeordnet sind
-        sql = convert_sql("SELECT COUNT(*) FROM benutzer WHERE betrieb_id = ?")
+        # Prüfen ob Benutzer zugeordnet sind (über benutzer_betriebe)
+        sql = convert_sql("SELECT COUNT(*) FROM benutzer_betriebe WHERE betrieb_id = ?")
         cursor.execute(sql, (betrieb_id,))
         if cursor.fetchone()[0] > 0:
             flash('Betrieb kann nicht gelöscht werden - Benutzer zugeordnet.', 'danger')

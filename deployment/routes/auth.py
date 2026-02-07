@@ -47,13 +47,26 @@ def login():
                 else:
                     session['gemeinschafts_admin_ids'] = []
 
-                # Lade Gemeinschaften des Benutzers für das Menü
+                # Lade Betriebe des Benutzers (über benutzer_betriebe)
                 cursor = db.connection.cursor()
                 sql = convert_sql("""
-                    SELECT g.id, g.name
+                    SELECT b.id, b.name
+                    FROM betriebe b
+                    JOIN benutzer_betriebe bb ON b.id = bb.betrieb_id
+                    WHERE bb.benutzer_id = ? AND (b.aktiv = true OR b.aktiv IS NULL)
+                    ORDER BY b.name
+                """)
+                cursor.execute(sql, (benutzer['id'],))
+                betriebe = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
+                session['betriebe'] = betriebe
+
+                # Lade Gemeinschaften des Benutzers (über Betriebe -> betriebe_gemeinschaften)
+                sql = convert_sql("""
+                    SELECT DISTINCT g.id, g.name
                     FROM gemeinschaften g
-                    JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
-                    WHERE mg.mitglied_id = ? AND g.aktiv = true
+                    JOIN betriebe_gemeinschaften bg ON g.id = bg.gemeinschaft_id
+                    JOIN benutzer_betriebe bb ON bg.betrieb_id = bb.betrieb_id
+                    WHERE bb.benutzer_id = ? AND (g.aktiv = true OR g.aktiv IS NULL)
                     ORDER BY g.name
                 """)
                 cursor.execute(sql, (benutzer['id'],))
@@ -116,22 +129,38 @@ def datenbank_wechseln():
     else:
         flash('Ungültige Datenbank ausgewählt.', 'danger')
 
-    # Gemeinschaften für neue DB laden
+    # Betriebe und Gemeinschaften für neue DB laden
     db_path = get_current_db_path()
     try:
         with MaschinenDBContext(db_path) as db:
             cursor = db.connection.cursor()
+
+            # Betriebe laden
             sql = convert_sql("""
-                SELECT g.id, g.name
+                SELECT b.id, b.name
+                FROM betriebe b
+                JOIN benutzer_betriebe bb ON b.id = bb.betrieb_id
+                WHERE bb.benutzer_id = ? AND (b.aktiv = true OR b.aktiv IS NULL)
+                ORDER BY b.name
+            """)
+            cursor.execute(sql, (session['benutzer_id'],))
+            betriebe = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
+            session['betriebe'] = betriebe
+
+            # Gemeinschaften laden (über Betriebe)
+            sql = convert_sql("""
+                SELECT DISTINCT g.id, g.name
                 FROM gemeinschaften g
-                JOIN mitglied_gemeinschaft mg ON g.id = mg.gemeinschaft_id
-                WHERE mg.mitglied_id = ? AND g.aktiv = true
+                JOIN betriebe_gemeinschaften bg ON g.id = bg.gemeinschaft_id
+                JOIN benutzer_betriebe bb ON bg.betrieb_id = bb.betrieb_id
+                WHERE bb.benutzer_id = ? AND (g.aktiv = true OR g.aktiv IS NULL)
                 ORDER BY g.name
             """)
             cursor.execute(sql, (session['benutzer_id'],))
             gemeinschaften = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
             session['gemeinschaften'] = gemeinschaften
     except:
+        session['betriebe'] = []
         session['gemeinschaften'] = []
 
     return redirect(url_for('dashboard.dashboard'))

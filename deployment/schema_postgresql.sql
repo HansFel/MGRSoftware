@@ -17,10 +17,40 @@ CREATE TABLE IF NOT EXISTS benutzer (
     mitglied_seit DATE,
     aktiv BOOLEAN DEFAULT TRUE,
     bemerkungen TEXT,
-    treibstoffkosten_preis REAL DEFAULT 1.50,
-    backup_schwellwert REAL DEFAULT 10.0,
     nur_training BOOLEAN DEFAULT FALSE
 );
+
+-- Tabelle für Betriebe
+CREATE TABLE IF NOT EXISTS betriebe (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    adresse TEXT,
+    ort TEXT,
+    telefon TEXT,
+    email TEXT,
+    iban TEXT,
+    bic TEXT,
+    bank_name TEXT,
+    kontaktperson TEXT,
+    treibstoffkosten_preis REAL DEFAULT 1.50,
+    notizen TEXT,
+    aktiv BOOLEAN DEFAULT TRUE,
+    erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Verknüpfungstabelle: Benutzer <-> Betriebe (N:M)
+CREATE TABLE IF NOT EXISTS benutzer_betriebe (
+    id SERIAL PRIMARY KEY,
+    benutzer_id INTEGER NOT NULL REFERENCES benutzer(id) ON DELETE CASCADE,
+    betrieb_id INTEGER NOT NULL REFERENCES betriebe(id) ON DELETE CASCADE,
+    rolle TEXT DEFAULT 'mitglied',
+    ist_kontaktperson BOOLEAN DEFAULT FALSE,
+    zugeordnet_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(benutzer_id, betrieb_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_benutzer_betriebe_benutzer ON benutzer_betriebe(benutzer_id);
+CREATE INDEX IF NOT EXISTS idx_benutzer_betriebe_betrieb ON benutzer_betriebe(betrieb_id);
 
 -- Tabelle für Gemeinschaften (muss vor maschinen erstellt werden wegen FK)
 CREATE TABLE IF NOT EXISTS gemeinschaften (
@@ -175,11 +205,14 @@ CREATE INDEX IF NOT EXISTS idx_mitglied_gemeinschaft_gemeinschaft ON mitglied_ge
 -- Betriebe-Gemeinschaften Verknüpfung
 CREATE TABLE IF NOT EXISTS betriebe_gemeinschaften (
     id SERIAL PRIMARY KEY,
-    betrieb_id INTEGER NOT NULL,
-    gemeinschaft_id INTEGER NOT NULL,
+    betrieb_id INTEGER NOT NULL REFERENCES betriebe(id) ON DELETE CASCADE,
+    gemeinschaft_id INTEGER NOT NULL REFERENCES gemeinschaften(id) ON DELETE CASCADE,
     beigetreten_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(betrieb_id, gemeinschaft_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_betriebe_gemeinschaften_betrieb ON betriebe_gemeinschaften(betrieb_id);
+CREATE INDEX IF NOT EXISTS idx_betriebe_gemeinschaften_gemeinschaft ON betriebe_gemeinschaften(gemeinschaft_id);
 
 -- View für Gemeinschafts-Übersicht
 CREATE OR REPLACE VIEW gemeinschaften_uebersicht AS

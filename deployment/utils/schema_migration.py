@@ -39,7 +39,7 @@ REQUIRED_COLUMNS = [
     # benutzer
     ("benutzer", "letzter_treibstoffpreis", "REAL", "REAL", None),
     ("benutzer", "aktiv", "BOOLEAN", "BOOLEAN", "TRUE"),
-    ("benutzer", "betrieb_id", "INTEGER", "INTEGER", None),
+    # betrieb_id entfernt - Zuordnung über benutzer_betriebe Tabelle
 
     # mitglieder_abrechnungen
     ("mitglieder_abrechnungen", "gemeinschaft_id", "INTEGER", "INTEGER", None),
@@ -362,33 +362,58 @@ REQUIRED_TABLES = [
         "betriebe",
         """CREATE TABLE IF NOT EXISTS betriebe (
             id SERIAL PRIMARY KEY,
-            gemeinschaft_id INTEGER NOT NULL,
             name TEXT NOT NULL,
             adresse TEXT,
+            ort TEXT,
             kontaktperson TEXT,
             telefon TEXT,
             email TEXT,
             iban TEXT,
             bic TEXT,
             bank_name TEXT,
+            treibstoffkosten_preis REAL DEFAULT 1.50,
             notizen TEXT,
             aktiv BOOLEAN DEFAULT TRUE,
             erstellt_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""",
         """CREATE TABLE IF NOT EXISTS betriebe (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            gemeinschaft_id INTEGER NOT NULL,
             name TEXT NOT NULL,
             adresse TEXT,
+            ort TEXT,
             kontaktperson TEXT,
             telefon TEXT,
             email TEXT,
             iban TEXT,
             bic TEXT,
             bank_name TEXT,
+            treibstoffkosten_preis REAL DEFAULT 1.50,
             notizen TEXT,
             aktiv BOOLEAN DEFAULT 1,
             erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP
+        )"""
+    ),
+    (
+        "benutzer_betriebe",
+        """CREATE TABLE IF NOT EXISTS benutzer_betriebe (
+            id SERIAL PRIMARY KEY,
+            benutzer_id INTEGER NOT NULL REFERENCES benutzer(id) ON DELETE CASCADE,
+            betrieb_id INTEGER NOT NULL REFERENCES betriebe(id) ON DELETE CASCADE,
+            rolle TEXT DEFAULT 'mitglied',
+            ist_kontaktperson BOOLEAN DEFAULT FALSE,
+            zugeordnet_am TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(benutzer_id, betrieb_id)
+        )""",
+        """CREATE TABLE IF NOT EXISTS benutzer_betriebe (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            benutzer_id INTEGER NOT NULL,
+            betrieb_id INTEGER NOT NULL,
+            rolle TEXT DEFAULT 'mitglied',
+            ist_kontaktperson INTEGER DEFAULT 0,
+            zugeordnet_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(benutzer_id, betrieb_id),
+            FOREIGN KEY (benutzer_id) REFERENCES benutzer(id) ON DELETE CASCADE,
+            FOREIGN KEY (betrieb_id) REFERENCES betriebe(id) ON DELETE CASCADE
         )"""
     ),
     (
@@ -552,26 +577,25 @@ def create_table(cursor, table: str, create_sql: str):
 
 
 def migrate_konten_to_betriebe(cursor):
-    """Aktualisiert mitglieder_konten mit betrieb_id basierend auf benutzer_id"""
+    """Aktualisiert mitglieder_konten mit betrieb_id basierend auf benutzer_betriebe"""
     print("  Prüfe Mitgliederkonten ohne Betrieb-Zuordnung...")
 
     if USING_POSTGRESQL:
         cursor.execute("""
             UPDATE mitglieder_konten mk
-            SET betrieb_id = b.betrieb_id
-            FROM benutzer b
-            WHERE mk.benutzer_id = b.id
+            SET betrieb_id = bb.betrieb_id
+            FROM benutzer_betriebe bb
+            WHERE mk.benutzer_id = bb.benutzer_id
             AND mk.betrieb_id IS NULL
-            AND b.betrieb_id IS NOT NULL
         """)
     else:
         cursor.execute("""
             UPDATE mitglieder_konten
             SET betrieb_id = (
-                SELECT betrieb_id FROM benutzer WHERE benutzer.id = mitglieder_konten.benutzer_id
+                SELECT betrieb_id FROM benutzer_betriebe WHERE benutzer_betriebe.benutzer_id = mitglieder_konten.benutzer_id LIMIT 1
             )
             WHERE betrieb_id IS NULL
-            AND EXISTS (SELECT 1 FROM benutzer WHERE benutzer.id = mitglieder_konten.benutzer_id AND benutzer.betrieb_id IS NOT NULL)
+            AND EXISTS (SELECT 1 FROM benutzer_betriebe WHERE benutzer_betriebe.benutzer_id = mitglieder_konten.benutzer_id)
         """)
 
     updated = cursor.rowcount
@@ -581,26 +605,25 @@ def migrate_konten_to_betriebe(cursor):
 
 
 def migrate_abrechnungen_to_betriebe(cursor):
-    """Aktualisiert mitglieder_abrechnungen mit betrieb_id basierend auf benutzer_id"""
+    """Aktualisiert mitglieder_abrechnungen mit betrieb_id basierend auf benutzer_betriebe"""
     print("  Prüfe Abrechnungen ohne Betrieb-Zuordnung...")
 
     if USING_POSTGRESQL:
         cursor.execute("""
             UPDATE mitglieder_abrechnungen ma
-            SET betrieb_id = b.betrieb_id
-            FROM benutzer b
-            WHERE ma.benutzer_id = b.id
+            SET betrieb_id = bb.betrieb_id
+            FROM benutzer_betriebe bb
+            WHERE ma.benutzer_id = bb.benutzer_id
             AND ma.betrieb_id IS NULL
-            AND b.betrieb_id IS NOT NULL
         """)
     else:
         cursor.execute("""
             UPDATE mitglieder_abrechnungen
             SET betrieb_id = (
-                SELECT betrieb_id FROM benutzer WHERE benutzer.id = mitglieder_abrechnungen.benutzer_id
+                SELECT betrieb_id FROM benutzer_betriebe WHERE benutzer_betriebe.benutzer_id = mitglieder_abrechnungen.benutzer_id LIMIT 1
             )
             WHERE betrieb_id IS NULL
-            AND EXISTS (SELECT 1 FROM benutzer WHERE benutzer.id = mitglieder_abrechnungen.benutzer_id AND benutzer.betrieb_id IS NOT NULL)
+            AND EXISTS (SELECT 1 FROM benutzer_betriebe WHERE benutzer_betriebe.benutzer_id = mitglieder_abrechnungen.benutzer_id)
         """)
 
     updated = cursor.rowcount
@@ -610,26 +633,25 @@ def migrate_abrechnungen_to_betriebe(cursor):
 
 
 def migrate_buchungen_to_betriebe(cursor):
-    """Aktualisiert buchungen mit betrieb_id basierend auf benutzer_id"""
+    """Aktualisiert buchungen mit betrieb_id basierend auf benutzer_betriebe"""
     print("  Prüfe Buchungen ohne Betrieb-Zuordnung...")
 
     if USING_POSTGRESQL:
         cursor.execute("""
             UPDATE buchungen bu
-            SET betrieb_id = b.betrieb_id
-            FROM benutzer b
-            WHERE bu.benutzer_id = b.id
+            SET betrieb_id = bb.betrieb_id
+            FROM benutzer_betriebe bb
+            WHERE bu.benutzer_id = bb.benutzer_id
             AND bu.betrieb_id IS NULL
-            AND b.betrieb_id IS NOT NULL
         """)
     else:
         cursor.execute("""
             UPDATE buchungen
             SET betrieb_id = (
-                SELECT betrieb_id FROM benutzer WHERE benutzer.id = buchungen.benutzer_id
+                SELECT betrieb_id FROM benutzer_betriebe WHERE benutzer_betriebe.benutzer_id = buchungen.benutzer_id LIMIT 1
             )
             WHERE betrieb_id IS NULL
-            AND EXISTS (SELECT 1 FROM benutzer WHERE benutzer.id = buchungen.benutzer_id AND benutzer.betrieb_id IS NOT NULL)
+            AND EXISTS (SELECT 1 FROM benutzer_betriebe WHERE benutzer_betriebe.benutzer_id = buchungen.benutzer_id)
         """)
 
     updated = cursor.rowcount
@@ -639,32 +661,30 @@ def migrate_buchungen_to_betriebe(cursor):
 
 
 def migrate_benutzer_gemeinschaften(cursor):
-    """Füllt benutzer_gemeinschaften basierend auf Betrieb-Zuordnungen"""
+    """Füllt benutzer_gemeinschaften basierend auf benutzer_betriebe und betriebe_gemeinschaften"""
     print("  Prüfe Benutzer-Gemeinschaft-Zuordnungen...")
 
     if USING_POSTGRESQL:
-        # Füge fehlende Zuordnungen hinzu basierend auf Betrieb
+        # Füge fehlende Zuordnungen hinzu basierend auf Betrieb -> Gemeinschaft
         cursor.execute("""
             INSERT INTO benutzer_gemeinschaften (benutzer_id, gemeinschaft_id)
-            SELECT DISTINCT b.id, bt.gemeinschaft_id
-            FROM benutzer b
-            JOIN betriebe bt ON b.betrieb_id = bt.id
-            WHERE bt.gemeinschaft_id IS NOT NULL
-            AND NOT EXISTS (
-                SELECT 1 FROM benutzer_gemeinschaften bg
-                WHERE bg.benutzer_id = b.id AND bg.gemeinschaft_id = bt.gemeinschaft_id
+            SELECT DISTINCT bb.benutzer_id, bg.gemeinschaft_id
+            FROM benutzer_betriebe bb
+            JOIN betriebe_gemeinschaften bg ON bb.betrieb_id = bg.betrieb_id
+            WHERE NOT EXISTS (
+                SELECT 1 FROM benutzer_gemeinschaften beg
+                WHERE beg.benutzer_id = bb.benutzer_id AND beg.gemeinschaft_id = bg.gemeinschaft_id
             )
         """)
     else:
         cursor.execute("""
             INSERT INTO benutzer_gemeinschaften (benutzer_id, gemeinschaft_id)
-            SELECT DISTINCT b.id, bt.gemeinschaft_id
-            FROM benutzer b
-            JOIN betriebe bt ON b.betrieb_id = bt.id
-            WHERE bt.gemeinschaft_id IS NOT NULL
-            AND NOT EXISTS (
-                SELECT 1 FROM benutzer_gemeinschaften bg
-                WHERE bg.benutzer_id = b.id AND bg.gemeinschaft_id = bt.gemeinschaft_id
+            SELECT DISTINCT bb.benutzer_id, bg.gemeinschaft_id
+            FROM benutzer_betriebe bb
+            JOIN betriebe_gemeinschaften bg ON bb.betrieb_id = bg.betrieb_id
+            WHERE NOT EXISTS (
+                SELECT 1 FROM benutzer_gemeinschaften beg
+                WHERE beg.benutzer_id = bb.benutzer_id AND beg.gemeinschaft_id = bg.gemeinschaft_id
             )
         """)
 
