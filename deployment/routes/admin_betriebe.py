@@ -297,7 +297,7 @@ def betrieb_benutzer(betrieb_id):
             AND COALESCE(u.nur_training, false) = false
             AND COALESCE(u.is_admin, false) = false
             AND COALESCE(u.admin_level, 0) = 0
-            AND u.username NOT LIKE 'S-%'
+            AND u.username NOT LIKE 'S-%%'
             ORDER BY u.name, u.vorname
         """)
         cursor.execute(sql, (betrieb_id,))
